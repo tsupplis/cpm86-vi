@@ -231,8 +231,6 @@ int n;
 	return(1);
 }
 
-#define NULL 0
-
 delchar()
 {
 	char *p;

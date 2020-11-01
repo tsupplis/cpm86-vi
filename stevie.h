@@ -10,7 +10,6 @@
 /*#define UNIXPC	1	/* The AT&T UNIX PC (console) */
 #define TCAP		1	/* For termcap-based terminals */
 
-#define NULL 0
 #define FILELENG 16000
 #define NORMAL 0
 #define CMDLINE 1
@@ -18,14 +17,11 @@
 #define APPEND 3
 #define FORWARD 4
 #define BACKWARD 5
+#define NORMAL_ESCAPE 6
 #define WORDSEP " \t\n()[]{},;:'\"-="
 
 #define CHANGED Changed=1
 #define UNCHANGED Changed=0
-
-#ifndef NULL
-#define NULL 0
-#endif
 
 struct charinfo {
 	char ch_size;

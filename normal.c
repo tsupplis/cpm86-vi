@@ -2,8 +2,9 @@
  * STevie - ST editor for VI enthusiasts.    ...Tim Thompson...twitch!tjt...
  */
 
-#include "ctype.h"
+#include <ctype.h>
 #include "stevie.h"
+#include <stdio.h>
 
 /*
  * normal
