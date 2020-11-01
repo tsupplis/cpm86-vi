@@ -97,6 +97,11 @@ int firstc;	/* either ':', '/', or '?' */
 			writeit(arg);
 		return;
 	}
+	if ( strcmp(cmd,"x")==0 ) {
+		if ( writeit(Filename) )
+			getout();
+		return;
+	}
 	if ( strcmp(cmd,"wq")==0 ) {
 		if ( writeit(Filename) )
 			getout();
