@@ -24,118 +24,145 @@ edit()
 		message("");
 
 	for ( ;; ) {
-	/* Figure out where the cursor is based on Curschar. */
-	cursupdate();
-	if ( State == INSERT )
-		message("Insert Mode");
-	/* printf("Curschar=(%d,%d) row/col=(%d,%d)",
-		Curschar,*Curschar,Cursrow,Curscol); */
-	windgoto(Cursrow,Curscol);
-	windrefresh();
-	c = vgetc();
-	switch(State) {
-	case NORMAL:
-		/* We're in the normal (non-insert) mode. */
+        /* Figure out where the cursor is based on Curschar. */
+        cursupdate();
+        if ( State == INSERT )
+            message("Insert Mode");
+        /* printf("Curschar=(%d,%d) row/col=(%d,%d)",
+            Curschar,*Curschar,Cursrow,Curscol); */
+        windgoto(Cursrow,Curscol);
+        windrefresh();
+        c = vgetc();
+        switch(State) {
+        case NORMAL:
+            /* We're in the normal (non-insert) mode. */
+            if(c==27) {
+                State=NORMAL_ESCAPE;
+                break;
+            }
 
-		/* Pick up any leading digits and compute 'Prenum' */
-		if ( (Prenum>0 && isdigit(c)) || (isdigit(c) && c!='0') ){
-			Prenum = Prenum*10 + (c-'0');
-			break;
-		}
-		/* execute the command */
-		normal(c);
-		Prenum = 0;
-		break;
-	case INSERT:
-		/* We're in insert mode. */
-		switch(c){
-		case '\033':	/* an ESCape ends input mode */
+            /* Pick up any leading digits and compute 'Prenum' */
+            if ( (Prenum>0 && isdigit(c)) || (isdigit(c) && c!='0') ){
+                Prenum = Prenum*10 + (c-'0');
+                break;
+            }
+            /* execute the command */
+            normal(c);
+            Prenum = 0;
+            break;
+        case NORMAL_ESCAPE:
+            {
+                int d=0;
+                switch(c) {
+                    case 'A':
+                        d='j';   
+                    case 'B':
+                        d='k';   
+                        break;
+                    case 'C':
+                        d='l';   
+                        break;
+                    case 'D':
+                        d='h';   
+                        break;
+                }
+                State=NORMAL;
+                Prenum = 0;
+                if(d) {
+                    normal(d);    
+                }
+            }
+            break;
+        case INSERT:
+            /* We're in insert mode. */
+            switch(c){
+            case '\033':	/* an ESCape ends input mode */
 
-			/* If we're past the end of the file, (which should */
-			/* only happen when we're editing a new file or a */
-			/* file that doesn't have a newline at the end of */
-			/* the line), add a newline automatically. */
-			if ( Curschar >= Fileend ) {
-				insertchar('\n');
-				Curschar--;
-			}
+                /* If we're past the end of the file, (which should */
+                /* only happen when we're editing a new file or a */
+                /* file that doesn't have a newline at the end of */
+                /* the line), add a newline automatically. */
+                if ( Curschar >= Fileend ) {
+                    insertchar('\n');
+                    Curschar--;
+                }
 
-			/* Don't end up on a '\n' if you can help it. */
-			if ( Curschar>Filemem && *Curschar=='\n'
-				&& *(Curschar-1)!='\n' ) {
-				Curschar--;
-			}
-			State = NORMAL;
-			message("");
-			Uncurschar = Insstart;
-			Undelchars = Ninsert;
-			/* Undobuff[0] = '\0'; */
-			/* construct the Redo buffer */
-			p=Redobuff;
-			q=Insbuff;
-			while ( q<Insptr )
-				*p++ = *q++;
-			*p++ = '\033';
-			*p = '\0';
-			updatescreen();
-			break;
-		case '\b':
-			if ( Curschar <= Insstart )
-				beep();
-			else {
-				int wasnewline = 0;
-				if ( *Curschar == '\n' )
-					wasnewline=1;
-				Curschar--;
-				delchar();
-				Insptr--;
-				Ninsert--;
-				if ( wasnewline )
-					Curschar++;
-				cursupdate();
-				updatescreen();
-			}
-			break;
-		case '\030':	/* control-x */ 
-			{ int wasnewline = 0; char *p1;
-			p1 = Curschar;
-			if ( *Curschar == '\n' )
-				wasnewline = 1;
-			inschar('[');
-			inschar('x');
-			cursupdate();
-			updatescreen();
-			c1 = gethexchar();
-			inschar(c1);
-			cursupdate();
-			updatescreen();
-			c2 = gethexchar();
-			Curschar = p1;
-			delchar();
-			delchar();
-			delchar();
-			c = 16*hextoint(c1)+hextoint(c2);
-			if(Debug)printf("(c=%d)",c);
-			if ( wasnewline )
-				Curschar++;
-			inschar(c);
-			Ninsert++;
-			*Insptr++ = c;
-			updatescreen();
-			break;
-			}
-		case '\017':
-			break;
-		case 0x0A:	/* <CR> */
-			insertchar(0x0A);
-			c = 0x0D;
-			/* This is SUPPOSED to fall down into 'default' */
-		default:
-			insertchar(c);
-			break;
-		}
-		break;
-	}
+                /* Don't end up on a '\n' if you can help it. */
+                if ( Curschar>Filemem && *Curschar=='\n'
+                    && *(Curschar-1)!='\n' ) {
+                    Curschar--;
+                }
+                State = NORMAL;
+                message("");
+                Uncurschar = Insstart;
+                Undelchars = Ninsert;
+                /* Undobuff[0] = '\0'; */
+                /* construct the Redo buffer */
+                p=Redobuff;
+                q=Insbuff;
+                while ( q<Insptr )
+                    *p++ = *q++;
+                *p++ = '\033';
+                *p = '\0';
+                updatescreen();
+                break;
+            case '\b':
+                if ( Curschar <= Insstart )
+                    beep();
+                else {
+                    int wasnewline = 0;
+                    if ( *Curschar == '\n' )
+                        wasnewline=1;
+                    Curschar--;
+                    delchar();
+                    Insptr--;
+                    Ninsert--;
+                    if ( wasnewline )
+                        Curschar++;
+                    cursupdate();
+                    updatescreen();
+                }
+                break;
+            case '\030':	/* control-x */ 
+                { int wasnewline = 0; char *p1;
+                p1 = Curschar;
+                if ( *Curschar == '\n' )
+                    wasnewline = 1;
+                inschar('[');
+                inschar('x');
+                cursupdate();
+                updatescreen();
+                c1 = gethexchar();
+                inschar(c1);
+                cursupdate();
+                updatescreen();
+                c2 = gethexchar();
+                Curschar = p1;
+                delchar();
+                delchar();
+                delchar();
+                c = 16*hextoint(c1)+hextoint(c2);
+                if(Debug)printf("(c=%d)",c);
+                if ( wasnewline )
+                    Curschar++;
+                inschar(c);
+                Ninsert++;
+                *Insptr++ = c;
+                updatescreen();
+                break;
+                }
+            case '\017':
+                break;
+            case 0x0A:	/* <CR> */
+                insertchar(0x0A);
+                c = 0x0D;
+                /* This is SUPPOSED to fall down into 'default' */
+            default:
+                insertchar(c);
+                break;
+            }
+            break;
+        }
 	}
 }
 

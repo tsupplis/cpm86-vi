@@ -10,7 +10,7 @@ windinit()
 {
 	/* Initialise tty */
 	struct sgttyb stty;
-	stty.sg_flags = CBREAK | CRMOD;
+	stty.sg_flags = CBREAK|CRMOD;
 	ioctl(0, TIOCSETP, &stty);
 
 	Columns=80;
@@ -23,11 +23,11 @@ windgoto(r,c)
 int r,c;
 {
 	/* Locate cursor */
-	/* Phillips P2000 */
-	/*printf("\033Y%c%c",r+0x20,c+0x20);*/
+	/* CP/M-86 VT-52 */
+	printf("\033Y%c%c",r+0x20,c+0x20);
 
 	/* ANSI */
-	printf("\033[%d;%dH",r,c);
+	/*printf("\033[%d;%dH",r,c);*/
 }
 
 windexit(r)
@@ -39,11 +39,11 @@ int r;
 windclear()
 {
 	/* Clear the screen */
-	/* Phillips P2000 */
-	/*printf("\014");*/
+	/* CP/M-86 VT-52 */
+	printf("\033E");
 
 	/* ANSI */
-	printf("\033[2J");
+	/*printf("\033[2J");*/
 }
 
 windgetc()
