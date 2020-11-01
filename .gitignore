@@ -1,5 +1,6 @@
 *.lha
 .D*
+*.o
 *.log
 *.cfg
 *.cmd
