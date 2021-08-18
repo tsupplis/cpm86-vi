@@ -151,12 +151,14 @@ edit()
                 updatescreen();
                 break;
                 }
-            case '\017':
+            case 0x0F:	
                 break;
+            case 0x0D:	/* <CR> */
             case 0x0A:	/* <CR> */
                 insertchar(0x0A);
                 c = 0x0D;
                 /* This is SUPPOSED to fall down into 'default' */
+                break;
             default:
                 insertchar(c);
                 break;

@@ -6,12 +6,30 @@
 #include "stdio.h"
 #include "sgtty.h"
 
+#ifdef __CPM86__
+getch()
+{
+    int i,c,d;
+    static int s=0;
+
+    if(s>0) {
+        c=s;s=0;
+        return c;
+    }
+    while(!(c=bdos(6,255)));
+    while(d=bdos(6,255));
+    return c;
+}
+#endif
+
 windinit()
 {
+#ifndef __CPM86__
 	/* Initialise tty */
 	struct sgttyb stty;
 	stty.sg_flags = CBREAK|CRMOD;
 	ioctl(0, TIOCSETP, &stty);
+#endif
 
 	Columns=80;
 	Rows=24;
@@ -24,10 +42,12 @@ int r,c;
 {
 	/* Locate cursor */
 	/* CP/M-86 VT-52 */
+#ifdef __VT52__
 	printf("\033Y%c%c",r+0x20,c+0x20);
-
+#else 
 	/* ANSI */
-	/*printf("\033[%d;%dH",r,c);*/
+	printf("\033[%d;%dH",r,c);
+#endif
 }
 
 windexit(r)
@@ -38,17 +58,23 @@ int r;
 
 windclear()
 {
+#ifdef __VT52__
 	/* Clear the screen */
 	/* CP/M-86 VT-52 */
 	printf("\033E");
-
+#else
 	/* ANSI */
-	/*printf("\033[2J");*/
+	printf("\033[2J\033[H");
+#endif
 }
 
 windgetc()
 {
+#ifdef __CPM86__
+	return(getch());
+#else
 	return(getchar());
+#endif
 }
 
 windstr(s)
