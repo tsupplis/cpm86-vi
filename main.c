@@ -97,7 +97,7 @@ char **argv;
 	}
 
 	if ( argc <= 1 ) {
-		fprintf(stderr,"usage: stevie {file}\n");
+		fprintf(stderr,"Usage: vi [-xodb] [user/][drive:]file\n");
 		exit(1);
 	}
 
