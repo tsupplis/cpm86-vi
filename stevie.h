@@ -18,6 +18,7 @@
 #define FORWARD 4
 #define BACKWARD 5
 #define NORMAL_ESCAPE 6
+#define BRACKET_ESCAPE 7
 #define WORDSEP " \t\n()[]{},;:'\"-="
 
 #define CHANGED Changed=1

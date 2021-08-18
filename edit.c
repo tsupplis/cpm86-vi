@@ -37,7 +37,10 @@ edit()
         case NORMAL:
             /* We're in the normal (non-insert) mode. */
             if(c==27) {
+                State=BRACKET_ESCAPE;
+#ifdef __VT52__
                 State=NORMAL_ESCAPE;
+#endif
                 break;
             }
 
@@ -50,14 +53,24 @@ edit()
             normal(c);
             Prenum = 0;
             break;
+        case BRACKET_ESCAPE:
+            {
+                if(c=='[') 
+                    State=NORMAL_ESCAPE;
+                else
+                    State=NORMAL;
+                Prenum=0;
+            }
+            break;
         case NORMAL_ESCAPE:
             {
                 int d=0;
                 switch(c) {
                     case 'A':
-                        d='j';   
-                    case 'B':
                         d='k';   
+                        break;
+                    case 'B':
+                        d='j';   
                         break;
                     case 'C':
                         d='l';   
@@ -65,6 +78,7 @@ edit()
                     case 'D':
                         d='h';   
                         break;
+
                 }
                 State=NORMAL;
                 Prenum = 0;

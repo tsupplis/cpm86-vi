@@ -6,30 +6,30 @@
 #include "stdio.h"
 #include "sgtty.h"
 
-#ifdef __CPM86__
+static char buffer[64];
+
 getch()
 {
     int i,c,d;
     static int s=0;
 
     if(s>0) {
-        c=s;s=0;
+        c=buffer[s-1];s--;
         return c;
     }
-    while(!(c=bdos(6,255)));
-    while(d=bdos(6,255));
+    while(!(c=bdos(6,255))) 
+        continue;
+    while(s<64 && (d=bdos(6,255)))
+        buffer[s++]=d;
     return c;
 }
-#endif
+
 
 windinit()
 {
-#ifndef __CPM86__
-	/* Initialise tty */
 	struct sgttyb stty;
-	stty.sg_flags = CBREAK|CRMOD;
+	stty.sg_flags = CBREAK;
 	ioctl(0, TIOCSETP, &stty);
-#endif
 
 	Columns=80;
 	Rows=24;
@@ -70,11 +70,7 @@ windclear()
 
 windgetc()
 {
-#ifdef __CPM86__
 	return(getch());
-#else
-	return(getchar());
-#endif
 }
 
 windstr(s)
