@@ -165,6 +165,12 @@ edit()
                 updatescreen();
                 break;
                 }
+            case 0x09:
+                insertchar(' ');
+                insertchar(' ');
+                insertchar(' ');
+                insertchar(' ');
+                break;
             case 0x0F:	
                 break;
             case 0x0D:	/* <CR> */
