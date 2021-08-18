@@ -8,6 +8,7 @@ Work in progress ....
 - Working on IBM-PC CP/M-86 with VT-100 settings 
 
 ## To Do's
+- Refresh problems on scrolling and redrawing lines
 - Ctrl-X does not seem to work
 - Map Page-Up and Page-Down
 - More test
