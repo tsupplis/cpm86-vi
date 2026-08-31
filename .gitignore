@@ -5,6 +5,7 @@ cpm86
 *.log
 *.cfg
 *.cmd
+*.exe
 .*.swp
 *.obj
 *.img
