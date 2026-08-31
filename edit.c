@@ -150,15 +150,16 @@ edit()
                 if ( Curschar <= Insstart )
                     beep();
                 else {
-                    int wasnewline = 0;
-                    if ( *Curschar == '\n' )
-                        wasnewline=1;
+                    char *target;
                     Curschar--;
+                    target = Curschar;
                     delchar();
+                    /* delchar() may back Curschar up further to avoid */
+                    /* landing on a trailing newline (for Normal mode); */
+                    /* Insert mode always wants it exactly at 'target'. */
+                    Curschar = target;
                     Insptr--;
                     Ninsert--;
-                    if ( wasnewline )
-                        Curschar++;
                     cursupdate();
                     updatescreen();
                 }
