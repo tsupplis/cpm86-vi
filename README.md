@@ -7,12 +7,28 @@ A port of **STevie** (ST Editor for VI Enthusiasts, by Tim Thompson) to
 
 ---
 
+## Why vi on CP/M-86?
+
+CP/M-86 ships with `ed` — a line-oriented editor inherited from Unix.
+While powerful for scripting, `ed` is notoriously difficult to use
+interactively: you work blind, with no visible context of the file, no
+cursor, and a command syntax that takes time to learn.
+
+There is no lightweight **screen-mode** editor for CP/M-86.
+Most available options are either proprietary, CP/M-80 only, or require
+a specific hardware terminal or heavier. This port of STevie fills that gap:
+a familiar, full-screen vi experience that runs on standard IBM-PC
+CP/M-86 hardware with nothing more than a VT-52 or VT-100 compatible
+terminal emulator.
+
+---
+
 ## Background
 
 STevie was originally written by Tim Thompson for the Atari 520 ST and later
 ported to various CP/M-80 machines. This version targets **CP/M-86** on
- IBM-PC hardware. The terminal type is selected at compile time — only
-`window.c` differs between builds; all other objects are shared.
+IBM-PC hardware. The terminal type is selected at compile time — only
+`window.c` and `edit.c` differ between builds; all other objects are shared.
 
 ---
 
