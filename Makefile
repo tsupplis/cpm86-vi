@@ -86,10 +86,19 @@ cpmtest.img: vivt52.cmd vivt100.cmd
 	cpmls -F -f ibmpc-514ss cpmtest.img 0:*.*
 
 # --------------------------------------------------------------------
+# Binary zip
+# --------------------------------------------------------------------
+dist: vi-bin.zip
+
+vi-bin.zip: vivt52.cmd vivt100.cmd
+	rm -f vi-bin.zip
+	zip vi-bin.zip vivt52.cmd vivt100.cmd
+
+# --------------------------------------------------------------------
 # Utility
 # --------------------------------------------------------------------
 clean:
-	$(RM) *.o vivt52.cmd vivt100.cmd
+	$(RM) *.o vivt52.cmd vivt100.cmd vi-bin.zip
 
 test: cpmtest.img
 	./cpm86
