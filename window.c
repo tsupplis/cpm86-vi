@@ -6,21 +6,28 @@
 #include "stdio.h"
 #include "sgtty.h"
 
-static char buffer[64];
+#define GETCH_BUFLEN 64
+static char getch_buffer[GETCH_BUFLEN];
 
 getch()
 {
     int i,c,d;
     static int s=0;
+    static int o=0;
 
     if(s>0) {
-        c=buffer[s-1];s--;
+        c=getch_buffer[o];s--;o++;
+        o=o%GETCH_BUFLEN;
         return c;
     }
     while(!(c=bdos(6,255))) 
         continue;
-    while(s<64 && (d=bdos(6,255)))
-        buffer[s++]=d;
+    while(s<GETCH_BUFLEN && (d=bdos(6,255))) {
+        if(1) { 
+            getch_buffer[(o+s)%GETCH_BUFLEN]=d;
+            s++;
+        }
+    }
     return c;
 }
 
@@ -28,7 +35,7 @@ getch()
 windinit()
 {
 	struct sgttyb stty;
-	stty.sg_flags = CBREAK;
+	stty.sg_flags = CRMOD|CBREAK;
 	ioctl(0, TIOCSETP, &stty);
 
 	Columns=80;
@@ -45,8 +52,8 @@ int r,c;
 #ifdef __VT52__
 	printf("\033Y%c%c",r+0x20,c+0x20);
 #else 
-	/* ANSI */
-	printf("\033[%d;%dH",r,c);
+	/* ANSI (1-based row/col, r and c here are 0-based) */
+	printf("\033[%d;%dH",r+1,c+1);
 #endif
 }
 
@@ -54,6 +61,16 @@ windexit(r)
 int r;
 {
 	exit(r);
+}
+
+windclreol() 
+{
+#ifdef __VT52__
+	printf("\033I");
+#else 
+	/* ANSI */
+	printf("\033[K");
+#endif
 }
 
 windclear()

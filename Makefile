@@ -1,8 +1,8 @@
-CC=aztec_cc
+CC=aztec42_cc
 CFLAGS=-D__CPM86__ -D__VT52__
-STRIP=aztec_sqz
+STRIP=aztec42_sqz
 LDFLAGS=-lc86
-LD=aztec_link
+LD=aztec42_link
 BINEXT=.cmd
 
 TOOLS=vi$(BINEXT) getch$(BINEXT)
@@ -24,7 +24,9 @@ vi$(BINEXT): $(OBJECTS)
 
 cpmtest.img: $(TOOLS)
 	cpmrm -f ibmpc-514ss cpmtest.img 0:*.cmd
+	cpmrm -f ibmpc-514ss cpmtest.img 0:test.txt
 	cpmcp -f ibmpc-514ss cpmtest.img vi.cmd 0:
+	cpmcp -f ibmpc-514ss cpmtest.img test.txt 0:
 	cpmcp -f ibmpc-514ss cpmtest.img getch.cmd 0:
 	cpmls -F -f ibmpc-514ss cpmtest.img 0:*.*
 

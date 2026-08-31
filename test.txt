@@ -43,22 +43,24 @@ edit()
 #endif
                 break;
             }
-            donormal(c);
-            break;
-        case BRACKET_ESCAPE:
-            /* A lone ESC (not followed by '[') is just the usual */
-            /* harmless "make sure we're in Normal mode" keystroke; */
-            /* the character that follows must still be executed. */
-            if(c=='[') {
-                State=NORMAL_ESCAPE;
-                Prenum=0;
+
+            /* Pick up any leading digits and compute 'Prenum' */
+            if ( (Prenum>0 && isdigit(c)) || (isdigit(c) && c!='0') ){
+                Prenum = Prenum*10 + (c-'0');
                 break;
             }
-            State=NORMAL;
-            if ( c==27 )
-                State=BRACKET_ESCAPE;
-            else
-                donormal(c);
+            /* execute the command */
+            normal(c);
+            Prenum = 0;
+            break;
+        case BRACKET_ESCAPE:
+            {
+                if(c=='[') 
+                    State=NORMAL_ESCAPE;
+                else
+                    State=NORMAL;
+                Prenum=0;
+            }
             break;
         case NORMAL_ESCAPE:
             {
@@ -79,21 +81,10 @@ edit()
 
                 }
                 State=NORMAL;
+                Prenum = 0;
                 if(d) {
-                    Prenum=0;
                     normal(d);    
                 }
-                /* Same as above: don't drop a keystroke that turns */
-                /* out not to be part of an escape sequence. */
-                else if ( c==27 ) {
-#ifdef __VT52__
-                    State=NORMAL_ESCAPE;
-#else
-                    State=BRACKET_ESCAPE;
-#endif
-                }
-                else
-                    donormal(c);
             }
             break;
         case INSERT:
@@ -195,23 +186,6 @@ edit()
             break;
         }
 	}
-}
-
-/*
- * donormal(c)
- *
- * Feed a character to the Normal-mode command interpreter, first
- * collecting any leading digits into 'Prenum'.
- */
-donormal(c)
-int c;
-{
-	if ( (Prenum>0 && isdigit(c)) || (isdigit(c) && c!='0') ) {
-		Prenum = Prenum*10 + (c-'0');
-		return;
-	}
-	normal(c);
-	Prenum = 0;
 }
 
 insertchar(c)
