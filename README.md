@@ -9,7 +9,7 @@ A port of **STevie** (ST Editor for VI Enthusiasts, by Tim Thompson) to
 
 ## Why vi on CP/M-86?
 
-CP/M-86 ships with `ed` — a line-oriented editor inherited from dec OSes.
+CP/M-86 ships with `ed` — a line-oriented editor inherited from DEC OSes.
 While powerful for scripting, `ed` is notoriously difficult to use
 interactively: you work blind, with no visible context of the file, no
 cursor, and a command syntax that takes time to learn.
