@@ -4,10 +4,17 @@
 
 #include "stevie.h"
 #include "stdio.h"
+#ifdef __CPM86__
 #include "sgtty.h"
+#endif
 
 #define GETCH_BUFLEN 64
 static char getch_buffer[GETCH_BUFLEN];
+
+/* ------------------------------------------------------------------ */
+/* CP/M-86 implementation                                              */
+/* ------------------------------------------------------------------ */
+#if defined(__CPM86__)
 
 getch()
 {
@@ -31,7 +38,6 @@ getch()
     return c;
 }
 
-
 windinit()
 {
 	struct sgttyb stty;
@@ -47,12 +53,9 @@ windinit()
 windgoto(r,c)
 int r,c;
 {
-	/* Locate cursor */
-	/* CP/M-86 VT-52 */
-#ifdef __VT52__
+#if defined(__VT52__)
 	printf("\033Y%c%c",r+0x20,c+0x20);
-#else 
-	/* ANSI (1-based row/col, r and c here are 0-based) */
+#elif defined(_VT100_)
 	printf("\033[%d;%dH",r+1,c+1);
 #endif
 }
@@ -63,24 +66,20 @@ int r;
 	exit(r);
 }
 
-windclreol() 
+windclreol()
 {
-#ifdef __VT52__
+#if defined(__VT52__)
 	printf("\033I");
-#else 
-	/* ANSI */
+#elif defined(_VT100_)
 	printf("\033[K");
 #endif
 }
 
 windclear()
 {
-#ifdef __VT52__
-	/* Clear the screen */
-	/* CP/M-86 VT-52 */
+#if defined(__VT52__)
 	printf("\033E");
-#else
-	/* ANSI */
+#elif defined(_VT100_)
 	printf("\033[2J\033[H");
 #endif
 }
@@ -111,3 +110,5 @@ beep()
 {
 	putchar('\007');
 }
+
+#endif /* __CPM86__ */
