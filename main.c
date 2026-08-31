@@ -52,6 +52,8 @@ char *Insstart;		/* This is where the latest insert/append */
 int Changed = 0;	/* Set to 1 if something in the file has been */
 			/* changed and not written out. */
 
+int UndoChanged = 0;	/* Modified state before the current undoable change. */
+
 int Debug = 0;
 
 int Binary = 0;		/* Set to 1 if the file should be read and written */
@@ -219,6 +221,8 @@ filetonext()
 	/* put '~'s on rows that aren't part of the file. */
 	if ( col != 0 )
 		row++;
+	else if ( Fileend == Filemem && State == INSERT )
+		row = 1;
 	while ( row < Rows ) {
 		Nextscreen[row*Columns] = '~';
 		row++;

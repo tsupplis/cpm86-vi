@@ -150,10 +150,11 @@ int c;
 		startinsert("i");
 		break;
 	case 'o':
+		resetundo();
 		opencmd();
 		updatescreen();
-		resetundo();
 		startinsert("o");
+		Ninsert = 1;
 		break;
 	case 'd':
 		nchar = vgetc();
@@ -341,6 +342,7 @@ int c;
 			*p++ = *q++ = '\033';
 			*p = *q = '\0';
 			/* Undelchars has been reset to 0 */
+			Changed = UndoChanged;
 			updatescreen();
 		}
 		break;
@@ -400,11 +402,12 @@ char *initstr;
 	for (p=initstr; (c=(*p++))!='\0'; )
 		*Insptr++ = c;
 	State = INSERT;
-	windrefresh();
+	updatescreen();
 }
 
 resetundo()
 {
+	UndoChanged = Changed;
 	Undelchars = 0;
 	*Undobuff = '\0';
 	Uncurschar = NULL;

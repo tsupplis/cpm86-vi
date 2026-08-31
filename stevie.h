@@ -48,6 +48,7 @@ extern int Cursrow, Curscol, Cursvcol;
 extern int Prenum;
 extern int Debug;
 extern int Changed;
+extern int UndoChanged;
 extern int Binary;
 extern char Redobuff[], Undobuff[], Insbuff[];
 extern char *Uncurschar, *Insptr;
