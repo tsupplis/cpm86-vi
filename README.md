@@ -1,15 +1,9 @@
-Work in progress ....
+# Vi Editor fo CP/M-86
+
+VI Port to CP/M-86
 
 ## Current state
 - Compiling with Aztetc 3.2/4.2
 - Proper reading of composite keys using BDOS(6)
-- up/down/left/right keys supported
+- up/down/left/right/home/end/pgup/pgdown keys supported
 - Working on IBM-PC CP/M-86 with VT-52 settings
-- Working on IBM-PC CP/M-86 with VT-100 settings 
-
-## To Do's
-- Refresh problems on scrolling and redrawing lines
-- Ctrl-X does not seem to work
-- Map Page-Up and Page-Down
-- More test
-- Fix tab to characters

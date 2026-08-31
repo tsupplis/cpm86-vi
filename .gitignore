@@ -11,3 +11,4 @@ cpm86
 *.sym
 *.lst
 .vscode
+ibmxt.lock

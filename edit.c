@@ -43,6 +43,17 @@ edit()
 #endif
                 break;
             }
+            /* End and Page-Down arrive as bare bytes, with no ESC prefix */
+            if ( c=='\032' ) {		/* End key -> end of line */
+                Prenum=0;
+                normal('$');
+                break;
+            }
+            if ( c=='\n' ) {		/* Page-Down key -> forward 1 screen */
+                Prenum=0;
+                normal(06);
+                break;
+            }
             donormal(c);
             break;
         case BRACKET_ESCAPE:
@@ -75,6 +86,12 @@ edit()
                         break;
                     case 'D':
                         d='h';   
+                        break;
+                    case 'H':	/* Home key -> beginning of line */
+                        d='0';
+                        break;
+                    case 'I':	/* Page Up key -> back 1 screen */
+                        d=02;
                         break;
 
                 }
