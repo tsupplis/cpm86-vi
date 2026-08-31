@@ -6,14 +6,13 @@ LDFLAGS = -lc86
 # Flags common to both CP/M-86 builds
 CPM_CFLAGS = -D__CPM86__
 
-# Objects shared by both terminal builds (window.o excluded)
+# Objects shared by both terminal builds (window.o and edit.o excluded)
 SHARED_OBJS = \
-	cmdline.o \
-	edit.o    \
-	help.o    \
+	cmdline.o  \
+	help.o     \
 	hexchars.o \
 	linefunc.o \
-	main.o    \
+	main.o     \
 	misccmds.o \
 	normal.o
 
@@ -25,15 +24,23 @@ all: vivt52.cmd vivt100.cmd cpmtest.img
 # --------------------------------------------------------------------
 # Link targets
 # --------------------------------------------------------------------
-vivt52.cmd: $(SHARED_OBJS) winvt52.o
+vivt52.cmd: $(SHARED_OBJS) edtvt52.o winvt52.o
 	$(LD) -o $@ $^ $(LDFLAGS)
 
-vivt100.cmd: $(SHARED_OBJS) winvt100.o
+vivt100.cmd: $(SHARED_OBJS) edtvt100.o winvt100.o
 	$(LD) -o $@ $^ $(LDFLAGS)
 
 # --------------------------------------------------------------------
-# window.c – two variants
+# edit.c and window.c – two variants each
 # --------------------------------------------------------------------
+edtvt52.o: edit.c
+	$(CC) $(CPM_CFLAGS) -D__VT52__ -o $@ edit.c
+	$(STRIP) $@
+
+edtvt100.o: edit.c
+	$(CC) $(CPM_CFLAGS) -D_VT100_ -o $@ edit.c
+	$(STRIP) $@
+
 winvt52.o: window.c
 	$(CC) $(CPM_CFLAGS) -D__VT52__ -o $@ window.c
 	$(STRIP) $@
@@ -47,10 +54,6 @@ winvt100.o: window.c
 # --------------------------------------------------------------------
 cmdline.o: cmdline.c
 	$(CC) $(CPM_CFLAGS) -o $@ cmdline.c
-	$(STRIP) $@
-
-edit.o: edit.c
-	$(CC) $(CPM_CFLAGS) -o $@ edit.c
 	$(STRIP) $@
 
 help.o: help.c
@@ -98,7 +101,7 @@ vi-bin.zip: vivt52.cmd vivt100.cmd
 # Utility
 # --------------------------------------------------------------------
 clean:
-	$(RM) *.o vivt52.cmd vivt100.cmd vi-bin.zip
+	$(RM) *.o vivt52.cmd vivt100.cmd vi-bin.zip edtvt52.o edtvt100.o winvt52.o winvt100.o
 
 test: cpmtest.img
 	./cpm86

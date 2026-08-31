@@ -37,9 +37,10 @@ edit()
         case NORMAL:
             /* We're in the normal (non-insert) mode. */
             if(c==27) {
-                State=BRACKET_ESCAPE;
-#ifdef __VT52__
+#if defined(__VT52__)
                 State=NORMAL_ESCAPE;
+#elif defined(_VT100_)
+                State=BRACKET_ESCAPE;
 #endif
                 break;
             }
@@ -103,9 +104,9 @@ edit()
                 /* Same as above: don't drop a keystroke that turns */
                 /* out not to be part of an escape sequence. */
                 else if ( c==27 ) {
-#ifdef __VT52__
+#if defined(__VT52__)
                     State=NORMAL_ESCAPE;
-#else
+#elif defined(_VT100_)
                     State=BRACKET_ESCAPE;
 #endif
                 }
