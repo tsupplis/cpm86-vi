@@ -79,6 +79,47 @@ make test
 
 ---
 
+## Key mappings
+
+The arrow keys, Home, PgUp, PgDn and End send different byte sequences
+depending on the terminal type. The table below shows what each terminal
+sends and how the editor interprets it.
+
+### VT-52 (`vivt52.cmd`)
+
+VT-52 cursor keys send a two-byte sequence: `ESC` followed by a single letter.
+
+| Key | Sequence | vi action |
+|-----|----------|-----------|
+| ↑ Up    | `ESC A` | `k` — move up one line |
+| ↓ Down  | `ESC B` | `j` — move down one line |
+| → Right | `ESC C` | `l` — move right one char |
+| ← Left  | `ESC D` | `h` — move left one char |
+| Home    | `ESC H` | `0` — beginning of line |
+| PgUp    | `ESC I` | `^B` — back one screen |
+| End     | `^Z` (0x1A) | `$` — end of line |
+| PgDn    | `^J` (0x0A) | `^F` — forward one screen |
+
+### VT-100 / ANSI (`vivt100.cmd`)
+
+VT-100 cursor keys send a three-byte sequence: `ESC [` followed by a letter.
+
+| Key | Sequence | vi action |
+|-----|----------|-----------|
+| ↑ Up    | `ESC [ A` | `k` — move up one line |
+| ↓ Down  | `ESC [ B` | `j` — move down one line |
+| → Right | `ESC [ C` | `l` — move right one char |
+| ← Left  | `ESC [ D` | `h` — move left one char |
+| Home    | `ESC [ H` | `0` — beginning of line |
+| PgUp    | `ESC [ I` | `^B` — back one screen |
+| End     | `^Z` (0x1A) | `$` — end of line |
+| PgDn    | `^J` (0x0A) | `^F` — forward one screen |
+
+> End and PgDn arrive as bare control codes with no ESC prefix on both
+> terminal types, as sent by the IBM-PC CP/M-86 BDOS keyboard handler.
+
+---
+
 ## Requirements
 
 - **Aztec C 86 v4.2** cross-compiler (`aztec42_cc`, `aztec42_link`, `aztec42_sqz`)
