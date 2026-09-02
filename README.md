@@ -51,8 +51,9 @@ IBM-PC hardware. The terminal type is selected at compile time — only
 ## Building
 
 Requires the Aztec C 86 cross-development toolchain
-(`aztec42_cc`, `aztec42_link`, `aztec42_sqz`) on the PATH, and
-**cpmtools** (`cpmcp`, `cpmrm`, `cpmls`) for disk image management.
+(`aztec42_cc`, `aztec42_link`, `aztec42_sqz`) on the PATH, available from
+[tsupplis/cpm86-crossdev](https://github.com/tsupplis/cpm86-crossdev),
+and **cpmtools** (`cpmcp`, `cpmrm`, `cpmls`) for disk image management.
 
 ```sh
 # Build both terminal variants
@@ -64,7 +65,7 @@ make dist          # produces vi-bin.zip
 # Copy binaries to CP/M-86 test disk image
 make cpmtest.img
 
-# Run under the PCE CP/M-86 emulator
+# Run under the PCE CP/M-86 emulator (or emu2 from cpm86-crossdev)
 make test
 ```
 
@@ -138,10 +139,14 @@ VT-100 cursor keys send a three-byte sequence: `ESC [` followed by a letter.
 
 ## Requirements
 
-- **Aztec C 86 v4.2** cross-compiler (`aztec42_cc`, `aztec42_link`, `aztec42_sqz`)
+- **Aztec C 86 v4.2** cross-compiler (`aztec42_cc`, `aztec42_link`, `aztec42_sqz`) —
+  from [tsupplis/cpm86-crossdev](https://github.com/tsupplis/cpm86-crossdev)
 - **cpmtools** (`cpmcp`, `cpmrm`, `cpmls`) to manage CP/M disk images
 - **zip** for `make dist`
-- **PCE** CP/M-86 emulator (`cpm86`) for `make test` — optional
+- A CP/M-86 emulator for `make test` — optional; two suitable options:
+  - **PCE** CP/M-86 emulator (`cpm86`)
+  - **emu2** — also available from
+    [tsupplis/cpm86-crossdev](https://github.com/tsupplis/cpm86-crossdev)
 
 ---
 
