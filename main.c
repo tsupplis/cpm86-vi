@@ -259,6 +259,13 @@ nexttoscreen()
 				windgoto(gorow=row,gocol=col);
 			windputc(nc);
 			gocol++;
+			/* After writing the last column of a row, invalidate
+			 * the tracked position.  Relying on terminal auto-wrap
+			 * to advance to the next row would corrupt Realscreen
+			 * tracking when the terminal wraps the character onto
+			 * the next line instead of staying at col Columns-1. */
+			if ( col == Columns-1 )
+				gocol = -1;
 		}
 		if ( ++col >= Columns ) {
 			col = 0;

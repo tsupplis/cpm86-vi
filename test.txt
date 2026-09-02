@@ -405,4 +405,4 @@ onedown(n)
 	/* that we were at before. */
 	Curschar = coladvance(p,Cursvcol);
 	return(1);
-}
+}

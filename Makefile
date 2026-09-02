@@ -80,7 +80,8 @@ normal.o: normal.c
 	$(CC) $(CPM_CFLAGS) -o $@ normal.c
 	$(STRIP) $@
 
-cpmtest.img: vivt52.cmd vivt100.cmd
+cpmtest.img: vivt52.cmd vivt100.cmd cpmbase.img
+	cp cpmbase.img cpmtest.img
 	cpmrm -f ibmpc-514ss cpmtest.img 0:*.cmd
 	cpmrm -f ibmpc-514ss cpmtest.img 0:test.txt
 	cpmcp -f ibmpc-514ss cpmtest.img vivt52.cmd 0:
@@ -101,7 +102,7 @@ vi-bin.zip: vivt52.cmd vivt100.cmd
 # Utility
 # --------------------------------------------------------------------
 clean:
-	$(RM) *.o vivt52.cmd vivt100.cmd vi-bin.zip edtvt52.o edtvt100.o winvt52.o winvt100.o
+	$(RM) cpmtest.img *.o vivt52.cmd vivt100.cmd vi-bin.zip edtvt52.o edtvt100.o winvt52.o winvt100.o
 
 test: cpmtest.img
 	./cpm86
