@@ -46,5 +46,8 @@ help()
 	windrefresh();
 	vgetc();
 	screenclear();
+	/* Reset message cache so the main loop's message("Normal Mode")
+	 * repaints the status line after returning from help. */
+	message("");
 	updatescreen();
 }
