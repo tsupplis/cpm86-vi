@@ -58,3 +58,5 @@ char *malloc(), *strchr(), *strsave(), *alloc(), *strcpy();
 
 char *nextline(), *prevline(), *coladvance(), *ssearch();
 char *fwdsearch(), *bcksearch();
+
+windcursor(), windcolor(), windcolorreset();

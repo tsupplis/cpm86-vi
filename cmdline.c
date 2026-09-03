@@ -44,6 +44,7 @@ int firstc;	/* either ':', '/', or '?' */
 		*p++ = c;
 	}
 	*p = '\0';
+	windcolorreset();
 
 	/* skip any initial white space */
 	for ( cmd = buff; isspace(*cmd); cmd++ )
@@ -193,6 +194,7 @@ gotocmd(clr,fresh,firstc)
 	int n;
 
 	windgoto(Rows-1,0);
+	windcolor(2);
 	if ( clr ) {
 		/* clear the line */
 		for ( n=0; n<(Columns-1); n++ )
@@ -221,6 +223,7 @@ char *s;
 	if ( (p=strchr(s,'\0'))!=NULL && *p=='\n' )
 		*p = '\0';
 	windstr(s);
+	windcolorreset();
 	lastmess = strsave(s);
 }
 

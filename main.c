@@ -257,7 +257,13 @@ nexttoscreen()
 			/* we don't have to use windgoto(). */
 			if ( ! (gorow == row && gocol == col) )
 				windgoto(gorow=row,gocol=col);
-			windputc(nc);
+			if ( nc == '~' && col == 0 ) {
+				windcolor(2);
+				windputc(nc);
+				windcolorreset();
+			} else {
+				windputc(nc);
+			}
 			gocol++;
 		}
 		if ( ++col >= Columns ) {

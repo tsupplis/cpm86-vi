@@ -79,9 +79,32 @@ windcursor(on)
 int on;
 {
 #if defined(__VT52__)
-	printf(on ? "\033n" : "\033m");
+	/* ESC f = cursor off, ESC e = cursor on (CP/M-86 >= 2.2) */
+	printf(on ? "\033e" : "\033f");
 #elif defined(_VT100_)
 	printf(on ? "\033[?25h" : "\033[?25l");
+#endif
+}
+
+windcolor(fg)
+int fg;
+{
+#if defined(__VT52__)
+	/* ESC b <c> sets foreground colour (CGA: 2=green) */
+	printf("\033b%c", (char)fg);
+#elif defined(_VT100_)
+	/* ANSI SGR: 30+fg for foreground (0=black,1=red,2=green,...) */
+	printf("\033[3%dm", fg);
+#endif
+}
+
+windcolorreset()
+{
+#if defined(__VT52__)
+	/* Restore default foreground colour (white=7) */
+	printf("\033b\007");
+#elif defined(_VT100_)
+	printf("\033[0m");
 #endif
 }
 
