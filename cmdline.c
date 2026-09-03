@@ -17,24 +17,35 @@ int firstc;	/* either ':', '/', or '?' */
 	p = buff;
 	if ( firstc != ':' )
 		*p++ = firstc;
-	/* collect the command string, handling '\b' and @ */
+	/* collect the command string, handling '\b', ^U/@, and ESC */
 	for ( ; ; ) {
 		c = vgetc();
 		if ( c=='\n'||c=='\r'||c==EOF )
 			break;
-		if ( c=='\b' ) {
+		if ( c=='\033' ) {
+			/* ESC cancels the command line */
+			windcolorreset();
+			message("");
+			updatescreen();
+			return;
+		}
+		if ( c=='\b' || c=='\177' ) {
 			if ( p > buff ) {
 				p--;
-				/* I know this is gross, but it has the */
-				/* advantage of relying only on 'gotocmd' */
 				gotocmd(1,0,firstc==':'?':':0);
 				for ( q=buff; q<p; q++ )
 					windputc(*q);
 				windrefresh();
+			} else {
+				/* Backspace on empty line cancels */
+				windcolorreset();
+				message("");
+				updatescreen();
+				return;
 			}
 			continue;
 		}
-		if ( c=='@' ) {
+		if ( c=='@' || c=='\025' ) {	/* @ or ^U kills the line */
 			p = buff;
 			gotocmd(1,1,firstc);
 			continue;
