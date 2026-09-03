@@ -86,6 +86,7 @@ int n;
 
 char *Savedline = NULL;
 int Savednum = 0;
+int Savedcount = 0;
 
 /*
  * yankline
@@ -121,6 +122,7 @@ yankline(n)
 	*q = '\0';
 	Curschar = savep;
 	Savednum = leng+1;
+	Savedcount = (Prenum==0?1:Prenum);
 }
 
 /*
@@ -137,6 +139,9 @@ int k;
 	int n;
 
 	if ( Savedline == NULL )
+		return;
+	/* Bail out without disturbing undo state if there is no room */
+	if ( !canincrease(Savednum) )
 		return;
 	message("Inserting saved stuff...");
 	if ( k == 0 ) {
@@ -159,6 +164,11 @@ int k;
 	if ( k == 1 )
 		Curschar--;
 	beginline();
+	/* Set up undo: deleting the pasted line(s) undoes the paste. */
+	resetundo();
+	Uncurschar = Curschar;
+	sprintf(Undobuff, "%ddd", Savedcount);
+	sprintf(Redobuff, "%s", k==0 ? "p" : "P");
 	message("");
 	updatescreen();
 }
