@@ -69,7 +69,7 @@ int r;
 windclreol()
 {
 #if defined(__VT52__)
-	printf("\033I");
+	printf("\033K");
 #elif defined(_VT100_)
 	printf("\033[K");
 #endif
