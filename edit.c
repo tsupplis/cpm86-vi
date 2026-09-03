@@ -329,11 +329,18 @@ cursupdate()
 	}
 
 	Cursrow = Curscol = Cursvcol = 0;
+	{ int wrapped = 0;
 	for ( p=Topchar; p<Curschar; p++ ) {
 		c = *p;
 		if ( c == '\n' ) {
-			Cursrow++;
-			Curscol = Cursvcol = 0;
+			/* If the previous line filled exactly Columns chars
+			 * the wrap already incremented Cursrow — don't do it
+			 * again for the \n or the cursor lands one row too low.
+			 * Two consecutive \n (blank line) still works because
+			 * wrapped is cleared after each \n. */
+			if ( !wrapped )
+				Cursrow++;
+			Curscol = Cursvcol = wrapped = 0;
 			continue;
 		}
 		/* A tab gets expanded, depending on the current column */
@@ -346,7 +353,11 @@ cursupdate()
 		if ( Curscol >= Columns ) {
 			Curscol -= Columns;
 			Cursrow++;
+			wrapped = 1;
+		} else {
+			wrapped = 0;
 		}
+	}
 	}
 }
 
