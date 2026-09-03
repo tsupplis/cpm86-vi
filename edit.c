@@ -28,6 +28,8 @@ edit()
         cursupdate();
         if ( State == INSERT )
             message("Insert Mode");
+        else if ( State == NORMAL )
+            message("Normal Mode");
         /* printf("Curschar=(%d,%d) row/col=(%d,%d)",
             Curschar,*Curschar,Cursrow,Curscol); */
         windgoto(Cursrow,Curscol);
