@@ -96,11 +96,108 @@ make test
 
 ---
 
-## Key mappings
+## Command Reference
+
+### Movement
+
+| Command | Action |
+|---------|--------|
+| `h` `j` `k` `l` | Left / down / up / right |
+| `b` | Back one word |
+| `w` | Forward one word |
+| `^` or `0` | Beginning of line |
+| `$` | End of line |
+| `[#]G` | Go to line `#` (no count = last line) |
+| `^F` | Forward one screen |
+| `^B` | Back one screen |
+| `^D` | Down 10 lines |
+| `^U` | Up 10 lines |
+| `^G` | Show file info |
+| `^L` | Redraw screen |
+
+### Insert / Replace
+
+| Command | Action |
+|---------|--------|
+| `i` | Insert before cursor |
+| `a` | Append after cursor |
+| `o` | Open new line below, enter insert mode |
+| `r <c>` | Replace single character under cursor with `<c>` |
+| `R` | Enter replace mode (overwrite); `ESC` to exit |
+| `ESC` | Exit insert or replace mode, return to normal |
+
+### Delete
+
+| Command | Action |
+|---------|--------|
+| `x` | Delete character under cursor |
+| `[#]dd` | Delete `#` lines (default 1) |
+| `dw` | Delete word |
+| `D` or `d$` | Delete to end of line |
+
+### Change
+
+| Command | Action |
+|---------|--------|
+| `cc` | Change entire line (delete line, enter insert) |
+| `cw` | Change word |
+| `C` or `c$` | Change to end of line |
+
+### Yank & Put
+
+| Command | Action |
+|---------|--------|
+| `[#]yy` | Yank `#` lines into buffer (default 1) |
+| `p` | Put yanked/deleted lines after current line |
+| `P` | Put yanked/deleted lines before current line |
+
+### Miscellaneous
+
+| Command | Action |
+|---------|--------|
+| `u` | Undo last change |
+| `.` | Redo last insert or delete |
+| `J` | Join current line with next |
+| `[#]>>` | Indent `#` lines right by one tab (default 1) |
+| `[#]<<` | Indent `#` lines left by one tab (default 1) |
+| `H` | Show built-in help screen |
+
+### Search
+
+| Command | Action |
+|---------|--------|
+| `/str` | Search forward for `str` |
+| `?str` | Search backward for `str` |
+| `n` | Repeat last search |
+| `//` or `??` | Repeat last search (command-line form) |
+
+### `:` Command line
+
+| Command | Action |
+|---------|--------|
+| `:w` | Write file |
+| `:w <file>` | Write to `<file>` |
+| `:wq` or `:x` | Write and quit |
+| `:q` | Quit (refuses if unsaved changes) |
+| `:q!` | Quit unconditionally |
+| `:e <file>` | Edit `<file>` |
+| `:e!` | Re-read current file, discarding changes |
+| `:r <file>` | Read `<file>` and insert after current line |
+| `:f` | Show current filename and size |
+| `:f <name>` | Rename current file (in-editor) |
+| `:.=` | Show current line number and character offset |
+| `:$=` | Show total number of lines |
+| `:set oct` | Display non-printable characters in octal |
+| `:set hex` | Display non-printable characters in hex |
+| `:set dec` | Display non-printable characters in decimal |
+| `:h` or `:help` | Show built-in help screen |
+
+---
+
+## Terminal key sequences
 
 The arrow keys, Home, PgUp, PgDn and End send different byte sequences
-depending on the terminal type. The table below shows what each terminal
-sends and how the editor interprets it.
+depending on the terminal type.
 
 ### VT-52 (`vivt52.cmd`)
 
