@@ -10,6 +10,10 @@ edit()
 {
 	int c, c1, c2;
 	char *p, *q;
+	/* Buffer to save original chars overwritten in Replace mode,
+	 * so backspace can restore them. */
+	static char replbuf[1024];
+	static char *replptr = NULL;
 
 	Prenum = 0;
 
@@ -28,6 +32,8 @@ edit()
         cursupdate();
         if ( State == INSERT )
             message("Insert Mode");
+        else if ( State == REPLACE )
+            message("Replace Mode");
         else if ( State == NORMAL )
             message("Normal Mode");
         /* printf("Curschar=(%d,%d) row/col=(%d,%d)",
@@ -214,8 +220,55 @@ edit()
                 break;
             }
             break;
+        case REPLACE:
+            /* Initialise save buffer on first entry */
+            if ( replptr == NULL )
+                replptr = replbuf;
+            switch(c) {
+            case '\033':	/* ESC exits replace mode */
+                /* Don't end up on a '\n' */
+                if ( Curschar>Filemem && *Curschar=='\n'
+                    && *(Curschar-1)!='\n' )
+                    Curschar--;
+                State = NORMAL;
+                replptr = NULL;
+                updatescreen();
+                break;
+            case '\b':	/* backspace: restore original char */
+                if ( replptr > replbuf ) {
+                    replptr--;
+                    Curschar--;
+                    *Curschar = *replptr;
+                    CHANGED;
+                    cursupdate();
+                    updatescreen();
+                } else {
+                    beep();
+                }
+                break;
+            default:
+                if ( isprint(c) || c=='\t' ) {
+                    /* Save original char before overwriting */
+                    if ( replptr < replbuf + sizeof(replbuf) - 1 ) {
+                        /* If at end of file or newline, insert instead */
+                        if ( Curschar >= Fileend || *Curschar == '\n' ) {
+                            inschar(c);
+                        } else {
+                            *replptr++ = *Curschar;
+                            *Curschar = c;
+                            CHANGED;
+                            if ( Curschar+1 < Fileend )
+                                Curschar++;
+                        }
+                        cursupdate();
+                        updatescreen();
+                    }
+                }
+                break;
+            }
+            break;
         }
-	}
+ }
 }
 
 /*

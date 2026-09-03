@@ -302,6 +302,11 @@ int c;
 	case 'P':
 		putline(1);
 		break;
+	case 'R':
+		resetundo();
+		Uncurschar = Curschar;
+		State = REPLACE;
+		break;
 	case 'J':
 		for ( p=Curschar; *p!= '\n' && p<(Fileend-1) ; p++ )
 			;
