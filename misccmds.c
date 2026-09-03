@@ -260,6 +260,39 @@ delchar()
 	CHANGED;
 }
 
+/*
+ * deleol - delete from Curschar to end of line (not including the newline).
+ * Sets up Undobuff/Uncurschar so undo works.
+ */
+deleol()
+{
+	char *scan, *p;
+	int n;
+
+	resetundo();
+	Uncurschar = Curschar;
+	/* Count characters to delete first so delchar() repositioning
+	 * doesn't confuse the loop. */
+	n = 0;
+	for ( scan = Curschar; *scan != '\n' && scan < Fileend; scan++ )
+		n++;
+	/* Build undo string: i<deleted chars>\033 */
+	p = Undobuff;
+	*p++ = 'i';
+	scan = Curschar;
+	while ( n-- > 0 )
+		*p++ = *scan++;
+	*p++ = '\033';
+	*p = '\0';
+	/* Now do the actual deletions */
+	n = 0;
+	for ( scan = Curschar; *scan != '\n' && scan < Fileend; scan++ )
+		n++;
+	while ( n-- > 0 )
+		delchar();
+	addtobuff(Redobuff,'D',NULL);
+}
+
 delword(deltrailing)
 int deltrailing;	/* 1 if trailing white space should be removed. */
 {

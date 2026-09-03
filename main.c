@@ -73,6 +73,9 @@ int Ninsert = 0;	/* Number of characters in the current insertion. */
 int Undelchars = 0;	/* Number of characters to delete, when undoing. */
 char *Insptr = NULL;
 
+char Replbuf[1024];	/* Original chars saved during Replace mode. */
+int Unrplchars = 0;	/* Number of chars to restore on undo. */
+
 main(argc,argv)
 int argc;
 char **argv;

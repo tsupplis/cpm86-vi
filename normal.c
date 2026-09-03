@@ -187,6 +187,9 @@ int c;
 			Uncurschar = Curschar;
 			updatescreen();
 			break;
+		case '$':
+			/* d$ is identical to D */
+			goto do_D;
 		}
 		break;
 	case 'c':
@@ -209,6 +212,9 @@ int c;
 			startinsert("cw");
 			updatescreen();
 			break;
+		case '$':
+			/* c$ is identical to C */
+			goto do_C;
 		}
 		break;
 	case 'y':
@@ -254,18 +260,22 @@ int c;
 		repsearch();
 		break;
 	case 'C':
-	case 'D':
-		p = Curschar;
-		while ( Curschar >= p )
-			delchar();
-		updatescreen();
-		resetundo();	/* This should really go above the */
-				/* delchars above, and the undobuff should */
-				/* be constructed by them. */
-		if ( c == 'C' ) {
+	do_C:
+		deleol();
+		/* Clear Undobuff so insert-ESC undo (path 3: Undelchars)
+		 * fires on 'u', not the deleted-text replay from deleol(). */
+		*Undobuff = '\0';
+		/* After deleol(), cursor backed up one if line was non-empty.
+		 * Advance to append position (like 'a'). */
+		if ( *Curschar != '\n' )
 			Curschar++;
-			startinsert("C");
-		}
+		updatescreen();
+		startinsert("C");
+		break;
+	case 'D':
+	do_D:
+		deleol();
+		updatescreen();
 		break;
 	case 'r':
 		nchar = vgetc();
@@ -305,6 +315,7 @@ int c;
 	case 'R':
 		resetundo();
 		Uncurschar = Curschar;
+		Unrplchars = 0;
 		State = REPLACE;
 		break;
 	case 'J':
@@ -326,12 +337,26 @@ int c;
 		stuffin(Redobuff);
 		break;
 	case 'u':
-		if ( Uncurschar != NULL && *Undobuff != '\0' ) {
+		if ( Unrplchars > 0 ) {
+			/* Undo Replace mode: restore original characters */
+			char *rp = Replbuf;
+			int k = Unrplchars;
+			Curschar = Uncurschar;
+			while ( k-- > 0 ) {
+				*Curschar = *rp++;
+				Curschar++;
+			}
+			Curschar = Uncurschar;
+			Unrplchars = 0;
+			Changed = UndoChanged;
+			updatescreen();
+		}
+		else if ( Uncurschar != NULL && *Undobuff != '\0' ) {
 			Curschar = Uncurschar;
 			stuffin(Undobuff);
 			*Undobuff = '\0';
 		}
-		if ( Undelchars > 0 ) {
+		else if ( Undelchars > 0 ) {
 			Curschar = Uncurschar;
 			/* construct the next Undobuff and Redobuff, which */
 			/* will re-insert the characters we're deleting. */
@@ -349,6 +374,9 @@ int c;
 			/* Undelchars has been reset to 0 */
 			Changed = UndoChanged;
 			updatescreen();
+		}
+		else {
+			beep();
 		}
 		break;
 	default:

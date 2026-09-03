@@ -231,6 +231,14 @@ edit()
                     && *(Curschar-1)!='\n' )
                     Curschar--;
                 State = NORMAL;
+                /* Save originals for undo */
+                Unrplchars = (int)(replptr - replbuf);
+                if ( Unrplchars > 0 ) {
+                    char *s = replbuf, *d = Replbuf;
+                    int k = Unrplchars;
+                    while ( k-- > 0 ) *d++ = *s++;
+                    UndoChanged = Changed;
+                }
                 replptr = NULL;
                 updatescreen();
                 break;

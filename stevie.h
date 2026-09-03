@@ -54,8 +54,11 @@ extern int Binary;
 extern char Redobuff[], Undobuff[], Insbuff[];
 extern char *Uncurschar, *Insptr;
 extern int Ninsert, Undelchars;
+extern char Replbuf[];
+extern int Unrplchars;
 
 char *malloc(), *strchr(), *strsave(), *alloc(), *strcpy();
+deleol();
 
 char *nextline(), *prevline(), *coladvance(), *ssearch();
 char *fwdsearch(), *bcksearch();
