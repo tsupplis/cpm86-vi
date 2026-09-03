@@ -192,6 +192,10 @@ int firstc;	/* either ':', '/', or '?' */
 			badcmd();
 		return;
 	}
+	if ( strcmp(cmd,"h")==0 || strcmp(cmd,"help")==0 ) {
+		help();
+		return;
+	}
 	badcmd();
 }
 

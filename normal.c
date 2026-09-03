@@ -379,6 +379,9 @@ int c;
 			beep();
 		}
 		break;
+	case 'H':
+		help();
+		break;
 	default:
 		beep();
 		break;
