@@ -259,13 +259,6 @@ nexttoscreen()
 				windgoto(gorow=row,gocol=col);
 			windputc(nc);
 			gocol++;
-			/* After writing the last column of a row, invalidate
-			 * the tracked position.  Relying on terminal auto-wrap
-			 * to advance to the next row would corrupt Realscreen
-			 * tracking when the terminal wraps the character onto
-			 * the next line instead of staying at col Columns-1. */
-			if ( col == Columns-1 )
-				gocol = -1;
 		}
 		if ( ++col >= Columns ) {
 			col = 0;
@@ -333,6 +326,8 @@ int nochangename;	/* if 1, don't change the Filename */
  
 	/* Read file into buffer until EOF or CP/M SUB char */
 	for ( n=0; (c=getc(f)) != EOF && c != 0x1A; n++ ) {
+		/* Skip CR; lines are terminated by LF alone internally */
+		if ( !Binary && c == '\r' ) { n--; continue; }
 		if ( ! (isprint(c)||isspace(c)) )
 			unprint++;
 		if ( fromp >= Filemax ) {

@@ -80,10 +80,11 @@ normal.o: normal.c
 	$(CC) $(CPM_CFLAGS) -o $@ normal.c
 	$(STRIP) $@
 
-cpmtest.img: vivt52.cmd vivt100.cmd cpmbase.img
+cpmtest.img: vivt52.cmd vivt100.cmd cpmbase.img test.txt
 	cp cpmbase.img cpmtest.img
 	cpmrm -f ibmpc-514ss cpmtest.img 0:*.cmd
 	cpmrm -f ibmpc-514ss cpmtest.img 0:test.txt
+	cpmcp -f ibmpc-514ss cpmtest.img vivt52.cmd 0:vi.cmd
 	cpmcp -f ibmpc-514ss cpmtest.img vivt52.cmd 0:
 	cpmcp -f ibmpc-514ss cpmtest.img vivt100.cmd 0:
 	cpmcp -f ibmpc-514ss cpmtest.img test.txt 0:
