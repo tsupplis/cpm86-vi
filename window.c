@@ -75,6 +75,16 @@ windclreol()
 #endif
 }
 
+windcursor(on)
+int on;
+{
+#if defined(__VT52__)
+	printf(on ? "\033n" : "\033m");
+#elif defined(_VT100_)
+	printf(on ? "\033[?25h" : "\033[?25l");
+#endif
+}
+
 windclear()
 {
 #if defined(__VT52__)
