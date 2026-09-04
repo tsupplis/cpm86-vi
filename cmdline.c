@@ -258,8 +258,13 @@ char *fname;
 		return(0);
 	}
 
-	for ( n=0,p=Filemem; p<Fileend; p++,n++ )
+	for ( n=0,p=Filemem; p<Fileend; p++,n++ ) {
+		if ( !Binary && *p == '\n' )
+			putc('\r',f);
 		putc(*p,f);
+	}
+	if ( !Binary )
+		putc(0x1A,f);
 	sprintf(buff,"\"%s\" %d characters",fname,n);
 	fclose(f);
 
