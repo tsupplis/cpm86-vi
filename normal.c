@@ -145,9 +145,24 @@ int c;
 		resetundo();
 		startinsert("a");
 		break;
+	case 'A':
+		while ( oneright() )
+			;
+		if ( Curschar < (Fileend-1) && *Curschar != '\n' )
+			Curschar++;
+		resetundo();
+		startinsert("A");
+		break;
 	case 'i':
 		resetundo();
 		startinsert("i");
+		break;
+	case 'I':
+		beginline();
+		while ( isspace(*Curschar) && *Curschar != '\n' && Curschar < (Fileend-1) )
+			Curschar++;
+		resetundo();
+		startinsert("I");
 		break;
 	case 'o':
 		resetundo();

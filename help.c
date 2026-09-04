@@ -17,8 +17,8 @@ help()
 	windclear();
 
 	windgoto( 0, 0); helpstr("  --- Movement --------------------   --- Insert / Replace -----------");
-	windgoto( 1, 0); helpstr("  h j k l      left/down/up/right     i        insert before cursor");
-	windgoto( 2, 0); helpstr("  b / w        back / forward word    a        append after cursor");
+	windgoto( 1, 0); helpstr("  h j k l      left/down/up/right     i / I    insert cursor / first non-blank");
+	windgoto( 2, 0); helpstr("  b / w        back / forward word    a / A    append cursor / EOL");
 	windgoto( 3, 0); helpstr("  ^ 0 / $      begin / end of line    o        open new line below");
 	windgoto( 4, 0); helpstr("  [#]G         goto line (G=last)     r <c>    replace single char");
 	windgoto( 5, 0); helpstr("  ^F / ^B      fwd / back screen      R        replace mode  (ESC)");
