@@ -308,11 +308,21 @@ so the two builds share the same escape-parsing code in `edit.c`.
 - **zip** for `make dist`
 - **git** (optional) — used to embed a version string via `:v`; falls back
   to `unknown` if not run from a git checkout
+- **CP/M-86 1.1**, from [tsupplis/cpm86-kernel](https://github.com/tsupplis/cpm86-kernel),
+  for the `vivt52.cmd`/`vivt100.cmd`/`vibios.cmd` binaries
+- **PC-DOS 1.1**, from [tsupplis/pcdos11-hacking](https://github.com/tsupplis/pcdos11-hacking),
+  for the `vidos.com` binary
 - An emulator for testing — optional; two suitable options:
   - **PCE** CP/M-86 emulator (`cpm86`), for the CP/M-86 binaries
-  - **emu2** — runs both CP/M-86 `.cmd` and DOS `.com` binaries directly,
-    also available from
-    [tsupplis/cpm86-crossdev](https://github.com/tsupplis/cpm86-crossdev)
+  - **emu2** — runs both CP/M-86 `.cmd` and DOS `.com` binaries locally,
+    bundled with [tsupplis/cpm86-crossdev](https://github.com/tsupplis/cpm86-crossdev)
+    (originally from [johnsonjh/emu2-cpm86](https://github.com/johnsonjh/emu2-cpm86))
+
+---
+
+## Known issues / TODO
+
+See [TODO.md](TODO.md).
 
 ---
 
