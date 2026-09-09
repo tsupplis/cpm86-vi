@@ -38,7 +38,7 @@ edtvt52.o: edit.c
 	$(STRIP) $@
 
 edtvt100.o: edit.c
-	$(CC) $(CPM_CFLAGS) -D_VT100_ -o $@ edit.c
+	$(CC) $(CPM_CFLAGS) -D__VT100__ -o $@ edit.c
 	$(STRIP) $@
 
 winvt52.o: window.c
@@ -46,7 +46,7 @@ winvt52.o: window.c
 	$(STRIP) $@
 
 winvt100.o: window.c
-	$(CC) $(CPM_CFLAGS) -D_VT100_ -o $@ window.c
+	$(CC) $(CPM_CFLAGS) -D__VT100__ -o $@ window.c
 	$(STRIP) $@
 
 # --------------------------------------------------------------------

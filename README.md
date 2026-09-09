@@ -44,7 +44,7 @@ IBM-PC hardware. The terminal type is selected at compile time — only
 | Binary | Terminal | `window.c` flags |
 |--------|----------|------------------|
 | `vivt52.cmd`  | VT-52 escape sequences      | `-D__CPM86__ -D__VT52__` |
-| `vivt100.cmd` | ANSI / VT-100 escape sequences | `-D__CPM86__ -D_VT100_` |
+| `vivt100.cmd` | ANSI / VT-100 escape sequences | `-D__CPM86__ -D__VT100__` |
 
 ---
 
@@ -91,7 +91,7 @@ make test
 ```
 #if defined(__CPM86__)
     #if defined(__VT52__)   ← VT-52 escape sequences
-    #elif defined(_VT100_)  ← ANSI / VT-100 escape sequences
+    #elif defined(__VT100__)  ← ANSI / VT-100 escape sequences
 ```
 
 ---

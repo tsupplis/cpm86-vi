@@ -6,6 +6,44 @@
 #include "ctype.h"
 #include "stevie.h"
 
+/* ------------------------------------------------------------------ */
+/* Raw keyboard input                                                  */
+/* ------------------------------------------------------------------ */
+#if defined(__CPM86__)
+
+#define GETCH_BUFLEN 64
+static char getch_buffer[GETCH_BUFLEN];
+
+getch()
+{
+    int i,c,d;
+    static int s=0;
+    static int o=0;
+
+    if(s>0) {
+        c=getch_buffer[o];s--;o++;
+        o=o%GETCH_BUFLEN;
+        return c;
+    }
+    while(!(c=bdos(6,255))) 
+        continue;
+    while(s<GETCH_BUFLEN && (d=bdos(6,255))) {
+        if(1) { 
+            getch_buffer[(o+s)%GETCH_BUFLEN]=d;
+            s++;
+        }
+    }
+    return c;
+}
+
+#endif /* __CPM86__ */
+
+/* OS-independent wrapper around whichever getch() is active above. */
+windgetc()
+{
+	return(getch());
+}
+
 edit()
 {
 	int c, c1, c2;
@@ -47,7 +85,7 @@ edit()
             if(c==27) {
 #if defined(__VT52__)
                 State=NORMAL_ESCAPE;
-#elif defined(_VT100_)
+#elif defined(__VT100__)
                 State=BRACKET_ESCAPE;
 #endif
                 break;
@@ -114,7 +152,7 @@ edit()
                 else if ( c==27 ) {
 #if defined(__VT52__)
                     State=NORMAL_ESCAPE;
-#elif defined(_VT100_)
+#elif defined(__VT100__)
                     State=BRACKET_ESCAPE;
 #endif
                 }
