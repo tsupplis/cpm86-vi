@@ -262,14 +262,15 @@ so the two builds share the same escape-parsing code in `edit.c`.
 
 ## OS compatibility matrix
 
-| Binary | CP/M-86 1.1 | Concurrent CP/M-86 3.1 | Concurrent DOS 4.1 | DOS Plus 1.2 | PC-DOS 1.1 | DOS ≥ 2.0 |
-|--------|-------------|------------------------|---------------------|--------------|------------|-----------|
-| `vicpbios.cmd`             | ✅ | ❌ | ✅* | ✅ | — | — |
-| `vicp52.cmd` | ✅ | ✅* | ✅* | ✅ | — | — |
-| `vicp100.cmd` | ✅ | ✅* | ✅* | ✅ | — | — |
-| `vid1bios.com`             | — | — | ✅ | ✅ | ✅ | ✅ |
-| `vid2bios.com`             | — | — | ✅  | ✅ | ✅  | ✅ |
-* keyboard needs to be configured
+| Binary | CP/M-86 1.1 | Concurrent CP/M-86 3.1 | Concurrent DOS 4.1 | DOS Plus 1.2 | PC-DOS 1.1 | DOS ≥ 2.0 | Emu2 |
+|--------|-------------|------------------------|---------------------|--------------|------------|-----------|------|
+| `vicpbios.cmd`             | ✅ | ❌ | ✅* | ✅ | — | — | ✅ |
+| `vicp52.cmd` | ✅ | ✅(1) | ✅(1) | ✅ | — | — | ✅(1) |
+| `vicp100.cmd` | ✅ | ✅(1) | ✅(1) | ✅ | — | — | ✅(1) |
+| `vid1bios.com`             | — | — | ✅ | ✅ | ✅ | ✅ | ✅(2)|
+| `vid2bios.com`             | — | — | ✅  | ✅ | ✅  | ✅ | ✅(20) |
+1. keyboard navigation keys need to be configured
+2. need 25 lines terminal needed
 
 ---
 
