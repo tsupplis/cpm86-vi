@@ -156,22 +156,11 @@ windinit()
 	 * fights with our direct BIOS reads and writes over the cursor. */
 	stty.sg_flags = CRMOD|CBREAK;
 	ioctl(0, TIOCSETP, &stty);
-
-	/* Don't reset the video mode: CP/M-86 already set up 80x25 text mode,
-	 * and a mode reset would wipe its status line on row 24 (which we
-	 * deliberately leave alone, see Rows below). Just make sure page 0
-	 * is the active page, since that's the one windgoto/windputc use. */
-#asm
-	mov ax, 0500h
-	int 10h
-#endasm
-#else
-	/* AH=0,AL=3: set video mode 3 (80x25, 16-colour text), clears screen */
-#asm
-	mov ax, 3
-	int 10h
-#endasm
 #endif
+	/* No video mode or page select here: querying/forcing the mode
+	 * (AH=0Fh/AH=0) hung or exited immediately on CGA/MDA adapters.
+	 * CP/M-86 and DOS both already leave the display in a valid 80x25
+	 * text mode (mono on MDA, colour on CGA/EGA/VGA) before we start. */
 	Columns=80;
 	/* Match the 24-line convention of the vivt52/vivt100 CP/M-86 builds;
 	 * plain DOS gets the full 25-line BIOS text mode. */
