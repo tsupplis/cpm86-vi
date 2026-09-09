@@ -6,6 +6,8 @@
 #include "ctype.h"
 #include "stevie.h"
 
+static char *lastmess = NULL;
+
 readcmdline(firstc)
 int firstc;	/* either ':', '/', or '?' */
 {
@@ -56,6 +58,7 @@ int firstc;	/* either ':', '/', or '?' */
 	}
 	*p = '\0';
 	windcolorreset();
+	clearlastmess();
 
 	/* skip any initial white space */
 	for ( cmd = buff; isspace(*cmd); cmd++ )
@@ -192,6 +195,10 @@ int firstc;	/* either ':', '/', or '?' */
 			badcmd();
 		return;
 	}
+	if ( strcmp(cmd,"v")==0 ) {
+		message(viversion());
+		return;
+	}
 	if ( strcmp(cmd,"h")==0 || strcmp(cmd,"help")==0 ) {
 		help();
 		return;
@@ -225,7 +232,6 @@ gotocmd(clr,fresh,firstc)
 message(s)
 char *s;
 {
-	static char *lastmess = NULL;
 	char *p;
 
 	if ( lastmess!=NULL ) {
@@ -240,6 +246,16 @@ char *s;
 	windstr(s);
 	windcolorreset();
 	lastmess = strsave(s);
+}
+
+/* Forget the last message shown, so the next message() call always
+ * redraws even if it repeats the previous one (e.g. two ':q' attempts
+ * in a row on a dirty buffer should both show the warning). */
+clearlastmess()
+{
+	if ( lastmess != NULL )
+		free(lastmess);
+	lastmess = NULL;
 }
 
 writeit(fname)

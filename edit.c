@@ -9,7 +9,75 @@
 /* ------------------------------------------------------------------ */
 /* Raw keyboard input                                                  */
 /* ------------------------------------------------------------------ */
-#if defined(__CPM86__)
+#if defined(__PCBIOS__)
+
+/* One pending byte, for the second half of a synthesized ESC sequence. */
+static int pending = -1;
+
+/* INT 16h AH=0: wait for a keystroke, return AH=scan code, AL=ASCII in AX. */
+bioskey()
+{
+#asm
+	mov ah, 0
+	int 16h
+#endasm
+}
+
+/* INT 16h AH=1: non-zero if a keystroke is waiting (doesn't consume it). */
+keyready()
+{
+#asm
+	mov ah, 1
+	int 16h
+	jz keyready_none
+	mov ax, 1
+	jmp keyready_done
+keyready_none:
+	mov ax, 0
+keyready_done:
+#endasm
+}
+
+getch()
+{
+	int c, al, ah;
+
+	if ( pending >= 0 ) {
+		c = pending;
+		pending = -1;
+		return c;
+	}
+	for ( ;; ) {
+		/* Don't block in INT 16h: CP/M-86's background clock/status
+		 * update can reposition the BIOS cursor while we're blocked,
+		 * with no chance for us to correct it until a key arrives.
+		 * Poll instead, re-asserting our cursor position every time
+		 * around, so any interference is fought at high frequency
+		 * instead of just once, best-effort, after the fact. */
+		while ( !keyready() )
+			windrefreshcursor();
+		c = bioskey();
+		al = c & 0xff;
+		ah = (c >> 8) & 0xff;
+		if ( al != 0 )
+			return al;
+		/* Extended key: no ASCII, decode the BIOS scan code in AH. */
+		switch ( ah ) {
+		case 0x48: pending='A'; return 27;	/* Up */
+		case 0x50: pending='B'; return 27;	/* Down */
+		case 0x4D: pending='C'; return 27;	/* Right */
+		case 0x4B: pending='D'; return 27;	/* Left */
+		case 0x47: pending='H'; return 27;	/* Home */
+		case 0x49: pending='I'; return 27;	/* Page Up */
+		case 0x51: return '\n';		/* Page Down */
+		case 0x4F: return '\032';		/* End */
+		case 0x52: pending='L'; return 27;	/* Insert */
+		case 0x53: return '\177';		/* Delete */
+		}
+	}
+}
+
+#elif defined(__CPM86__)
 
 #define GETCH_BUFLEN 64
 static char getch_buffer[GETCH_BUFLEN];
@@ -36,7 +104,7 @@ getch()
     return c;
 }
 
-#endif /* __CPM86__ */
+#endif /* __PCBIOS__ / __CPM86__ */
 
 /* OS-independent wrapper around whichever getch() is active above. */
 windgetc()
@@ -65,15 +133,23 @@ edit()
 	else
 		message("");
 
+	{
+	int laststate = -1;	/* forces the mode message on the first pass */
 	for ( ;; ) {
         /* Figure out where the cursor is based on Curschar. */
         cursupdate();
-        if ( State == INSERT )
-            message("Insert Mode");
-        else if ( State == REPLACE )
-            message("Replace Mode");
-        else if ( State == NORMAL )
-            message("Normal Mode");
+        /* Only (re)announce the mode when it actually changes, so a
+         * command's own message (e.g. "File not written out...") isn't
+         * immediately clobbered on the very next loop iteration. */
+        if ( State != laststate ) {
+            if ( State == INSERT )
+                message("Insert Mode");
+            else if ( State == REPLACE )
+                message("Replace Mode");
+            else if ( State == NORMAL )
+                message("Normal Mode");
+            laststate = State;
+        }
         /* printf("Curschar=(%d,%d) row/col=(%d,%d)",
             Curschar,*Curschar,Cursrow,Curscol); */
         windgoto(Cursrow,Curscol);
@@ -83,7 +159,9 @@ edit()
         case NORMAL:
             /* We're in the normal (non-insert) mode. */
             if(c==27) {
-#if defined(__VT52__)
+                /* VT52 and the DOS BIOS key mapping both send a lone ESC
+                 * followed directly by a letter; VT100/ANSI sends ESC '['. */
+#if defined(__VT52__) || defined(__PCBIOS__)
                 State=NORMAL_ESCAPE;
 #elif defined(__VT100__)
                 State=BRACKET_ESCAPE;
@@ -150,7 +228,7 @@ edit()
                 /* Same as above: don't drop a keystroke that turns */
                 /* out not to be part of an escape sequence. */
                 else if ( c==27 ) {
-#if defined(__VT52__)
+#if defined(__VT52__) || defined(__PCBIOS__)
                     State=NORMAL_ESCAPE;
 #elif defined(__VT100__)
                     State=BRACKET_ESCAPE;
@@ -315,6 +393,7 @@ edit()
             break;
         }
  }
+ }
 }
 
 /*
@@ -330,6 +409,10 @@ int c;
 		Prenum = Prenum*10 + (c-'0');
 		return;
 	}
+	/* Forget the last message: a command that repeats the same warning
+	 * (e.g. "Pattern not found" on two failed searches in a row) must
+	 * still show it, not have it silently suppressed as unchanged. */
+	clearlastmess();
 	normal(c);
 	Prenum = 0;
 }
@@ -371,6 +454,7 @@ gethexchar()
 		c = vgetc();
 		if ( hextoint(c) >= 0 )
 			break;
+		clearlastmess();
 		message("Expecting a hexidecimal character (0-9 or a-f)");
 		beep();
 		/* sleep(1); */

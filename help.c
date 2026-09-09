@@ -31,13 +31,13 @@ help()
 	windgoto(12, 0); helpstr("                                       --- Change --------------------");
 	windgoto(13, 0); helpstr("  --- Yank & Put --------------------- cc       change line");
 	windgoto(14, 0); helpstr("  [#]yy        yank # lines            cw       change word");
-	windgoto(15, 0); helpstr("  p / P        put after / before      c$ / C / change to end of line");
+	windgoto(15, 0); helpstr("  p / P        put after / before      c$ / C   change to end of line");
 	windgoto(16, 0); helpstr("                                       --- Misc ---------------------");
 	windgoto(17, 0); helpstr("  --- : Commands --------------------- u / .    undo / redo");
 	windgoto(18, 0); helpstr("  :w [f]  :wq  :x   write / quit       J        join lines");
 	windgoto(19, 0); helpstr("  :q  :q!           quit               >> <<    indent");
-	windgoto(20, 0); helpstr("  :e[!] [f]  :r f   edit / read file");
-	windgoto(21, 0); helpstr("  :f [n]  :.=  :$=  :set oct|hex|dec  :h / H   this help");
+	windgoto(20, 0); helpstr("  :e[!] [f]  :r f   edit / read file   :v       show version");
+	windgoto(21, 0); helpstr("  :f [n]  :.=  :$=  :set oct|hex|dec   :h / H   this help");
 	windgoto(Rows-1, 0);
 	windcolor(2);
 	helpstr("  Press any key ...");

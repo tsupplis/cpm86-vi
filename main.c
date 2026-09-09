@@ -102,7 +102,11 @@ char **argv;
 	}
 
 	if ( argc <= 1 ) {
+#if defined(__CPM86__)
 		fprintf(stderr,"Usage: vi [-xodb] [user/][drive:]file\n");
+#else
+		fprintf(stderr,"Usage: vi [-xodb] [drive:]file\n");
+#endif
 		exit(1);
 	}
 

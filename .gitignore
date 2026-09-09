@@ -1,11 +1,13 @@
 *.zip
 cpm86
+dos
 *.lha
 .D*
 *.o
 *.log
 *.cfg
 *.cmd
+*.com
 *.exe
 .*.swp
 *.obj
@@ -14,3 +16,4 @@ cpm86
 *.lst
 .vscode
 ibmxt.lock
+gitver.h
