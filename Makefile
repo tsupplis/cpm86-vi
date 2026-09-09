@@ -115,10 +115,13 @@ edtbios.o: edit.c
 winbios.o: window.c gitver.h
 	$(CC) $(CPM_CFLAGS) $(PCBIOS_CFLAGS) -o $@ window.c
 	$(STRIP) $@
-
-# Regenerated on every build so it always reflects the current git state.
+# Checked against the current git state on every build, but only actually
+# rewritten (touching its mtime) if the version string changed -- otherwise
+# `make` would consider every window.c object stale on every invocation.
+# PID-tagged tmp file so concurrent/parallel make runs don't clash.
 gitver.h: FORCE
-	echo '#define GIT_VERSION "$(GIT_VERSION)"' > gitver.h
+	@echo '#define GIT_VERSION "$(GIT_VERSION)"' > gitver.h.$$$$.tmp && \
+	(cmp -s gitver.h.$$$$.tmp gitver.h 2>/dev/null && $(RM) gitver.h.$$$$.tmp || mv gitver.h.$$$$.tmp gitver.h)
 
 FORCE:
 
