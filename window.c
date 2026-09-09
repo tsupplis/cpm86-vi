@@ -10,21 +10,50 @@
 #include "gitver.h"
 
 /* Build-variant version string for the ":v" command; lives here since
- * window.c is already compiled once per variant with the right macros. */
+ * window.c is already compiled once per variant with the right macros.
+ * Hierarchical: OS first (__CPM86__ / __PCDOS__=11 / __PCDOS__=20), then
+ * screen/keyboard technique within it. */
 char *viversion()
 {
 	static char buf[80];
 
-#if defined(__VTCMD__) && defined(__VT52__)
-	sprintf(buf, "VI for CP/M-86 1.1 version %s (vt52 mode)", GIT_VERSION);
+#if defined(__CPM86__)
+#if defined(__PCBIOS__)
+	sprintf(buf, "VI for CP/M-86 %s (bios mode)", GIT_VERSION);
+#elif defined(__VTCMD__) && defined(__VT52__)
+	sprintf(buf, "VI for CP/M-86 %s (vt52 mode)", GIT_VERSION);
 #elif defined(__VTCMD__) && defined(__VT100__)
-	sprintf(buf, "VI for CP/M-86 1.1 version %s (vt100 mode)", GIT_VERSION);
-#elif defined(__PCBIOS__) && defined(__CPM86__)
-	sprintf(buf, "VI for CP/M-86 1.1 version %s (bios mode)", GIT_VERSION);
-#elif defined(__PCBIOS__)
-	sprintf(buf, "VI for DOS 1.1 version %s (bios mode)", GIT_VERSION);
+	sprintf(buf, "VI for CP/M-86 %s (vt100 mode)", GIT_VERSION);
+#else
+	sprintf(buf, "VI for CP/M-86 %s (unknown mode)", GIT_VERSION);
+#endif
+#elif defined(__PCDOS__) && __PCDOS__==11
+#if defined(__PCBIOS__)
+	sprintf(buf, "VI for PC-DOS 1.1 %s (bios mode)", GIT_VERSION);
+#else
+	sprintf(buf, "VI for PC-DOS 1.1 %s (unknown mode)", GIT_VERSION);
+#endif
+#elif defined(__PCDOS__) && __PCDOS__==20
+#if defined(__PCBIOS__)
+	sprintf(buf, "VI for PC-DOS 2.0 %s (bios mode)", GIT_VERSION);
+#else
+	sprintf(buf, "VI for PC-DOS 2.0 %s (unknown mode)", GIT_VERSION);
+#endif
+#else
+	sprintf(buf, "VI version %s (unknown mode)", GIT_VERSION);
 #endif
 	return buf;
+}
+
+/* Usage message shown when no filename was given; wording depends on the
+ * OS's path/drive syntax. Lives here (not main.c) to keep main.c OS-agnostic. */
+windusage()
+{
+#if defined(__CPM86__)
+	fprintf(stderr,"Usage: vi [-xodb] [user/][drive:]file\n");
+#else
+	fprintf(stderr,"Usage: vi [-xodb] [drive:]file\n");
+#endif
 }
 
 /* ------------------------------------------------------------------ */

@@ -62,14 +62,15 @@ runtime for file I/O), while `vidos.com` is `__PCBIOS__` alone (a plain DOS
     blocking, so the cursor position can be re-asserted while waiting (see
     below)
 - Composite / extended key support: arrow keys, Home, End, PgUp, PgDn
-- Four build variants:
+- Five build variants:
 
 | Binary | Screen/keyboard | Build flags |
 |--------|-----------------|-------------|
-| `vivt52.cmd`  | VT-52 escape sequences (CP/M-86)      | `-D__VTCMD__ -D__VT52__` |
-| `vivt100.cmd` | ANSI / VT-100 escape sequences (CP/M-86) | `-D__VTCMD__ -D__VT100__` |
-| `vibios.cmd`  | Direct PC BIOS, CP/M-86 `.cmd` binary | `-D__PCBIOS__` |
-| `vidos.com`   | Direct PC BIOS, plain DOS 1.1 `.com` binary | `-D__PCBIOS__` |
+| `vicp52.cmd`    | VT-52 escape sequences (CP/M-86)         | `-D__CPM86__ -D__VTCMD__ -D__VT52__` |
+| `vicp100.cmd`   | ANSI / VT-100 escape sequences (CP/M-86) | `-D__CPM86__ -D__VTCMD__ -D__VT100__` |
+| `vicpbios.cmd`  | Direct PC BIOS, CP/M-86 `.cmd` binary    | `-D__CPM86__ -D__PCBIOS__` |
+| `vid1bios.com`  | Direct PC BIOS, PC-DOS 1.1 `.com` binary | `-D__PCDOS__=11 -D__PCBIOS__` |
+| `vid2bios.com`  | Direct PC BIOS, PC-DOS 2.0 `.com` binary | `-D__PCDOS__=20 -D__PCBIOS__` |
 
 ---
 
@@ -102,44 +103,6 @@ Each build embeds the current `git describe` output (or `unknown` outside a
 git checkout) as the version shown by the `:v` command; see `gitver.h`
 (generated, not checked in) and `viversion()` in `window.c`.
 
----
-
-## Source layout
-
-| File | Purpose |
-|------|---------|
-| `window.c` | All platform-specific screen I/O — cursor, clear, colour, and the `:v` version string |
-| `edit.c` | Insert / append / replace mode, and all platform-specific raw keyboard input (`getch()`/`windgetc()`) |
-| `main.c` | Startup, screen/file allocation, update loop |
-| `normal.c` | Normal-mode command dispatch |
-| `cmdline.c` | `:` command-line parser (`:w`, `:q`, `:e`, `:v`, …) |
-| `linefunc.c` | Line navigation helpers |
-| `misccmds.c` | Miscellaneous vi commands |
-| `help.c` | Built-in help text |
-| `hexchars.c` | Hex / octal character display tables |
-| `stevie.h` | Shared externs and defines |
-
-### `edit.c` and `window.c` build sections
-
-```
-# edit.c: raw keyboard input
-#if defined(__PCBIOS__)      ← INT 16h, polled, re-asserts cursor position
-#elif defined(__CPM86__)     ← BDOS function 6, ring buffer
-
-# edit.c: escape-sequence parsing (arrow/Home/PgUp keys)
-#if defined(__VT52__) || defined(__PCBIOS__)  ← lone ESC + letter
-#elif defined(__VT100__)                      ← ESC '[' + letter
-
-# window.c: screen output
-#if defined(__VTCMD__)
-    #if defined(__VT52__)    ← VT-52 escape sequences
-    #elif defined(__VT100__) ← ANSI / VT-100 escape sequences
-#elif defined(__PCBIOS__)    ← PC BIOS INT 10h calls; Rows=24 if __CPM86__
-                                is also defined (matches the VTCMD builds),
-                                Rows=25 otherwise (plain DOS)
-```
-
----
 
 ## Command Reference
 

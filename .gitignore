@@ -1,6 +1,10 @@
 *.zip
 cpm86
-dos
+ccpm86
+dosplus
+cdos41
+dos11
+dos20
 *.lha
 .D*
 *.o
