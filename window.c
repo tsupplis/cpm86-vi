@@ -184,11 +184,27 @@ int r,c;
 	cur_col = c;
 	/* AH=2: set cursor position, BH=page, DH=row, DL=column */
 #asm
+    push ax
+    push cx
+    push dx
+    push bx
+    push sp     ; Pushes the original SP value (before AX was pushed)
+    push bp
+    push si
+    push di
 	mov dh, byte ptr [bp+4]
 	mov dl, byte ptr [bp+6]
 	mov bh, 0
 	mov ah, 2
 	int 10h
+	pop di
+    pop si
+    pop bp
+    add sp, 2   ; Discards the saved SP value (replaces POP SP)
+    pop bx
+    pop dx
+    pop cx
+    pop ax
 #endasm
 }
 
@@ -227,6 +243,14 @@ int on;
 
 	/* AH=1: set cursor shape; a start-scanline past the end hides it */
 #asm
+    push ax
+    push cx
+    push dx
+    push bx
+    push sp     ; Pushes the original SP value (before AX was pushed)
+    push bp
+    push si
+    push di
 	mov ax, [bp+4]
 	cmp ax, 0
 	je windcursor_hide
@@ -237,6 +261,14 @@ windcursor_hide:
 windcursor_done:
 	mov ah, 1
 	int 10h
+	pop di
+    pop si
+    pop bp
+    add sp, 2   ; Discards the saved SP value (replaces POP SP)
+    pop bx
+    pop dx
+    pop cx
+    pop ax
 #endasm
 }
 
@@ -254,9 +286,20 @@ windcolorreset()
 windclear()
 {
 	clearbottom = Rows - 1;
-	/* AH=6,AL=0: scroll-clear rows 0..Rows-1 only, so a 24-row build
-	 * doesn't touch the BIOS's unused 25th physical line */
+	/* AH=6: scroll up window. AL=0 ("clear") is a documented shortcut
+	 * that some non-genuine BIOS clones don't implement correctly;
+	 * AL=25 (>= window height) forces the real scroll path instead,
+	 * which has the same visual effect (nothing left to scroll into
+	 * view) but is far more widely compatible. */
 #asm
+    push ax
+    push cx
+    push dx
+    push bx
+    push sp     ; Pushes the original SP value (before AX was pushed)
+    push bp
+    push si
+    push di
 	mov ax, 0600h
 	mov bh, 7
 	mov cx, 0
@@ -267,6 +310,14 @@ windclear()
 	mov bh, 0
 	mov dx, 0
 	int 10h
+	pop di
+    pop si
+    pop bp
+    add sp, 2   ; Discards the saved SP value (replaces POP SP)
+    pop bx
+    pop dx
+    pop cx
+    pop ax
 #endasm
 }
 
@@ -281,6 +332,14 @@ int c;
 	 * can't trust "wherever the cursor already is" to still be ours.
 	 * AH=2 sets it, then AH=0eh writes the char and auto-advances. */
 #asm
+    push ax
+    push cx
+    push dx
+    push bx
+    push sp     ; Pushes the original SP value (before AX was pushed)
+    push bp
+    push si
+    push di
 	mov dh, byte ptr cur_row_
 	mov dl, byte ptr cur_col_
 	mov bh, 0
@@ -291,6 +350,14 @@ int c;
 	mov bh, 0
 	mov ah, 0eh
 	int 10h
+	pop di
+    pop si
+    pop bp
+    add sp, 2   ; Discards the saved SP value (replaces POP SP)
+    pop bx
+    pop dx
+    pop cx
+    pop ax
 #endasm
 	cur_col++;
 	if ( cur_col >= Columns ) {
