@@ -9,7 +9,7 @@
 /* ------------------------------------------------------------------ */
 /* Raw keyboard input                                                  */
 /* ------------------------------------------------------------------ */
-#if defined(__PCBIOS__)
+#if defined(__PCBIOS__) && defined(__PCDOS__)
 
 /* One pending byte, for the second half of a synthesized ESC sequence. */
 static int pending = -1;
@@ -196,6 +196,12 @@ edit()
 #endif
                 break;
             }
+#if defined(__CPM86__)
+			if(c==0x11) {
+				State=NORMAL_11;
+				break;
+			}
+#endif
             /* End and Page-Down arrive as bare bytes, with no ESC prefix */
             if ( c=='\032' ) {		/* End key -> end of line */
                 Prenum=0;
@@ -207,8 +213,50 @@ edit()
                 normal(06);
                 break;
             }
+#if defined(__CPM86__)
+			switch(c) { 
+				case 0x13:
+					c='h';
+					break;
+				case 0x04:
+					c='l';
+					break;
+				case 0x05:
+					c='k';
+					break;
+				case 0x18:
+					c='j';
+					break;
+				case 0x03:
+					c=06;
+					break;
+				case 0x12:
+					c=02;
+					break;
+				
+				default:
+					break;
+			}
+#endif
+
             donormal(c);
             break;
+#if defined(__CPM86__)
+		case NORMAL_11:
+			/* Handle the special case for CPM86 when c==0x11 */
+			switch(c) {
+				case 'E':
+					donormal('0');
+					break;
+				case 'X':
+					donormal('$');
+					break;
+				default:
+					break;
+			}
+			State=NORMAL;
+			break;
+#endif
         case BRACKET_ESCAPE:
             /* A lone ESC (not followed by '[') is just the usual */
             /* harmless "make sure we're in Normal mode" keystroke; */

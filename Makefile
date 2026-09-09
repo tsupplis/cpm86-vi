@@ -171,7 +171,8 @@ normal.o: normal.c
 	$(CC) $(CFLAGS) -o $@ normal.c
 	$(STRIP) $@
 
-cpmtest.img: vicp52.cmd vicp100.cmd vicpbios.cmd curstest.cmd cpmbase.img test.txt
+cpmtest.img: vicp52.cmd vicp100.cmd vicpbios.cmd curstest.cmd cpmbase.img test.txt \
+    getch.cmd vid1bios.com vid2bios.com
 	cp cpmbase.img cpmtest.img
 	cpmrm -f ibmpc-514ss cpmtest.img 0:*.cmd
 	cpmrm -f ibmpc-514ss cpmtest.img 0:test.txt
@@ -179,7 +180,10 @@ cpmtest.img: vicp52.cmd vicp100.cmd vicpbios.cmd curstest.cmd cpmbase.img test.t
 	cpmcp -f ibmpc-514ss cpmtest.img vicp52.cmd 0:
 	cpmcp -f ibmpc-514ss cpmtest.img vicp100.cmd 0:
 	cpmcp -f ibmpc-514ss cpmtest.img vicpbios.cmd 0:
+	cpmcp -f ibmpc-514ss cpmtest.img vid1bios.com 0:
+	cpmcp -f ibmpc-514ss cpmtest.img vid2bios.com 0:
 	cpmcp -f ibmpc-514ss cpmtest.img curstest.cmd 0:
+	cpmcp -f ibmpc-514ss cpmtest.img getch.cmd 0:
 	cpmcp -f ibmpc-514ss cpmtest.img test.txt 0:
 	cpmls -F -f ibmpc-514ss cpmtest.img 0:*.*
 
@@ -223,3 +227,6 @@ ccpm86test: cpmtest.img
 
 cdos41test: cpmtest.img
 	./cdos41
+
+dosplustest: cpmtest.img
+	./dosplus

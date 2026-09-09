@@ -20,6 +20,7 @@
 #define NORMAL_ESCAPE 6
 #define BRACKET_ESCAPE 7
 #define REPLACE 8
+#define NORMAL_11 9
 #define WORDSEP " \t\n()[]{},;:'\"-="
 
 #define CHANGED Changed=1
