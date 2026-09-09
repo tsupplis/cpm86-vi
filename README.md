@@ -270,7 +270,7 @@ so the two builds share the same escape-parsing code in `edit.c`.
 | `vid1bios.com`             | — | — | ✅ | ✅ | ✅ | ✅ | ✅(2)|
 | `vid2bios.com`             | — | — | ✅  | ✅ | ✅  | ✅ | ✅(2) |
 1. keyboard navigation keys need to be configured
-2. need 25 lines terminal needed
+2. 25 lines terminal needed
 
 ---
 
