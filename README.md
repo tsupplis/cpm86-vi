@@ -28,29 +28,6 @@ emulator, no ANSI.SYS required.
 
 ---
 
-## Background
-
-STevie was originally written by Tim Thompson for the Atari 520 ST and later
-ported to various CP/M-80 machines. This version targets **CP/M-86** and
-**MS-DOS 1.1** on IBM-PC hardware. Screen/keyboard I/O is selected at compile
-time along two independent axes — only `window.c` and `edit.c` differ
-between builds; all other objects are shared:
-
-- **OS** (`__CPM86__`): uses BDOS for console I/O (raw keystrokes via BDOS
-  function 6, `sgtty`/`ioctl` for raw mode) — vs. plain DOS 1.1, which has
-  none of that and talks to the hardware directly.
-- **Screen/keyboard technique** (`__VTCMD__` + `__VT52__`/`__VT100__` vs.
-  `__PCBIOS__`): escape-sequence output through a terminal (VT-52 or
-  VT-100/ANSI) vs. direct PC BIOS calls (`INT 10h` for the screen, `INT 16h`
-  for the keyboard) — no terminal, no ANSI.SYS.
-
-These two axes are independent: `vibios.cmd` combines `__CPM86__` with
-`__PCBIOS__` (BIOS I/O, but still a CP/M-86 `.cmd` binary using the BDOS
-runtime for file I/O), while `vidos.com` is `__PCBIOS__` alone (a plain DOS
-1.1 `.com` binary).
-
----
-
 ## Features
 
 - Full vi normal-mode command set (movement, insert, append, delete, yank,
