@@ -320,12 +320,6 @@ so the two builds share the same escape-parsing code in `edit.c`.
 
 ---
 
-## Known issues / TODO
-
-See [TODO.md](TODO.md).
-
----
-
 ## Credits
 
 - **Tim Thompson** — original STevie for the Atari ST
