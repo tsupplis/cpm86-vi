@@ -95,7 +95,7 @@ edtcp52.o: edit.c
 	$(STRIP) $@
 
 wincp52.o: window.c gitver.h
-	$(CC) $(CFLAGS) -D__CPM86__ -D__VTCMD__ -D__VT52__ -o $@ $^
+	$(CC) $(CFLAGS) -D__CPM86__ -D__VTCMD__ -D__VT52__ -o $@ $<
 	$(STRIP) $@
 
 edtcp100.o: edit.c
@@ -103,7 +103,7 @@ edtcp100.o: edit.c
 	$(STRIP) $@
 
 wincp100.o: window.c gitver.h
-	$(CC) $(CFLAGS) -D__CPM86__ -D__VTCMD__ -D__VT100__ -o $@ $^
+	$(CC) $(CFLAGS) -D__CPM86__ -D__VTCMD__ -D__VT100__ -o $@ $<
 	$(STRIP) $@
 
 edtd1bio.o: edit.c
@@ -111,7 +111,7 @@ edtd1bio.o: edit.c
 	$(STRIP) $@
 
 wind1bio.o: window.c gitver.h
-	$(CC) $(CFLAGS) -D__PCDOS__=11 -D__PCBIOS__ -o $@ $^
+	$(CC) $(CFLAGS) -D__PCDOS__=11 -D__PCBIOS__ -o $@ $<
 	$(STRIP) $@
 
 edtd2bio.o: edit.c
@@ -119,7 +119,7 @@ edtd2bio.o: edit.c
 	$(STRIP) $@
 
 wind2bio.o: window.c gitver.h
-	$(CC) $(CFLAGS) -D__PCDOS__=20 -D__PCBIOS__ -o $@ $^
+	$(CC) $(CFLAGS) -D__PCDOS__=20 -D__PCBIOS__ -o $@ $<
 	$(STRIP) $@
 
 edtcpbio.o: edit.c
@@ -127,7 +127,7 @@ edtcpbio.o: edit.c
 	$(STRIP) $@
 
 wincpbio.o: window.c gitver.h
-	$(CC) -D__CPM86__ -D__PCBIOS__ -o $@ $^
+	$(CC) -D__CPM86__ -D__PCBIOS__ -o $@ $<
 	$(STRIP) $@
 
 # Checked against the current git state on every build, but only actually
