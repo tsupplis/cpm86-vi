@@ -62,18 +62,16 @@ int n;
 {
 	char *p;
 
-	if ( n == 0 ) {
-		if ( (p=prevline(Fileend)) != NULL )
-			Curschar = p;
-	}
-	else {
-		/* Start at the top of the file and go down 'n'-1 lines */
-		Curschar = Filemem;
-		while ( --n > 0 ) {
-			if ( (p=nextline(Curschar)) == NULL )
-				break;
-			Curschar = p;
-		}
+	/* n==0 means "last line": use the same descent logic as the
+	 * numbered case, with the actual line count as the target. */
+	if ( n == 0 )
+		n = cntlines(Filemem, Fileend) - 1;
+	/* Start at the top of the file and go down 'n'-1 lines */
+	Curschar = Filemem;
+	while ( --n > 0 ) {
+		if ( (p=nextline(Curschar)) == NULL )
+			break;
+		Curschar = p;
 	}
 	Topchar = Curschar;
 	for ( n=0; n<Rows/2; n++ ) {

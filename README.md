@@ -107,6 +107,7 @@ git checkout) as the version shown by the `:v` command; see `gitver.h`
 | `i` | Insert before cursor |
 | `a` | Append after cursor |
 | `o` | Open new line below, enter insert mode |
+| `O` | Open new line above, enter insert mode |
 | `r <c>` | Replace single character under cursor with `<c>` |
 | `R` | Enter replace mode (overwrite); `ESC` to exit |
 | `ESC` | Exit insert or replace mode, return to normal |
@@ -177,6 +178,7 @@ git checkout) as the version shown by the `:v` command; see `gitver.h`
 | `:set dec` | Display non-printable characters in decimal |
 | `:v` | Show the build variant and version (git describe) |
 | `:h` or `:help` | Show built-in help screen |
+| `:<N>` | Go to line `N` (clamps to last line if `N` exceeds the file) |
 
 ---
 
@@ -264,11 +266,12 @@ so the two builds share the same escape-parsing code in `edit.c`.
 
 | Binary | CP/M-86 1.1 | Concurrent CP/M-86 3.1 | Concurrent DOS 4.1 | DOS Plus 1.2 | PC-DOS 1.1 | DOS ≥ 2.0 | Emu2 |
 |--------|-------------|------------------------|---------------------|--------------|------------|-----------|------|
-| `vicpbios.cmd`             | ✅(3) | ❌ | ✅(3) | ✅ (3) | — | — | ✅(3) |
+| `vicpbios.cmd`             | ✅ | ❌ | ✅ | ✅ (3) | — | — | ✅ |
 | `vicp52.cmd` | ✅ | ✅(1) | ✅(1) | ✅ | — | — | ✅(1) |
 | `vicp100.cmd` | ✅ | ✅(1) | ✅(1) | ✅ | — | — | ✅(1) |
 | `vid1bios.com`             | — | — | ✅ | ✅ | ✅ | ✅ | ✅(2)|
 | `vid2bios.com`             | — | — | ✅  | ✅ | ✅  | ✅ | ✅(2) |
+| preferred | `vicpbios.cmd` | `vicp52.cmd` | `vid2bios.com` | `vid1bios.com`| `vid2bios.com`| `vid2bios.com`|
 1. keyboard navigation keys need to be configured
 2. 25 lines terminal needed
 3. cursor issues bdos/bios clashing, still experimental

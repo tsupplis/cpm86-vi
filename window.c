@@ -86,6 +86,10 @@ int r,c;
 windexit(r)
 int r;
 {
+    windclear();
+    windgoto(0,0);
+    windrefresh();
+	printf("Bye ...\n");
 	exit(r);
 }
 
@@ -249,6 +253,13 @@ windrefreshcursor()
 windexit(r)
 int r;
 {
+    windclear();
+    windgoto(0,0);
+    windrefresh();
+	printf("Bye ...\n");
+#if defined(__PCBIOS__) && defined(__CPM86__)
+	printf("\033E\033Y%c%cBye...\n",0x20,0x20);
+#endif
 	exit(r);
 }
 

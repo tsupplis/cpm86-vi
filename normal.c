@@ -171,6 +171,17 @@ int c;
 		startinsert("o");
 		Ninsert = 1;
 		break;
+	case 'O':
+		/* Open a new line above the current line, enter insert mode. */
+		resetundo();
+		beginline();
+		inschar('\n');
+		/* Back up to the new blank line we just inserted above. */
+		Curschar--;
+		updatescreen();
+		startinsert("O");
+		Ninsert = 1;
+		break;
 	case 'd':
 		nchar = vgetc();
 		n = (Prenum==0?1:Prenum);

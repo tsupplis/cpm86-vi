@@ -27,7 +27,8 @@ int firstc;	/* either ':', '/', or '?' */
 		if ( c=='\033' ) {
 			/* ESC cancels the command line */
 			windcolorreset();
-			message("");
+			clearlastmess();
+			message("Normal Mode");
 			updatescreen();
 			return;
 		}
@@ -41,7 +42,8 @@ int firstc;	/* either ':', '/', or '?' */
 			} else {
 				/* Backspace on empty line cancels */
 				windcolorreset();
-				message("");
+				clearlastmess();
+				message("Normal Mode");
 				updatescreen();
 				return;
 			}
@@ -202,6 +204,16 @@ int firstc;	/* either ':', '/', or '?' */
 	if ( strcmp(cmd,"h")==0 || strcmp(cmd,"help")==0 ) {
 		help();
 		return;
+	}
+	/* :N  — go to line N (or last line if N exceeds the file) */
+	{
+		char *pp = cmd;
+		while ( isdigit(*pp) )
+			pp++;
+		if ( pp != cmd && *pp == '\0' ) {
+			gotoline(atoi(cmd));
+			return;
+		}
 	}
 	badcmd();
 }

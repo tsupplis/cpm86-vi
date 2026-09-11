@@ -176,7 +176,6 @@ cpmtest.img: vicp52.cmd vicp100.cmd vicpbios.cmd curstest.cmd cpmbase.img test.t
 	cp cpmbase.img cpmtest.img
 	cpmrm -f ibmpc-514ss cpmtest.img 0:*.cmd
 	cpmrm -f ibmpc-514ss cpmtest.img 0:test.txt
-	cpmcp -f ibmpc-514ss cpmtest.img vicp52.cmd 0:vi.cmd
 	cpmcp -f ibmpc-514ss cpmtest.img vicp52.cmd 0:
 	cpmcp -f ibmpc-514ss cpmtest.img vicp100.cmd 0:
 	cpmcp -f ibmpc-514ss cpmtest.img vicpbios.cmd 0:
