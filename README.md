@@ -1,4 +1,4 @@
-# Vi Editor for CP/M-86 and DOS 1.1/1.25
+# Vi Editor for CP/M-86 and PC-DOS 1.1/MS-DOS 1.25
 
 A port of **STevie** (ST Editor for VI Enthusiasts, by Tim Thompson) to
 **CP/M-86** and **MS-DOS 1.1** on IBM-PC compatible hardware, compiled with
@@ -23,7 +23,7 @@ Most available options are either proprietary, CP/M-80 only, or require
 a specific hardware terminal or heavier. This port of STevie fills that gap:
 a familiar, full-screen vi experience that runs on standard IBM-PC
 hardware, either through a VT-52/VT-100 terminal emulator on CP/M-86, or
-directly against the PC BIOS on CP/M-86 or bare DOS 1.1 — no terminal
+directly against the PC BIOS on CP/M-86 or bare PC-DOS 1.1 — no terminal
 emulator, no ANSI.SYS required.
 
 ---
@@ -69,7 +69,7 @@ make dist          # produces vi-bin.zip
 # Copy CP/M-86 binaries to a CP/M-86 test disk image
 make cpmtest.img
 
-# Copy the DOS binary to a DOS 1.1 test disk image
+# Copy the DOS binary to a PC-DOS 1.1 test disk image
 make dostest.img
 
 # Run under the PCE CP/M-86 emulator (or emu2 from cpm86-crossdev)
