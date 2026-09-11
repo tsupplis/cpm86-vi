@@ -259,6 +259,11 @@ int r;
 	printf("Bye ...\n");
 #if defined(__PCBIOS__) && defined(__CPM86__)
 	printf("\033E\033Y%c%cBye...\n",0x20,0x20);
+#asm
+	mov  dl, 0Dh    ; CR
+	mov  cl, 2      ; C_WRITE
+	int  0E0h
+#endasm
 #endif
 	exit(r);
 }
