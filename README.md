@@ -8,7 +8,7 @@ A port of **STevie** (ST Editor for VI Enthusiasts, by Tim Thompson) to
 
 ---
 
-## Why vi on CP/M-86 (and DOS 1.1/1.25)?
+## Why vi on CP/M-86 (and PC-DOS 1.1/MS-DOS 1.25)?
 
 CP/M-86 ships with `ed` — a line-oriented editor inherited from DEC OSes.
 While powerful for scripting, `ed` is notoriously difficult to use
