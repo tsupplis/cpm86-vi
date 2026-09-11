@@ -271,7 +271,7 @@ so the two builds share the same escape-parsing code in `edit.c`.
 | `vicp100.cmd` | ✅ | ✅(1) | ✅(1) | ✅ | — | — | ✅(1) |
 | `vid1bios.com`             | — | — | ✅ | ✅ | ✅ | ✅ | ✅(2)|
 | `vid2bios.com`             | — | — | ✅  | ✅ | ✅  | ✅ | ✅(2) |
-| preferred | `vicpbios.cmd` | `vicp52.cmd` | `vid2bios.com` | `vid1bios.com`| `vid2bios.com`| `vid2bios.com`|
+
 1. keyboard navigation keys need to be configured
 2. 25 lines terminal needed
 3. cursor issues bdos/bios clashing, still experimental, dosplus xios
