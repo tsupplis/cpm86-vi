@@ -9,7 +9,7 @@
 /* ------------------------------------------------------------------ */
 /* Raw keyboard input                                                  */
 /* ------------------------------------------------------------------ */
-#if defined(__PCBIOS__) && defined(__PCDOS__)
+#if defined(__PCBIOS__)
 
 /* One pending byte, for the second half of a synthesized ESC sequence. */
 static int pending = -1;
@@ -105,7 +105,7 @@ getch()
 	}
 }
 
-#elif defined(__CPM86__)
+#elif defined(__VTCMD__)
 
 #define GETCH_BUFLEN 64
 static char getch_buffer[GETCH_BUFLEN];
@@ -132,7 +132,7 @@ getch()
     return c;
 }
 
-#endif /* __PCBIOS__ / __CPM86__ */
+#endif /* __PCBIOS__ / __VTCMD__ */
 
 /* OS-independent wrapper around whichever getch() is active above. */
 windgetc()
@@ -581,11 +581,15 @@ cursupdate()
 		/* If the cursor is off the bottom of the screen, */
 		/* put it at the top of the screen.. */
 		Topchar = Curschar;
-		/* ... and back up */
+		/* ... and back up so Curschar lands within visible rows (0 .. Rows-2) */
 		if ( nlines > Rows/3 )
 			scrolldown((2*Rows)/3);
 		else
 			scrolldown(Rows-2);
+		if ( (p=prevline(Topchar))!=NULL &&
+			(p=nextline(p))!=NULL ) {
+			Topchar = p;
+		}
 		updatescreen();
 	}
 
@@ -620,6 +624,8 @@ cursupdate()
 		}
 	}
 	}
+	if ( Cursrow >= Rows - 1 )
+		Cursrow = Rows - 2;
 }
 
 scrolldown(nlines)
