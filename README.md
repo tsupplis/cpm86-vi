@@ -270,7 +270,7 @@ so the two builds share the same escape-parsing code in `edit.c`.
 | `vicp52.cmd` | ✅ | ✅(1) | ✅(1) | ✅ | — | — | ✅(1) |
 | `vicp100.cmd` | ✅ | ✅(1) | ✅(1) | ✅ | — | — | ✅(1) |
 | `vid1bios.com`             | — | — | ✅ | ✅ | ✅ | ✅| ✅(2)|
-| `vid2bios.com`             | — | — | ✅  | ✅ | ✅  | — | ✅(2) |
+| `vid2bios.com`             | — | — | ✅  | ✅ | -  | ✅ | ✅(2) |
 
 1. keyboard navigation keys need to be configured
 2. 25 lines terminal needed
