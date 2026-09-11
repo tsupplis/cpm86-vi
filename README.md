@@ -264,7 +264,7 @@ so the two builds share the same escape-parsing code in `edit.c`.
 
 ## OS compatibility matrix
 
-| Binary | CP/M-86 1.1 | Concurrent CP/M-86 3.1 | Concurrent DOS 4.1 | DOS Plus 1.2 | PC-DOS 1.1 | DOS ≥ 2.0 | Emu2 |
+| Binary | CP/M-86 1.1 |  CCP/M-86 3.1 | CDOS 4.1 | DOS Plus 1.2 | PC-DOS 1.1 | DOS ≥ 2.0 | Emu2 |
 |--------|-------------|------------------------|---------------------|--------------|------------|-----------|------|
 | `vicpbios.cmd`             | ✅ | ❌ | ⚠️ (4) | ⚠️ (3) | — | — | ✅ |
 | `vicp52.cmd` | ✅ | ✅(1) | ✅(1) | ✅ | — | — | ✅(1) |
