@@ -283,5 +283,3 @@ so the two builds share the same escape-parsing code in `edit.c`.
 
 - **Tim Thompson** — original STevie for the Atari ST
 - **Jon Bradbury** — CP/M-80 port for the Philips P2000C
-- This CP/M-86 port adds IBM-PC keyboard handling, dual terminal builds,
-  and a cross-compilation Makefile
