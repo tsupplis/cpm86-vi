@@ -558,17 +558,15 @@ cursupdate()
 	}
 	else if ( Curschar < Topchar ) {
 		nlines = cntlines(Curschar,Topchar);
-		/* if the cursor is above the top of */
-		/* the screen, put it at the top of the screen.. */
-		Topchar = Curschar;
-		/* ... and, if we weren't very close to begin with, */
-		/* we scroll so that the line is close to the middle. */
-		if ( nlines > Rows/3 )
-			scrolldown(Rows/3);
-		else {
-			/* make sure we have the current line completely */
-			/* on the screen, by setting Topchar to the */
-			/* beginning of the current line (in a strange way). */
+		if ( nlines <= 3 ) {
+			while ( Curschar < Topchar ) {
+				if ( (p = prevline(Topchar)) == NULL )
+					break;
+				Topchar = p;
+			}
+		} else {
+			Topchar = Curschar;
+			scrolldown(Rows/2);
 			if ( (p=prevline(Topchar))!=NULL &&
 				(p=nextline(p))!=NULL ) {
 				Topchar = p;
@@ -578,19 +576,22 @@ cursupdate()
 	}
 	else if ( Curschar >= Botchar && Curschar < Fileend ) {
 		nlines = cntlines(Botchar,Curschar);
-		/* If the cursor is off the bottom of the screen, */
-		/* put it at the top of the screen.. */
-		Topchar = Curschar;
-		/* ... and back up so Curschar lands within visible rows (0 .. Rows-2) */
-		if ( nlines > Rows/3 )
-			scrolldown((2*Rows)/3);
-		else
-			scrolldown(Rows-2);
-		if ( (p=prevline(Topchar))!=NULL &&
-			(p=nextline(p))!=NULL ) {
-			Topchar = p;
+		if ( nlines <= 3 ) {
+			while ( Curschar >= Botchar && Topchar < Fileend ) {
+				if ( (p = nextline(Topchar)) == NULL )
+					break;
+				Topchar = p;
+				updatescreen();
+			}
+		} else {
+			Topchar = Curschar;
+			scrolldown(Rows/2);
+			if ( (p=prevline(Topchar))!=NULL &&
+				(p=nextline(p))!=NULL ) {
+				Topchar = p;
+			}
+			updatescreen();
 		}
-		updatescreen();
 	}
 
 	Cursrow = Curscol = Cursvcol = 0;
@@ -624,8 +625,6 @@ cursupdate()
 		}
 	}
 	}
-	if ( Cursrow >= Rows - 1 )
-		Cursrow = Rows - 2;
 }
 
 scrolldown(nlines)

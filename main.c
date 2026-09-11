@@ -155,6 +155,7 @@ filetonext()
 	int row, col;
 	char *screenp = Nextscreen;
 	char *memp = Topchar;
+	char *lastmemp = Topchar;
 	char *endscreen;
 	char *nextrow;
 	char extra[16];
@@ -179,6 +180,7 @@ filetonext()
 		if ( nextra > 0 )
 			c = extra[--nextra];
 		else {
+			lastmemp = memp;
 			c = (unsigned)(0xff & (*memp++));
 			/* when getting a character from the file, we */
 			/* may have to turn it into something else on */
@@ -218,6 +220,13 @@ filetonext()
 		*screenp++ = c;
 		col++;
 	}
+	/* If we stopped before finishing the current file character,
+	 * Botchar is where that character began, else memp. */
+	if ( screenp >= endscreen && nextra > 0 )
+		Botchar = lastmemp;
+	else
+		Botchar = memp;
+
 	/* make sure the rest of the screen is blank */
 	while ( screenp < endscreen )
 		*screenp++ = ' ';
@@ -226,11 +235,10 @@ filetonext()
 		row++;
 	else if ( Fileend == Filemem && State == INSERT )
 		row = 1;
-	while ( row < Rows ) {
+	while ( row < Rows - 1 ) {
 		Nextscreen[row*Columns] = '~';
 		row++;
 	}
-	Botchar = memp;
 }
 
 /*

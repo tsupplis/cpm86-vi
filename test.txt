@@ -1,37 +1,37 @@
-/* hellop.pli - Hello World in PL/I-86 for CP/M-86 -------------------------- */
-/* hellop.pli - Hello World in PL/I-86 for CP/M-86 -------------------------- *//* hellop.pli - Hello World in PL/I-86 for CP/M-86 -------------------------- */
-hellop:
-    procedure options(main);
-    procedure options(main);
-    procedure options(main);
-    procedure options(main);
-    procedure options(main);
-
-    put skip list('Hello from PL/I-86');
-
-end hellop;
-/* hellop.pli - Hello World in PL/I-86 for CP/M-86 -------------------------- */
-/* hellop.pli - Hello World in PL/I-86 for CP/M-86 -------------------------- *//* hellop.pli - Hello World in PL/I-86 for CP/M-86 -------------------------- */
-hellop:
-    procedure options(main);
-    procedure options(main);
-    procedure options(main);
-    procedure options(main);
-    procedure options(main);
-
-    put skip list('Hello from PL/I-86');
-
-end hellop;
-/* hellop.pli - Hello World in PL/I-86 for CP/M-86 -------------------------- */
-/* hellop.pli - Hello World in PL/I-86 for CP/M-86 -------------------------- *//* hellop.pli - Hello World in PL/I-86 for CP/M-86 -------------------------- */
-hellop:
-    procedure options(main);
-    procedure options(main);
-    procedure options(main);
-    procedure options(main);
-    procedure options(main);
-
-    put skip list('Hello from PL/I-86');
-
-end hellop;
+  1 /* hellop.pli - Hello World in PL/I-86 for CP/M-86 -------------------------- */
+  2 /* hellop.pli - Hello World in PL/I-86 for CP/M-86 -------------------------- *//* hellop.pli - Hello World in PL/I-86 for CP/M-86 --------------    ------------ */
+  3 hellop:
+  4     procedure options(main);
+  5     procedure options(main);
+  6     procedure options(main);
+  7     procedure options(main);
+  8     procedure options(main);
+  9 
+ 10     put skip list('Hello from PL/I-86');
+ 11 
+ 12 end hellop;
+ 13 /* hellop.pli - Hello World in PL/I-86 for CP/M-86 -------------------------- */
+ 14 /* hellop.pli - Hello World in PL/I-86 for CP/M-86 -------------------------- *//* hellop.pli - Hello World in PL/I-86 for CP/M-86 --------------    ------------ */
+ 15 hellop:
+ 16     procedure options(main);
+ 17     procedure options(main);
+ 18     procedure options(main);
+ 19     procedure options(main);
+ 20     procedure options(main);
+ 21 
+ 22     put skip list('Hello from PL/I-86');
+ 23 
+ 24 end hellop;
+ 25 /* hellop.pli - Hello World in PL/I-86 for CP/M-86 -------------------------- */
+ 26 /* hellop.pli - Hello World in PL/I-86 for CP/M-86 -------------------------- *//* hellop.pli - Hello World in PL/I-86 for CP/M-86 --------------    ------------ */
+ 27 hellop:
+ 28     procedure options(main);
+ 29     procedure options(main);
+ 30     procedure options(main);
+ 31     procedure options(main);
+ 32     procedure options(main);
+ 33 
+ 34     put skip list('Hello from PL/I-86');
+ 35 
+ 36 end hellop;
 
