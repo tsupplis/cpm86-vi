@@ -10,7 +10,7 @@
 /*#define UNIXPC	1	/* The AT&T UNIX PC (console) */
 #define TCAP		1	/* For termcap-based terminals */
 
-#define FILELENG 16000
+#define FILELENG 24000
 #define NORMAL 0
 #define CMDLINE 1
 #define INSERT 2
