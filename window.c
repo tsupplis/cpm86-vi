@@ -3,7 +3,7 @@
  */
 
 #include "stevie.h"
-#include "stdio.h"
+#include <stdio.h>
 #ifdef __CPM86__
 #include "sgtty.h"
 #endif
@@ -216,29 +216,7 @@ int r,c;
 	cur_row = r;
 	cur_col = c;
 	/* AH=2: set cursor position, BH=page, DH=row, DL=column */
-#asm
-    push ax
-    push cx
-    push dx
-    push bx
-    push sp     ; Pushes the original SP value (before AX was pushed)
-    push bp
-    push si
-    push di
-	mov dh, byte ptr [bp+4]
-	mov dl, byte ptr [bp+6]
-	mov bh, 0
-	mov ah, 2
-	int 10h
-	pop di
-    pop si
-    pop bp
-    add sp, 2   ; Discards the saved SP value (replaces POP SP)
-    pop bx
-    pop dx
-    pop cx
-    pop ax
-#endasm
+#include "windgoto.asm"
 }
 
 /* Re-issue our last known cursor position, without changing it. Used by
@@ -259,11 +237,6 @@ int r;
 	printf("Bye ...\n");
 #if defined(__PCBIOS__) && defined(__CPM86__)
 	printf("\033E\033Y%c%cBye...\n",0x20,0x20);
-#asm
-	mov  dl, 0Dh    ; CR
-	mov  cl, 2      ; C_WRITE
-	int  0E0h
-#endasm
 #endif
 	exit(r);
 }
@@ -287,34 +260,7 @@ int on;
 	int dummy;	/* forces a bp frame so [bp+N] addresses the arg */
 
 	/* AH=1: set cursor shape; a start-scanline past the end hides it */
-#asm
-    push ax
-    push cx
-    push dx
-    push bx
-    push sp     ; Pushes the original SP value (before AX was pushed)
-    push bp
-    push si
-    push di
-	mov ax, [bp+4]
-	cmp ax, 0
-	je windcursor_hide
-	mov cx, 0607h
-	jmp windcursor_done
-windcursor_hide:
-	mov cx, 2000h
-windcursor_done:
-	mov ah, 1
-	int 10h
-	pop di
-    pop si
-    pop bp
-    add sp, 2   ; Discards the saved SP value (replaces POP SP)
-    pop bx
-    pop dx
-    pop cx
-    pop ax
-#endasm
+#include "windcurs.asm"
 }
 
 windcolor(fg)
@@ -336,34 +282,7 @@ windclear()
 	 * AL=25 (>= window height) forces the real scroll path instead,
 	 * which has the same visual effect (nothing left to scroll into
 	 * view) but is far more widely compatible. */
-#asm
-    push ax
-    push cx
-    push dx
-    push bx
-    push sp     ; Pushes the original SP value (before AX was pushed)
-    push bp
-    push si
-    push di
-	mov ax, 0600h
-	mov bh, 7
-	mov cx, 0
-	mov dh, byte ptr clearbottom_
-	mov dl, 79
-	int 10h
-	mov ax, 0200h
-	mov bh, 0
-	mov dx, 0
-	int 10h
-	pop di
-    pop si
-    pop bp
-    add sp, 2   ; Discards the saved SP value (replaces POP SP)
-    pop bx
-    pop dx
-    pop cx
-    pop ax
-#endasm
+#include "windclr.asm"
 }
 
 windputc(c)

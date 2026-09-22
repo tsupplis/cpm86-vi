@@ -276,7 +276,7 @@ void deleol(void) {
         n++;
     while (n-- > 0)
         delchar();
-    addtobuff(Redobuff, 'D', NULL);
+    addtobuff(Redobuff, 'D', 0, 0, 0, 0, 0);
 }
 
 void delword(int deltrailing) /* 1 if trailing white space should be removed */

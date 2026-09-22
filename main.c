@@ -2,9 +2,16 @@
  * STEVIE - ST Editor for VI Enthusiasts   ...Tim Thompson...twitch!tjt...
  */
 
-#include "ctype.h"
-#include "stdio.h"
+#include <ctype.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include "stevie.h"
+
+static void filetonext(void);
+static void nexttoscreen(void);
+static void filealloc(void);
+static void screenalloc(void);
 
 int Rows;    /* Number of Rows and Columns */
 int Columns; /* in the current window. */
@@ -76,8 +83,7 @@ char *Insptr = NULL;
 char Replbuf[1024]; /* Original chars saved during Replace mode. */
 int Unrplchars = 0; /* Number of chars to restore on undo. */
 
-main(argc, argv) int argc;
-char **argv;
+int main(int argc, char **argv)
 {
     int mode = 16;
 
@@ -137,6 +143,7 @@ char **argv;
     updatescreen();
     edit();
     windexit(0);
+    return 0;
 }
 
 /*
@@ -146,7 +153,7 @@ char **argv;
  * stuff from Filemem to Nextscreen, and update Botchar.
  */
 
-filetonext() {
+static void filetonext(void) {
     int row, col;
     char *screenp = Nextscreen;
     char *memp = Topchar;
@@ -242,7 +249,7 @@ filetonext() {
  * to avoid unnecessary output.
  */
 
-nexttoscreen() {
+static void nexttoscreen(void) {
     char *np = Nextscreen;
     char *rp = Realscreen;
     char *endscreen;
@@ -278,12 +285,12 @@ nexttoscreen() {
     windrefresh();
 }
 
-updatescreen() {
+void updatescreen(void) {
     filetonext();
     nexttoscreen();
 }
 
-screenclear() {
+void screenclear(void) {
     int n;
 
     windclear();
@@ -294,7 +301,7 @@ screenclear() {
     }
 }
 
-filealloc() {
+static void filealloc(void) {
     if ((Filemem = malloc((unsigned)FILELENG)) == NULL) {
         fprintf(stderr, "Unable to allocate %d bytes for file memory!\n",
                 FILELENG);
@@ -303,14 +310,12 @@ filealloc() {
     Filemax = Filemem + FILELENG;
 }
 
-screenalloc() {
+static void screenalloc(void) {
     Realscreen = malloc((unsigned)(Rows * Columns));
     Nextscreen = malloc((unsigned)(Rows * Columns));
 }
 
-readfile(fname, fromp, nochangename) char *fname;
-char *fromp;
-int nochangename; /* if 1, don't change the Filename */
+int readfile(char *fname, char *fromp, int nochangename) /* if 1, don't change the Filename */
 {
     FILE *f;
     char buff[128];
@@ -371,7 +376,7 @@ int nochangename; /* if 1, don't change the Filename */
 static char getcbuff[1024];
 static char *getcnext = NULL;
 
-stuffin(s) char *s;
+void stuffin(char *s)
 {
     if (getcnext == NULL) {
         strcpy(getcbuff, s);
@@ -380,8 +385,7 @@ stuffin(s) char *s;
         strcat(getcbuff, s);
 }
 
-addtobuff(s, c1, c2, c3, c4, c5, c6) char *s;
-char c1, c2, c3, c4, c5, c6;
+void addtobuff(char *s, int c1, int c2, int c3, int c4, int c5, int c6)
 {
     char *p = s;
     if ((*p++ = c1) == '\0')
@@ -398,7 +402,7 @@ char c1, c2, c3, c4, c5, c6;
         return;
 }
 
-vgetc() {
+int vgetc(void) {
     if (getcnext != NULL) {
         int nextc = *getcnext++;
         if (*getcnext == '\0') {
@@ -410,7 +414,7 @@ vgetc() {
     return (windgetc());
 }
 
-vpeekc() {
+int vpeekc(void) {
     if (getcnext != NULL)
         return (*getcnext);
     return (-1);
@@ -422,7 +426,7 @@ vpeekc() {
  * Return non-zero if input is pending.
  */
 
-anyinput() {
+int anyinput(void) {
     if (getcnext != NULL)
         return (1);
     return (0);

@@ -2,7 +2,7 @@
  * STevie - ST editor for VI enthusiasts.    ...Tim Thompson...twitch!tjt...
  */
 
-#include "stdio.h"
+#include <stdio.h>
 #include "stevie.h"
 
 /*
@@ -275,7 +275,7 @@ struct charinfo chars[] = {
  *
  * Convert the charinfo strings to octal.
  */
-octchars() {
+void octchars(void) {
     char *p;
     int n;
 
@@ -292,7 +292,7 @@ octchars() {
  *
  * Convert the charinfo strings to hex.
  */
-hexchars() {
+void hexchars(void) {
     char *p;
     int n;
 
@@ -308,7 +308,7 @@ hexchars() {
  *
  * Convert the charinfo strings to decimal.
  */
-decchars() {
+void decchars(void) {
     char *p;
     int n;
 
@@ -320,7 +320,7 @@ decchars() {
     }
 }
 
-hextoint(c) int c;
+int hextoint(int c)
 {
     if (c >= '0' && c <= '9')
         return (c - '0');

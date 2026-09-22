@@ -58,7 +58,6 @@ extern int Ninsert, Undelchars;
 extern char Replbuf[];
 extern int Unrplchars;
 
-char *strcpy();
 
 /* cmdline.c */
 void readcmdline(int firstc);
@@ -89,6 +88,37 @@ void deleol(void);
 void delword(int deltrailing);
 void delline(int nlines);
 char *strchr(); /* custom impl in misccmds.c, Aztec libc has none - deferred */
+
+/* normal.c */
+void normal(int c);
+void resetundo(void);
+
+/* hexchars.c */
+void octchars(void);
+void hexchars(void);
+void decchars(void);
+int hextoint(int c);
+
+/* main.c */
+void updatescreen(void);
+void screenclear(void);
+int readfile(char *fname, char *fromp, int nochangename);
+void stuffin(char *s);
+void addtobuff(char *s, int c1, int c2, int c3, int c4, int c5, int c6);
+int vgetc(void);
+int vpeekc(void);
+int anyinput(void);
+
+/* edit.c */
+int windgetc(void);
+void edit(void);
+void getout(void);
+void cursupdate(void);
+int oneright(void);
+int oneleft(void);
+void beginline(void);
+int oneup(int n);
+int onedown(int n);
 
 windcursor(), windcolor(), windcolorreset();
 help();
