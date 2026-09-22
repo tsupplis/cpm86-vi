@@ -8,7 +8,7 @@
 
 /*#define ATARI		1	/* For the Atari 520 ST */
 /*#define UNIXPC	1	/* The AT&T UNIX PC (console) */
-#define TCAP		1	/* For termcap-based terminals */
+#define TCAP 1 /* For termcap-based terminals */
 
 #define FILELENG 24000
 #define NORMAL 0
@@ -23,12 +23,12 @@
 #define NORMAL_11 9
 #define WORDSEP " \t\n()[]{},;:'\"-="
 
-#define CHANGED Changed=1
-#define UNCHANGED Changed=0
+#define CHANGED Changed = 1
+#define UNCHANGED Changed = 0
 
 struct charinfo {
-	char ch_size;
-	char *ch_str;
+    char ch_size;
+    char *ch_str;
 };
 
 extern struct charinfo chars[];
@@ -58,11 +58,37 @@ extern int Ninsert, Undelchars;
 extern char Replbuf[];
 extern int Unrplchars;
 
-char *malloc(), *strchr(), *strsave(), *alloc(), *strcpy();
-deleol();
+char *strcpy();
 
-char *nextline(), *prevline(), *coladvance(), *ssearch();
-char *fwdsearch(), *bcksearch();
+/* cmdline.c */
+void readcmdline(int firstc);
+void message(char *s);
+void clearlastmess(void);
+void filemess(char *s);
+
+/* linefunc.c */
+char *nextline(char *curr);
+char *prevline(char *curr);
+char *coladvance(char *p, int col);
+char *strsave(char *string);
+void dosearch(int dir, char *str);
+void repsearch(void);
+
+/* misccmds.c */
+void opencmd(void);
+int issepchar(int c);
+int cntlines(char *pbegin, char *pend);
+void fileinfo(void);
+void gotoline(int n);
+void yankline(int n);
+void putline(int k);
+void inschar(int c);
+void insstr(char *s);
+void delchar(void);
+void deleol(void);
+void delword(int deltrailing);
+void delline(int nlines);
+char *strchr(); /* custom impl in misccmds.c, Aztec libc has none - deferred */
 
 windcursor(), windcolor(), windcolorreset();
 help();
