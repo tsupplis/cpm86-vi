@@ -125,14 +125,14 @@ void edit(void) {
     static char replbuf[1024];
     static char *replptr = NULL;
 
-    Prenum = 0;
+    vi_renum = 0;
 
     /* position the display and the cursor at the top of the file. */
-    Topchar = Filemem;
-    Curschar = Filemem;
-    Cursrow = Curscol = 0;
+    vi_top_char = vi_file_mem;
+    vi_curs_char = vi_file_mem;
+    vi_curs_row = vi_curs_col = 0;
 
-    if (State == INSERT)
+    if (vi_state == INSERT)
         message("Insert");
     else
         message("");
@@ -145,21 +145,21 @@ void edit(void) {
             /* Only (re)announce the mode when it actually changes, so a
              * command's own message (e.g. "File not written out...") isn't
              * immediately clobbered on the very next loop iteration. */
-            if (State != laststate) {
-                if (State == INSERT)
+            if (vi_state != laststate) {
+                if (vi_state == INSERT)
                     message("Insert Mode");
-                else if (State == REPLACE)
+                else if (vi_state == REPLACE)
                     message("Replace Mode");
-                else if (State == NORMAL)
+                else if (vi_state == NORMAL)
                     message("Normal Mode");
-                laststate = State;
+                laststate = vi_state;
             }
             /* printf("Curschar=(%d,%d) row/col=(%d,%d)",
                 Curschar,*Curschar,Cursrow,Curscol); */
-            windgoto(Cursrow, Curscol);
+            windgoto(vi_curs_row, vi_curs_col);
             windrefresh();
             c = vgetc();
-            switch (State) {
+            switch (vi_state) {
             case NORMAL:
                 /* We're in the normal (non-insert) mode. */
                 if (c == 27) {
@@ -167,26 +167,26 @@ void edit(void) {
                      * followed directly by a letter; VT100/ANSI sends ESC '['.
                      */
 #if defined(__VT52__) || defined(__PCBIOS__)
-                    State = NORMAL_ESCAPE;
+                    vi_state = NORMAL_ESCAPE;
 #elif defined(__VT100__)
-                    State = BRACKET_ESCAPE;
+                    vi_state = BRACKET_ESCAPE;
 #endif
                     break;
                 }
 #if defined(__CPM86__)
                 if (c == 0x11) {
-                    State = NORMAL_11;
+                    vi_state = NORMAL_11;
                     break;
                 }
 #endif
                 /* End and Page-Down arrive as bare bytes, with no ESC prefix */
                 if (c == '\032') { /* End key -> end of line */
-                    Prenum = 0;
+                    vi_renum = 0;
                     normal('$');
                     break;
                 }
                 if (c == '\n') { /* Page-Down key -> forward 1 screen */
-                    Prenum = 0;
+                    vi_renum = 0;
                     normal(06);
                     break;
                 }
@@ -231,7 +231,7 @@ void edit(void) {
                 default:
                     break;
                 }
-                State = NORMAL;
+                vi_state = NORMAL;
                 break;
 #endif
             case BRACKET_ESCAPE:
@@ -239,13 +239,13 @@ void edit(void) {
                 /* harmless "make sure we're in Normal mode" keystroke; */
                 /* the character that follows must still be executed. */
                 if (c == '[') {
-                    State = NORMAL_ESCAPE;
-                    Prenum = 0;
+                    vi_state = NORMAL_ESCAPE;
+                    vi_renum = 0;
                     break;
                 }
-                State = NORMAL;
+                vi_state = NORMAL;
                 if (c == 27)
-                    State = BRACKET_ESCAPE;
+                    vi_state = BRACKET_ESCAPE;
                 else
                     donormal(c);
                 break;
@@ -271,18 +271,18 @@ void edit(void) {
                     d = 02;
                     break;
                 }
-                State = NORMAL;
+                vi_state = NORMAL;
                 if (d) {
-                    Prenum = 0;
+                    vi_renum = 0;
                     normal(d);
                 }
                 /* Same as above: don't drop a keystroke that turns */
                 /* out not to be part of an escape sequence. */
                 else if (c == 27) {
 #if defined(__VT52__) || defined(__PCBIOS__)
-                    State = NORMAL_ESCAPE;
+                    vi_state = NORMAL_ESCAPE;
 #elif defined(__VT100__)
-                    State = BRACKET_ESCAPE;
+                    vi_state = BRACKET_ESCAPE;
 #endif
                 } else
                     donormal(c);
@@ -296,44 +296,44 @@ void edit(void) {
                     /* only happen when we're editing a new file or a */
                     /* file that doesn't have a newline at the end of */
                     /* the line), add a newline automatically. */
-                    if (Curschar >= Fileend) {
+                    if (vi_curs_char >= vi_file_end) {
                         insertchar('\n');
-                        Curschar--;
+                        vi_curs_char--;
                     }
 
                     /* Don't end up on a '\n' if you can help it. */
-                    if (Curschar > Filemem && *Curschar == '\n' &&
-                        *(Curschar - 1) != '\n') {
-                        Curschar--;
+                    if (vi_curs_char > vi_file_mem && *vi_curs_char == '\n' &&
+                        *(vi_curs_char - 1) != '\n') {
+                        vi_curs_char--;
                     }
-                    State = NORMAL;
+                    vi_state = NORMAL;
                     message("");
-                    Uncurschar = Insstart;
-                    Undelchars = Ninsert;
+                    vi_uncurs_char = vi_ins_start;
+                    vi_undel_chars = vi_ninsert;
                     /* Undobuff[0] = '\0'; */
                     /* construct the Redo buffer */
-                    p = Redobuff;
-                    q = Insbuff;
-                    while (q < Insptr)
+                    p = vi_redo_buff;
+                    q = vi_ins_buff;
+                    while (q < vi_ins_ptr)
                         *p++ = *q++;
                     *p++ = '\033';
                     *p = '\0';
                     updatescreen();
                     break;
                 case '\b':
-                    if (Curschar <= Insstart)
+                    if (vi_curs_char <= vi_ins_start)
                         beep();
                     else {
                         char *target;
-                        Curschar--;
-                        target = Curschar;
+                        vi_curs_char--;
+                        target = vi_curs_char;
                         delchar();
                         /* delchar() may back Curschar up further to avoid */
                         /* landing on a trailing newline (for Normal mode); */
                         /* Insert mode always wants it exactly at 'target'. */
-                        Curschar = target;
-                        Insptr--;
-                        Ninsert--;
+                        vi_curs_char = target;
+                        vi_ins_ptr--;
+                        vi_ninsert--;
                         cursupdate();
                         updatescreen();
                     }
@@ -342,8 +342,8 @@ void edit(void) {
                 {
                     int wasnewline = 0;
                     char *p1;
-                    p1 = Curschar;
-                    if (*Curschar == '\n')
+                    p1 = vi_curs_char;
+                    if (*vi_curs_char == '\n')
                         wasnewline = 1;
                     inschar('[');
                     inschar('x');
@@ -354,18 +354,18 @@ void edit(void) {
                     cursupdate();
                     updatescreen();
                     c2 = gethexchar();
-                    Curschar = p1;
+                    vi_curs_char = p1;
                     delchar();
                     delchar();
                     delchar();
                     c = 16 * hextoint(c1) + hextoint(c2);
-                    if (Debug)
+                    if (vi_debug)
                         printf("(c=%d)", c);
                     if (wasnewline)
-                        Curschar++;
+                        vi_curs_char++;
                     inschar(c);
-                    Ninsert++;
-                    *Insptr++ = c;
+                    vi_ninsert++;
+                    *vi_ins_ptr++ = c;
                     updatescreen();
                     break;
                 }
@@ -395,18 +395,18 @@ void edit(void) {
                 switch (c) {
                 case '\033': /* ESC exits replace mode */
                     /* Don't end up on a '\n' */
-                    if (Curschar > Filemem && *Curschar == '\n' &&
-                        *(Curschar - 1) != '\n')
-                        Curschar--;
-                    State = NORMAL;
+                    if (vi_curs_char > vi_file_mem && *vi_curs_char == '\n' &&
+                        *(vi_curs_char - 1) != '\n')
+                        vi_curs_char--;
+                    vi_state = NORMAL;
                     /* Save originals for undo */
-                    Unrplchars = (int)(replptr - replbuf);
-                    if (Unrplchars > 0) {
-                        char *s = replbuf, *d = Replbuf;
-                        int k = Unrplchars;
+                    vi_unrpl_chars = (int)(replptr - replbuf);
+                    if (vi_unrpl_chars > 0) {
+                        char *s = replbuf, *d = vi_repl_buf;
+                        int k = vi_unrpl_chars;
                         while (k-- > 0)
                             *d++ = *s++;
-                        UndoChanged = Changed;
+                        vi_undo_changed = vi_changed;
                     }
                     replptr = NULL;
                     updatescreen();
@@ -414,8 +414,8 @@ void edit(void) {
                 case '\b': /* backspace: restore original char */
                     if (replptr > replbuf) {
                         replptr--;
-                        Curschar--;
-                        *Curschar = *replptr;
+                        vi_curs_char--;
+                        *vi_curs_char = *replptr;
                         CHANGED;
                         cursupdate();
                         updatescreen();
@@ -428,14 +428,14 @@ void edit(void) {
                         /* Save original char before overwriting */
                         if (replptr < replbuf + sizeof(replbuf) - 1) {
                             /* If at end of file or newline, insert instead */
-                            if (Curschar >= Fileend || *Curschar == '\n') {
+                            if (vi_curs_char >= vi_file_end || *vi_curs_char == '\n') {
                                 inschar(c);
                             } else {
-                                *replptr++ = *Curschar;
-                                *Curschar = c;
+                                *replptr++ = *vi_curs_char;
+                                *vi_curs_char = c;
                                 CHANGED;
-                                if (Curschar + 1 < Fileend)
-                                    Curschar++;
+                                if (vi_curs_char + 1 < vi_file_end)
+                                    vi_curs_char++;
                             }
                             cursupdate();
                             updatescreen();
@@ -457,8 +457,8 @@ void edit(void) {
  */
 static void donormal(int c)
 {
-    if ((Prenum > 0 && isdigit(c)) || (isdigit(c) && c != '0')) {
-        Prenum = Prenum * 10 + (c - '0');
+    if ((vi_renum > 0 && isdigit(c)) || (isdigit(c) && c != '0')) {
+        vi_renum = vi_renum * 10 + (c - '0');
         return;
     }
     /* Forget the last message: a command that repeats the same warning
@@ -466,7 +466,7 @@ static void donormal(int c)
      * still show it, not have it silently suppressed as unchanged. */
     clearlastmess();
     normal(c);
-    Prenum = 0;
+    vi_renum = 0;
 }
 
 static void insertchar(int c)
@@ -475,20 +475,20 @@ static void insertchar(int c)
 
     if (!anyinput()) {
         inschar(c);
-        *Insptr++ = c;
-        Ninsert++;
+        *vi_ins_ptr++ = c;
+        vi_ninsert++;
     } else {
         /* If there's any pending input, grab */
         /* it all at once. */
-        p = Insptr;
-        *Insptr++ = c;
-        Ninsert++;
+        p = vi_ins_ptr;
+        *vi_ins_ptr++ = c;
+        vi_ninsert++;
         while ((c = vpeekc()) != '\033') {
             c = vgetc();
-            *Insptr++ = c;
-            Ninsert++;
+            *vi_ins_ptr++ = c;
+            vi_ninsert++;
         }
-        *Insptr = '\0';
+        *vi_ins_ptr = '\0';
         insstr(p);
     }
     updatescreen();
@@ -498,7 +498,7 @@ static int gethexchar(void) {
     int c;
 
     for (;;) {
-        windgoto(Cursrow, Curscol);
+        windgoto(vi_curs_row, vi_curs_col);
         windrefresh();
         c = vgetc();
         if (hextoint(c) >= 0)
@@ -512,7 +512,7 @@ static int gethexchar(void) {
 }
 
 void getout(void) {
-    windgoto(Rows - 1, 0);
+    windgoto(vi_rows - 1, 0);
     windrefresh();
     putchar('\r');
     putchar('\n');
@@ -524,47 +524,47 @@ void cursupdate(void) {
     int inc, c, nlines;
 
     /* special case: file is completely empty */
-    if (Fileend == Filemem) {
-        Topchar = Curschar = Filemem;
-    } else if (Curschar < Topchar) {
-        nlines = cntlines(Curschar, Topchar);
+    if (vi_file_end == vi_file_mem) {
+        vi_top_char = vi_curs_char = vi_file_mem;
+    } else if (vi_curs_char < vi_top_char) {
+        nlines = cntlines(vi_curs_char, vi_top_char);
         if (nlines <= 3) {
-            while (Curschar < Topchar) {
-                if ((p = prevline(Topchar)) == NULL)
+            while (vi_curs_char < vi_top_char) {
+                if ((p = prevline(vi_top_char)) == NULL)
                     break;
-                Topchar = p;
+                vi_top_char = p;
             }
         } else {
-            Topchar = Curschar;
-            scrolldown(Rows / 2);
-            if ((p = prevline(Topchar)) != NULL && (p = nextline(p)) != NULL) {
-                Topchar = p;
+            vi_top_char = vi_curs_char;
+            scrolldown(vi_rows / 2);
+            if ((p = prevline(vi_top_char)) != NULL && (p = nextline(p)) != NULL) {
+                vi_top_char = p;
             }
         }
         updatescreen();
-    } else if (Curschar >= Botchar && Curschar < Fileend) {
-        nlines = cntlines(Botchar, Curschar);
+    } else if (vi_curs_char >= vi_bot_char && vi_curs_char < vi_file_end) {
+        nlines = cntlines(vi_bot_char, vi_curs_char);
         if (nlines <= 3) {
-            while (Curschar >= Botchar && Topchar < Fileend) {
-                if ((p = nextline(Topchar)) == NULL)
+            while (vi_curs_char >= vi_bot_char && vi_top_char < vi_file_end) {
+                if ((p = nextline(vi_top_char)) == NULL)
                     break;
-                Topchar = p;
+                vi_top_char = p;
                 updatescreen();
             }
         } else {
-            Topchar = Curschar;
-            scrolldown(Rows / 2);
-            if ((p = prevline(Topchar)) != NULL && (p = nextline(p)) != NULL) {
-                Topchar = p;
+            vi_top_char = vi_curs_char;
+            scrolldown(vi_rows / 2);
+            if ((p = prevline(vi_top_char)) != NULL && (p = nextline(p)) != NULL) {
+                vi_top_char = p;
             }
             updatescreen();
         }
     }
 
-    Cursrow = Curscol = Cursvcol = 0;
+    vi_curs_row = vi_curs_col = vi_curs_vcol = 0;
     {
         int wrapped = 0;
-        for (p = Topchar; p < Curschar; p++) {
+        for (p = vi_top_char; p < vi_curs_char; p++) {
             c = *p;
             if (c == '\n') {
                 /* If the previous line filled exactly Columns chars
@@ -573,20 +573,20 @@ void cursupdate(void) {
                  * Two consecutive \n (blank line) still works because
                  * wrapped is cleared after each \n. */
                 if (!wrapped)
-                    Cursrow++;
-                Curscol = Cursvcol = wrapped = 0;
+                    vi_curs_row++;
+                vi_curs_col = vi_curs_vcol = wrapped = 0;
                 continue;
             }
             /* A tab gets expanded, depending on the current column */
             if (c == '\t')
-                inc = (8 - (Curscol) % 8);
+                inc = (8 - (vi_curs_col) % 8);
             else
                 inc = chars[(unsigned)(c & 0xff)].ch_size;
-            Curscol += inc;
-            Cursvcol += inc;
-            if (Curscol >= Columns) {
-                Curscol -= Columns;
-                Cursrow++;
+            vi_curs_col += inc;
+            vi_curs_vcol += inc;
+            if (vi_curs_col >= vi_columns) {
+                vi_curs_col -= vi_columns;
+                vi_curs_row++;
                 wrapped = 1;
             } else {
                 wrapped = 0;
@@ -602,9 +602,9 @@ static void scrolldown(int nlines)
 
     /* Scroll up 'nlines' lines. */
     for (n = nlines; n > 0; n--) {
-        if ((p = prevline(Topchar)) == NULL)
+        if ((p = prevline(vi_top_char)) == NULL)
             break;
-        Topchar = p;
+        vi_top_char = p;
     }
 }
 
@@ -621,20 +621,20 @@ static void scrolldown(int nlines)
 int oneright(void) {
     char *p;
 
-    p = Curschar;
-    if ((*p++) == '\n' || p >= Fileend || *p == '\n')
+    p = vi_curs_char;
+    if ((*p++) == '\n' || p >= vi_file_end || *p == '\n')
         return (0);
-    Curschar++;
+    vi_curs_char++;
     return (1);
 }
 
 int oneleft(void) {
     char *p;
 
-    p = Curschar;
-    if (*p == '\n' || p == Filemem || *(p - 1) == '\n')
+    p = vi_curs_char;
+    if (*p == '\n' || p == vi_file_mem || *(p - 1) == '\n')
         return (0);
-    Curschar--;
+    vi_curs_char--;
     return (1);
 }
 
@@ -647,8 +647,8 @@ int oneup(int n) {
     char *p, *np;
     int savevcol, k;
 
-    savevcol = Cursvcol;
-    p = Curschar;
+    savevcol = vi_curs_vcol;
+    p = vi_curs_char;
     for (k = 0; k < n; k++) {
         /* Look for the previous line */
         if ((np = prevline(p)) == NULL) {
@@ -660,13 +660,13 @@ int oneup(int n) {
         }
         p = np;
     }
-    Curschar = p;
+    vi_curs_char = p;
     /* This makes sure Topchar gets updated so the complete line */
     /* is one the screen. */
     cursupdate();
     /* try to advance to the same (virtual) column */
     /* that we were at before. */
-    Curschar = coladvance(p, savevcol);
+    vi_curs_char = coladvance(p, savevcol);
     return (1);
 }
 
@@ -674,7 +674,7 @@ int onedown(int n) {
     char *p, *np;
     int k;
 
-    p = Curschar;
+    p = vi_curs_char;
     for (k = 0; k < n; k++) {
         /* Look for the next line */
         if ((np = nextline(p)) == NULL) {
@@ -687,6 +687,6 @@ int onedown(int n) {
     }
     /* try to advance to the same (virtual) column */
     /* that we were at before. */
-    Curschar = coladvance(p, Cursvcol);
+    vi_curs_char = coladvance(p, vi_curs_vcol);
     return (1);
 }

@@ -23,8 +23,8 @@
 #define NORMAL_11 9
 #define WORDSEP " \t\n()[]{},;:'\"-="
 
-#define CHANGED Changed = 1
-#define UNCHANGED Changed = 0
+#define CHANGED vi_changed = 1
+#define UNCHANGED vi_changed = 0
 
 struct charinfo {
     char ch_size;
@@ -33,30 +33,30 @@ struct charinfo {
 
 extern struct charinfo chars[];
 
-extern int State;
-extern int Rows;
-extern int Columns;
-extern char *Realscreen;
-extern char *Nextscreen;
-extern char *Filename;
-extern char *Filemem;
-extern char *Filemax;
-extern char *Fileend;
-extern char *Topchar;
-extern char *Botchar;
-extern char *Curschar;
-extern char *Insstart;
-extern int Cursrow, Curscol, Cursvcol;
-extern int Prenum;
-extern int Debug;
-extern int Changed;
-extern int UndoChanged;
-extern int Binary;
-extern char Redobuff[], Undobuff[], Insbuff[];
-extern char *Uncurschar, *Insptr;
-extern int Ninsert, Undelchars;
-extern char Replbuf[];
-extern int Unrplchars;
+extern int vi_state;
+extern int vi_rows;
+extern int vi_columns;
+extern char *vi_real_scr;
+extern char *vi_next_scr;
+extern char *vi_file_name;
+extern char *vi_file_mem;
+extern char *vi_file_max;
+extern char *vi_file_end;
+extern char *vi_top_char;
+extern char *vi_bot_char;
+extern char *vi_curs_char;
+extern char *vi_ins_start;
+extern int vi_curs_row, vi_curs_col, vi_curs_vcol;
+extern int vi_renum;
+extern int vi_debug;
+extern int vi_changed;
+extern int vi_undo_changed;
+extern int vi_binary;
+extern char vi_redo_buff[], vi_undo_buff[], vi_ins_buff[];
+extern char *vi_uncurs_char, *vi_ins_ptr;
+extern int vi_ninsert, vi_undel_chars;
+extern char vi_repl_buf[];
+extern int vi_unrpl_chars;
 
 
 /* cmdline.c */
@@ -87,7 +87,6 @@ void delchar(void);
 void deleol(void);
 void delword(int deltrailing);
 void delline(int nlines);
-char *strchr(); /* custom impl in misccmds.c, Aztec libc has none - deferred */
 
 /* normal.c */
 void normal(int c);

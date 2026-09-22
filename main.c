@@ -13,75 +13,75 @@ static void nexttoscreen(void);
 static void filealloc(void);
 static void screenalloc(void);
 
-int Rows;    /* Number of Rows and Columns */
-int Columns; /* in the current window. */
+int vi_rows;    /* Number of Rows and Columns */
+int vi_columns; /* in the current window. */
 
-char *Realscreen; /* What's currently on the screen, a single */
+char *vi_real_scr; /* What's currently on the screen, a single */
                   /* array of size Rows*Columns. */
-char *Nextscreen; /* What's to be put on the screen. */
+char *vi_next_scr; /* What's to be put on the screen. */
 
-char *Filename = NULL; /* Current file name */
+char *vi_file_name = NULL; /* Current file name */
 
-char *Filemem; /* The contents of the file, as a single array. */
+char *vi_file_mem; /* The contents of the file, as a single array. */
 
-char *Filemax; /* Pointer to the end of allocated space for */
+char *vi_file_max; /* Pointer to the end of allocated space for */
                /* Filemem. (It points to the first byte AFTER */
                /* the allocated space.) */
 
-char *Fileend; /* Pointer to the end of the file in Filemem. */
+char *vi_file_end; /* Pointer to the end of the file in Filemem. */
                /* (It points to the byte AFTER the last byte.) */
 
-char *Topchar; /* Pointer to the byte in Filemem which is */
+char *vi_top_char; /* Pointer to the byte in Filemem which is */
                /* in the upper left corner of the screen. */
 
-char *Botchar; /* Pointer to the byte in Filemem which is */
+char *vi_bot_char; /* Pointer to the byte in Filemem which is */
                /* just off the bottom of the screen. */
 
-char *Curschar; /* Pointer to byte in Filemem at which the */
+char *vi_curs_char; /* Pointer to byte in Filemem at which the */
                 /* cursor is currently placed. */
 
-int Cursrow, Curscol; /* Current position of cursor */
+int vi_curs_row, vi_curs_col; /* Current position of cursor */
 
-int Cursvcol; /* Current virtual column, the column number of */
+int vi_curs_vcol; /* Current virtual column, the column number of */
               /* the file's actual line, as opposed to the */
               /* column number we're at on the screen.  This */
               /* makes a difference on lines that span more */
               /* than one screen line. */
 
-int State = NORMAL; /* This is the current state of the command */
+int vi_state = NORMAL; /* This is the current state of the command */
                     /* interpreter. */
 
-int Prenum = 0; /* The (optional) number before a command. */
+int vi_renum = 0; /* The (optional) number before a command. */
 
-char *Insstart; /* This is where the latest insert/append */
+char *vi_ins_start; /* This is where the latest insert/append */
                 /* mode started. */
 
-int Changed = 0; /* Set to 1 if something in the file has been */
+int vi_changed = 0; /* Set to 1 if something in the file has been */
                  /* changed and not written out. */
 
-int UndoChanged = 0; /* Modified state before the current undoable change. */
+int vi_undo_changed = 0; /* Modified state before the current undoable change. */
 
-int Debug = 0;
+int vi_debug = 0;
 
-int Binary = 0; /* Set to 1 if the file should be read and written */
+int vi_binary = 0; /* Set to 1 if the file should be read and written */
                 /* in binary mode (no cr-lf translation). */
 
-char Redobuff[1024]; /* Each command should stuff characters into this */
+char vi_redo_buff[1024]; /* Each command should stuff characters into this */
                      /* buffer that will re-execute itself. */
 
-char Undobuff[1024]; /* Each command should stuff characters into this */
+char vi_undo_buff[1024]; /* Each command should stuff characters into this */
                      /* buffer that will undo its effects. */
 
-char Insbuff[1024]; /* Each insertion gets stuffed into this buffer. */
+char vi_ins_buff[1024]; /* Each insertion gets stuffed into this buffer. */
 
-char *Uncurschar = NULL; /* Curschar is restored to this before undoing. */
+char *vi_uncurs_char = NULL; /* Curschar is restored to this before undoing. */
 
-int Ninsert = 0;    /* Number of characters in the current insertion. */
-int Undelchars = 0; /* Number of characters to delete, when undoing. */
-char *Insptr = NULL;
+int vi_ninsert = 0;    /* Number of characters in the current insertion. */
+int vi_undel_chars = 0; /* Number of characters to delete, when undoing. */
+char *vi_ins_ptr = NULL;
 
-char Replbuf[1024]; /* Original chars saved during Replace mode. */
-int Unrplchars = 0; /* Number of chars to restore on undo. */
+char vi_repl_buf[1024]; /* Original chars saved during Replace mode. */
+int vi_unrpl_chars = 0; /* Number of chars to restore on undo. */
 
 int main(int argc, char **argv)
 {
@@ -96,10 +96,10 @@ int main(int argc, char **argv)
             mode = 8;
             break;
         case 'd':
-            Debug = 1;
+            vi_debug = 1;
             break;
         case 'b':
-            Binary = 1;
+            vi_binary = 1;
             break;
         }
         argc--;
@@ -111,13 +111,13 @@ int main(int argc, char **argv)
         exit(1);
     }
 
-    Filename = strsave(argv[1]);
+    vi_file_name = strsave(argv[1]);
 
     windinit();
 
     /* Make sure Rows/Columns are big enough */
-    if (Rows < 3 || Columns < 16) {
-        fprintf(stderr, "Rows=%d Columns=%d not big enough!\n", Rows, Columns);
+    if (vi_rows < 3 || vi_columns < 16) {
+        fprintf(stderr, "Rows=%d Columns=%d not big enough!\n", vi_rows, vi_columns);
         windexit(0);
     }
 
@@ -135,10 +135,10 @@ int main(int argc, char **argv)
 
     screenclear();
 
-    Fileend = Filemem;
-    if (readfile(Filename, Fileend, 0))
+    vi_file_end = vi_file_mem;
+    if (readfile(vi_file_name, vi_file_end, 0))
         filemess("[New File]");
-    Topchar = Curschar = Filemem;
+    vi_top_char = vi_curs_char = vi_file_mem;
 
     updatescreen();
     edit();
@@ -155,9 +155,9 @@ int main(int argc, char **argv)
 
 static void filetonext(void) {
     int row, col;
-    char *screenp = Nextscreen;
-    char *memp = Topchar;
-    char *lastmemp = Topchar;
+    char *screenp = vi_next_scr;
+    char *memp = vi_top_char;
+    char *lastmemp = vi_top_char;
     char *endscreen;
     char *nextrow;
     char extra[16];
@@ -167,10 +167,10 @@ static void filetonext(void) {
 
     /* The number of rows shown is Rows-1. */
     /* The last line is the status/command line. */
-    endscreen = &screenp[(Rows - 1) * Columns];
+    endscreen = &screenp[(vi_rows - 1) * vi_columns];
 
     row = col = 0;
-    while (screenp < endscreen && memp < Fileend) {
+    while (screenp < endscreen && memp < vi_file_end) {
 
         /* Get the next character to put on the screen. */
 
@@ -206,7 +206,7 @@ static void filetonext(void) {
         if (c == '\n') {
             row++;
             /* get pointer to start of next row */
-            nextrow = &Nextscreen[row * Columns];
+            nextrow = &vi_next_scr[row * vi_columns];
             /* blank out the rest of this row */
             while (screenp != nextrow)
                 *screenp++ = ' ';
@@ -214,7 +214,7 @@ static void filetonext(void) {
             continue;
         }
         /* store the character in Nextscreen */
-        if (col >= Columns) {
+        if (col >= vi_columns) {
             row++;
             col = 0;
         }
@@ -224,9 +224,9 @@ static void filetonext(void) {
     /* If we stopped before finishing the current file character,
      * Botchar is where that character began, else memp. */
     if (screenp >= endscreen && nextra > 0)
-        Botchar = lastmemp;
+        vi_bot_char = lastmemp;
     else
-        Botchar = memp;
+        vi_bot_char = memp;
 
     /* make sure the rest of the screen is blank */
     while (screenp < endscreen)
@@ -234,10 +234,10 @@ static void filetonext(void) {
     /* put '~'s on rows that aren't part of the file. */
     if (col != 0)
         row++;
-    else if (Fileend == Filemem && State == INSERT)
+    else if (vi_file_end == vi_file_mem && vi_state == INSERT)
         row = 1;
-    while (row < Rows - 1) {
-        Nextscreen[row * Columns] = '~';
+    while (row < vi_rows - 1) {
+        vi_next_scr[row * vi_columns] = '~';
         row++;
     }
 }
@@ -250,14 +250,14 @@ static void filetonext(void) {
  */
 
 static void nexttoscreen(void) {
-    char *np = Nextscreen;
-    char *rp = Realscreen;
+    char *np = vi_next_scr;
+    char *rp = vi_real_scr;
     char *endscreen;
     char nc;
     int row = 0, col = 0;
     int gorow = -1, gocol = -1;
 
-    endscreen = &np[(Rows - 1) * Columns];
+    endscreen = &np[(vi_rows - 1) * vi_columns];
 
     for (; np < endscreen; np++, rp++) {
         /* If desired screen (contents of Nextscreen) does not */
@@ -277,7 +277,7 @@ static void nexttoscreen(void) {
             }
             gocol++;
         }
-        if (++col >= Columns) {
+        if (++col >= vi_columns) {
             col = 0;
             row++;
         }
@@ -295,24 +295,24 @@ void screenclear(void) {
 
     windclear();
     /* blank out the stored screens */
-    for (n = Rows * Columns - 1; n >= 0; n--) {
-        Realscreen[n] = ' ';
-        Nextscreen[n] = ' ';
+    for (n = vi_rows * vi_columns - 1; n >= 0; n--) {
+        vi_real_scr[n] = ' ';
+        vi_next_scr[n] = ' ';
     }
 }
 
 static void filealloc(void) {
-    if ((Filemem = malloc((unsigned)FILELENG)) == NULL) {
+    if ((vi_file_mem = malloc((unsigned)FILELENG)) == NULL) {
         fprintf(stderr, "Unable to allocate %d bytes for file memory!\n",
                 FILELENG);
         exit(1);
     }
-    Filemax = Filemem + FILELENG;
+    vi_file_max = vi_file_mem + FILELENG;
 }
 
 static void screenalloc(void) {
-    Realscreen = malloc((unsigned)(Rows * Columns));
-    Nextscreen = malloc((unsigned)(Rows * Columns));
+    vi_real_scr = malloc((unsigned)(vi_rows * vi_columns));
+    vi_next_scr = malloc((unsigned)(vi_rows * vi_columns));
 }
 
 int readfile(char *fname, char *fromp, int nochangename) /* if 1, don't change the Filename */
@@ -327,35 +327,35 @@ int readfile(char *fname, char *fromp, int nochangename) /* if 1, don't change t
     message(buff);
 
     if (!nochangename)
-        Filename = strsave(fname);
+        vi_file_name = strsave(fname);
 
     if ((f = fopen(fname, "r")) == NULL) {
-        Fileend = Filemem;
+        vi_file_end = vi_file_mem;
         return (1);
     }
 
     /* Read file into buffer until EOF or CP/M SUB char */
     for (n = 0; (c = getc(f)) != EOF && c != 0x1A; n++) {
         /* Skip CR; lines are terminated by LF alone internally */
-        if (!Binary && c == '\r') {
+        if (!vi_binary && c == '\r') {
             n--;
             continue;
         }
         if (!(isprint(c) || isspace(c)))
             unprint++;
-        if (fromp >= Filemax) {
+        if (fromp >= vi_file_max) {
             fprintf(stderr, "File too long (limit is %d)!\n", FILELENG);
             exit(1);
         }
         /* Insert the char at the current point by shifting
         /* everything down. */
-        for (p = Fileend; p > fromp; p--)
+        for (p = vi_file_end; p > fromp; p--)
             *p = *(p - 1);
         *fromp++ = c;
-        if (Fileend < fromp)
-            Fileend = fromp;
+        if (vi_file_end < fromp)
+            vi_file_end = fromp;
     }
-    if (!Binary && unprint > 0) {
+    if (!vi_binary && unprint > 0) {
         sprintf(
             buff,
             "%d unprintable chars!  Perhaps binary mode (-b) should be used?",

@@ -21,11 +21,11 @@ static char *bcksearch(char *str);
 
 char *nextline(char *curr)
 {
-    while (curr < Fileend) {
+    while (curr < vi_file_end) {
         if (*curr++ == '\n')
             break;
     }
-    if (curr >= Fileend)
+    if (curr >= vi_file_end)
         return (NULL);
     return (curr);
 }
@@ -45,7 +45,7 @@ char *prevline(char *curr)
     /* we are on a blank line.  Adjust accordingly. */
     if (*curr == '\n')
         nnl = -1;
-    while (curr > Filemem) {
+    while (curr > vi_file_mem) {
         /* look for the 2nd previous newline */
         if (*curr == '\n') {
             nnl++;
@@ -54,10 +54,10 @@ char *prevline(char *curr)
         }
         curr--;
     }
-    if (curr <= Filemem) {
+    if (curr <= vi_file_mem) {
         /* If we found 1 newline, we found the first line */
         if (nnl == 1)
-            return (Filemem);
+            return (vi_file_mem);
         else
             return (NULL);
     }
@@ -89,7 +89,7 @@ char *coladvance(char *p, int col)
         p++;
         /* Don't go past the end of */
         /* the file or the line. */
-        if (p == Fileend || *p == '\n') {
+        if (p == vi_file_end || *p == '\n') {
             p--;
             break;
         }
@@ -140,12 +140,12 @@ void dosearch(int dir, char *str)
         cursupdate();
         /* if we're backing up, we make sure the line we're on */
         /* is on the screen. */
-        Curschar = savep = p;
+        vi_curs_char = savep = p;
         /* get to the beginning of the line */
         beginline();
-        if (Curschar < Topchar)
-            Topchar = Curschar;
-        Curschar = savep;
+        if (vi_curs_char < vi_top_char)
+            vi_top_char = vi_curs_char;
+        vi_curs_char = savep;
         cursupdate();
         updatescreen();
     }
@@ -162,12 +162,12 @@ void repsearch(void) {
 static char *fwdsearch(char *str)
 {
     register char *sofar = str;
-    register char *infile = Curschar + 1;
+    register char *infile = vi_curs_char + 1;
     int leng = strlen(str);
     char *stopit;
 
     /* search forward to the end of the file */
-    for (; infile < Fileend && *sofar != '\0'; infile++) {
+    for (; infile < vi_file_end && *sofar != '\0'; infile++) {
         if (*infile == *sofar)
             sofar++;
         else
@@ -176,9 +176,9 @@ static char *fwdsearch(char *str)
     if (*sofar == '\0')
         return (infile - strlen(str));
     /* search from the beginning of the file to Curschar */
-    infile = Filemem;
+    infile = vi_file_mem;
     sofar = str;
-    stopit = Curschar + leng;
+    stopit = vi_curs_char + leng;
     for (; infile <= stopit && *sofar != '\0'; infile++) {
         if (*infile == *sofar)
             sofar++;
@@ -194,7 +194,7 @@ static char *fwdsearch(char *str)
 static char *bcksearch(char *str)
 {
     int leng = strlen(str);
-    char *infile = Curschar + 1;
+    char *infile = vi_curs_char + 1;
     char *endofstr, *sofar, *stopit;
 
     /* make sure str isn't empty before getting pointer to */
@@ -204,7 +204,7 @@ static char *bcksearch(char *str)
     endofstr = &str[leng - 1];
     sofar = endofstr;
     /* search backward to the beginning of the file */
-    for (; infile >= Filemem && sofar >= str; infile--) {
+    for (; infile >= vi_file_mem && sofar >= str; infile--) {
         if (*infile == *sofar)
             sofar--;
         else
@@ -215,8 +215,8 @@ static char *bcksearch(char *str)
 
     /* search backward from the end of the file */
     sofar = endofstr;
-    infile = Fileend - 1;
-    stopit = Curschar - leng;
+    infile = vi_file_end - 1;
+    stopit = vi_curs_char - leng;
     for (; infile >= stopit && sofar >= str; infile--) {
         if (*infile == *sofar)
             sofar--;

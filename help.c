@@ -37,7 +37,7 @@ void help(void)
 	windgoto(19, 0); helpstr("  :nnn              goto line nnn ");
 	windgoto(20, 0); helpstr("  :h/H              help ");
 	windgoto(21, 0); helpstr("  :v                show version");
-	windgoto(Rows-1, 0);
+	windgoto(vi_rows-1, 0);
 	windcolor(2);
 	helpstr(" Press any key ...");
 	windcolorreset();

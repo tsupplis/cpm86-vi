@@ -18,11 +18,11 @@ static int canincrease(int n);
 
 void opencmd(void) {
     /* get to the end of the current line */
-    while (Curschar < Fileend && (*Curschar) != '\n')
-        Curschar++;
+    while (vi_curs_char < vi_file_end && (*vi_curs_char) != '\n')
+        vi_curs_char++;
     /* Try to handle a file that doesn't end with a newline */
-    if (Curschar >= Fileend)
-        Curschar = Fileend - 1;
+    if (vi_curs_char >= vi_file_end)
+        vi_curs_char = vi_file_end - 1;
     /* Add the blank line */
     appchar('\n');
 }
@@ -49,9 +49,9 @@ int cntlines(char *pbegin, char *pend)
 void fileinfo(void) {
     char buff[128];
 
-    sprintf(buff, "\"%s\"%s line %d of %d", Filename,
-            Changed ? " [Modified]" : "", cntlines(Filemem, Curschar),
-            cntlines(Filemem, Fileend) - 1);
+    sprintf(buff, "\"%s\"%s line %d of %d", vi_file_name,
+            vi_changed ? " [Modified]" : "", cntlines(vi_file_mem, vi_curs_char),
+            cntlines(vi_file_mem, vi_file_end) - 1);
     message(buff);
 }
 
@@ -62,19 +62,19 @@ void gotoline(int n)
     /* n==0 means "last line": use the same descent logic as the
      * numbered case, with the actual line count as the target. */
     if (n == 0)
-        n = cntlines(Filemem, Fileend) - 1;
+        n = cntlines(vi_file_mem, vi_file_end) - 1;
     /* Start at the top of the file and go down 'n'-1 lines */
-    Curschar = Filemem;
+    vi_curs_char = vi_file_mem;
     while (--n > 0) {
-        if ((p = nextline(Curschar)) == NULL)
+        if ((p = nextline(vi_curs_char)) == NULL)
             break;
-        Curschar = p;
+        vi_curs_char = p;
     }
-    Topchar = Curschar;
-    for (n = 0; n < Rows / 2; n++) {
-        if ((p = prevline(Topchar)) == NULL)
+    vi_top_char = vi_curs_char;
+    for (n = 0; n < vi_rows / 2; n++) {
+        if ((p = prevline(vi_top_char)) == NULL)
             break;
-        Topchar = p;
+        vi_top_char = p;
     }
     updatescreen();
 }
@@ -95,11 +95,11 @@ void yankline(int n) {
 
     if (savedline != NULL)
         free(savedline);
-    savep = Curschar;
+    savep = vi_curs_char;
     /* go to the beginning of the current line. */
     beginline();
     /* compute length of line */
-    for (p = Curschar, leng = 0;; p++) {
+    for (p = vi_curs_char, leng = 0;; p++) {
         if (*p == '\n') {
             /* keep going until we've seen 'n' lines */
             if (--n <= 0)
@@ -109,14 +109,14 @@ void yankline(int n) {
     }
     /* save a copy of it */
     savedline = malloc((unsigned)(leng + 2));
-    for (p = Curschar, q = savedline, k = 0; k < leng; k++)
+    for (p = vi_curs_char, q = savedline, k = 0; k < leng; k++)
         *q++ = *p++;
     /* get the final newline */
     *q++ = *p;
     *q = '\0';
-    Curschar = savep;
+    vi_curs_char = savep;
     savednum = leng + 1;
-    savedcount = (Prenum == 0 ? 1 : Prenum);
+    savedcount = (vi_renum == 0 ? 1 : vi_renum);
 }
 
 /*
@@ -139,8 +139,8 @@ void putline(int k)
     message("Inserting saved stuff...");
     if (k == 0) {
         /* get to the end of the current line */
-        while (Curschar < Fileend && *Curschar != '\n')
-            Curschar++;
+        while (vi_curs_char < vi_file_end && *vi_curs_char != '\n')
+            vi_curs_char++;
     } else
         beginline();
     /* append or insert the characters of the saved line */
@@ -152,15 +152,15 @@ void putline(int k)
     }
     /* We want to end up at the beginning of the line. */
     while (n-- > 1)
-        Curschar--;
+        vi_curs_char--;
     if (k == 1)
-        Curschar--;
+        vi_curs_char--;
     beginline();
     /* Set up undo: deleting the pasted line(s) undoes the paste. */
     resetundo();
-    Uncurschar = Curschar;
-    sprintf(Undobuff, "%ddd", savedcount);
-    sprintf(Redobuff, "%s", k == 0 ? "p" : "P");
+    vi_uncurs_char = vi_curs_char;
+    sprintf(vi_undo_buff, "%ddd", savedcount);
+    sprintf(vi_redo_buff, "%s", k == 0 ? "p" : "P");
     message("");
     updatescreen();
 }
@@ -174,11 +174,11 @@ void inschar(int c)
     if (!canincrease(1))
         return;
 
-    for (p = Fileend; p > Curschar; p--) {
+    for (p = vi_file_end; p > vi_curs_char; p--) {
         *p = *(p - 1);
     }
-    *Curschar++ = c;
-    Fileend++;
+    *vi_curs_char++ = c;
+    vi_file_end++;
     CHANGED;
 }
 
@@ -192,12 +192,12 @@ void insstr(char *s)
     if (!canincrease(n))
         return;
 
-    for (p = Fileend - 1 + n; p > Curschar; p--) {
+    for (p = vi_file_end - 1 + n; p > vi_curs_char; p--) {
         *p = *(p - n);
     }
     for (k = 0; k < n; k++)
-        *Curschar++ = *s++;
-    Fileend += n;
+        *vi_curs_char++ = *s++;
+    vi_file_end += n;
     CHANGED;
 }
 
@@ -210,20 +210,20 @@ static void appchar(int c)
     if (!canincrease(1))
         return;
 
-    endp = Curschar + 1;
-    for (p = Fileend; p > endp; p--) {
+    endp = vi_curs_char + 1;
+    for (p = vi_file_end; p > endp; p--) {
         *p = *(p - 1);
     }
-    *(++Curschar) = c;
-    Fileend++;
+    *(++vi_curs_char) = c;
+    vi_file_end++;
     CHANGED;
 }
 
 static int canincrease(int n)
 {
-    if ((Fileend + n) >= Filemax) {
+    if ((vi_file_end + n) >= vi_file_max) {
         message("Can't add anything, file is too big!");
-        State = NORMAL;
+        vi_state = NORMAL;
         return (0);
     }
     return (1);
@@ -233,56 +233,56 @@ void delchar(void) {
     char *p;
 
     /* Check for degenerate case; there's nothing in the file. */
-    if (Filemem == Fileend)
+    if (vi_file_mem == vi_file_end)
         return;
     /* Delete the character at Curschar by shifting everything */
     /* in the file down. */
-    for (p = Curschar + 1; p < Fileend; p++)
+    for (p = vi_curs_char + 1; p < vi_file_end; p++)
         *(p - 1) = *p;
     /* If we just took off the last character of a non-blank line, */
     /* we don't want to end up positioned at the newline. */
-    if (*Curschar == '\n' && Curschar > Filemem && *(Curschar - 1) != '\n')
-        Curschar--;
-    Fileend--;
+    if (*vi_curs_char == '\n' && vi_curs_char > vi_file_mem && *(vi_curs_char - 1) != '\n')
+        vi_curs_char--;
+    vi_file_end--;
     CHANGED;
 }
 
 /*
  * deleol - delete from Curschar to end of line (not including the newline).
- * Sets up Undobuff/Uncurschar so undo works.
+ * Sets up vi_undo_buff/vi_uncurs_char so undo works.
  */
 void deleol(void) {
     char *scan, *p;
     int n;
 
     resetundo();
-    Uncurschar = Curschar;
+    vi_uncurs_char = vi_curs_char;
     /* Count characters to delete first so delchar() repositioning
      * doesn't confuse the loop. */
     n = 0;
-    for (scan = Curschar; *scan != '\n' && scan < Fileend; scan++)
+    for (scan = vi_curs_char; *scan != '\n' && scan < vi_file_end; scan++)
         n++;
     /* Build undo string: i<deleted chars>\033 */
-    p = Undobuff;
+    p = vi_undo_buff;
     *p++ = 'i';
-    scan = Curschar;
+    scan = vi_curs_char;
     while (n-- > 0)
         *p++ = *scan++;
     *p++ = '\033';
     *p = '\0';
     /* Now do the actual deletions */
     n = 0;
-    for (scan = Curschar; *scan != '\n' && scan < Fileend; scan++)
+    for (scan = vi_curs_char; *scan != '\n' && scan < vi_file_end; scan++)
         n++;
     while (n-- > 0)
         delchar();
-    addtobuff(Redobuff, 'D', 0, 0, 0, 0, 0);
+    addtobuff(vi_redo_buff, 'D', 0, 0, 0, 0, 0);
 }
 
 void delword(int deltrailing) /* 1 if trailing white space should be removed */
 {
-    int c = *Curschar;
-    char *p = Undobuff;
+    int c = *vi_curs_char;
+    char *p = vi_undo_buff;
 
     /* The Undo string is an 'i'nsert of the word we're deleting. */
     *p++ = 'i';
@@ -291,21 +291,21 @@ void delword(int deltrailing) /* 1 if trailing white space should be removed */
         /* If we're on a non-space separator, remove */
         /* the separators and any following space. */
         while (issepchar(c) && !isspace(c)) {
-            /* Add the deleted character to the Undobuff */
-            *p++ = *Curschar;
+            /* Add the deleted character to the vi_undo_buff */
+            *p++ = *vi_curs_char;
             delchar();
-            c = *Curschar;
+            c = *vi_curs_char;
         }
     } else { /* we're positioned in the middle of a word */
         int endofline = 0;
-        while (!issepchar(*Curschar) && *Curschar != '\n') {
+        while (!issepchar(*vi_curs_char) && *vi_curs_char != '\n') {
             /* If the next char is a newline, we note */
             /* that fact here, because delchar() won't */
             /* position us there afterword. */
-            if (*(Curschar + 1) == '\n')
+            if (*(vi_curs_char + 1) == '\n')
                 endofline = 1;
-            /* Add the deleted character to the Undobuff */
-            *p++ = *Curschar;
+            /* Add the deleted character to the vi_undo_buff */
+            *p++ = *vi_curs_char;
             delchar();
             if (endofline)
                 break;
@@ -313,9 +313,9 @@ void delword(int deltrailing) /* 1 if trailing white space should be removed */
     }
     if (deltrailing) {
         /* remove any trailing white space */
-        while (isspace(*Curschar) && *Curschar != '\n') {
-            /* Add the deleted character to the Undobuff */
-            *p++ = *Curschar;
+        while (isspace(*vi_curs_char) && *vi_curs_char != '\n') {
+            /* Add the deleted character to the vi_undo_buff */
+            *p++ = *vi_curs_char;
             delchar();
         }
     }
@@ -328,35 +328,35 @@ void delline(int nlines) {
     char *p, *q;
 
     /* If we're not at the beginning of the line, get there. */
-    if (*Curschar != '\n') {
+    if (*vi_curs_char != '\n') {
         /* back up to the previous newline (or the beginning */
         /* of the file. */
-        while (Curschar > Filemem) {
-            if (*Curschar == '\n') {
-                Curschar++;
+        while (vi_curs_char > vi_file_mem) {
+            if (*vi_curs_char == '\n') {
+                vi_curs_char++;
                 break;
             }
-            Curschar--;
+            vi_curs_char--;
         }
     }
     message("Deleting...");
     while (nlines-- > 0) {
         /* Count the characters in the line */
-        for (nchars = 1, p = Curschar; p < Fileend && *p != '\n'; p++, nchars++)
+        for (nchars = 1, p = vi_curs_char; p < vi_file_end && *p != '\n'; p++, nchars++)
             ;
         /* Delete the characters of the line */
         /* by moving everything else in the file down. */
-        q = Curschar;
-        p = Curschar + nchars;
-        while (p < Fileend)
+        q = vi_curs_char;
+        p = vi_curs_char + nchars;
+        while (p < vi_file_end)
             *q++ = *p++;
-        Fileend -= nchars;
+        vi_file_end -= nchars;
         CHANGED;
 
         /* If we delete the last line in the file, back up */
-        if (Curschar >= Fileend) {
-            if ((Curschar = prevline(Curschar)) == NULL)
-                Curschar = Filemem;
+        if (vi_curs_char >= vi_file_end) {
+            if ((vi_curs_char = prevline(vi_curs_char)) == NULL)
+                vi_curs_char = vi_file_mem;
             /* and don't try to delete any more lines */
             break;
         }

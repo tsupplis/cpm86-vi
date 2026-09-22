@@ -37,19 +37,19 @@ void normal(int c)
         break;
     case 06:
         /* control-f */
-        if (!onedown(Rows))
+        if (!onedown(vi_rows))
             beep();
         break;
     case 02:
         /* control-b */
-        if (!oneup(Rows))
+        if (!oneup(vi_rows))
             beep();
         break;
     case '\007':
         fileinfo();
         break;
     case 'G':
-        gotoline(Prenum);
+        gotoline(vi_renum);
         break;
     case 'l':
         if (!oneright())
@@ -70,49 +70,49 @@ void normal(int c)
     case 'b':
         /* If we're on the first character of a word, force */
         /* an initial backup. */
-        if (!issepchar(*Curschar) && Curschar > Filemem &&
-            issepchar(*(Curschar - 1)))
-            Curschar--;
+        if (!issepchar(*vi_curs_char) && vi_curs_char > vi_file_mem &&
+            issepchar(*(vi_curs_char - 1)))
+            vi_curs_char--;
 
-        if (!issepchar(*Curschar)) {
+        if (!issepchar(*vi_curs_char)) {
             /* If we start in the middle of a word, back */
             /* up until we hit a separator. */
-            while (Curschar > Filemem && !issepchar(*Curschar))
-                Curschar--;
-            if (issepchar(*Curschar))
-                Curschar++;
+            while (vi_curs_char > vi_file_mem && !issepchar(*vi_curs_char))
+                vi_curs_char--;
+            if (issepchar(*vi_curs_char))
+                vi_curs_char++;
         } else {
             /* back up past all separators. */
-            while (Curschar > Filemem && issepchar(*Curschar))
-                Curschar--;
+            while (vi_curs_char > vi_file_mem && issepchar(*vi_curs_char))
+                vi_curs_char--;
             /* back up past all non-separators. */
-            while (Curschar > Filemem && !issepchar(*Curschar)) {
-                Curschar--;
+            while (vi_curs_char > vi_file_mem && !issepchar(*vi_curs_char)) {
+                vi_curs_char--;
             }
-            if (issepchar(*Curschar))
-                Curschar++;
+            if (issepchar(*vi_curs_char))
+                vi_curs_char++;
         }
         break;
     case 'w':
-        if (issepchar(*Curschar)) {
+        if (issepchar(*vi_curs_char)) {
             /* If we're on a separator, we advance to */
             /* the next non-separator char. */
-            while ((p = Curschar + 1) < Fileend) {
-                Curschar = p;
-                if (!issepchar(*Curschar))
+            while ((p = vi_curs_char + 1) < vi_file_end) {
+                vi_curs_char = p;
+                if (!issepchar(*vi_curs_char))
                     break;
             }
         } else {
             /* If we're in the middle of a word, we */
             /* advance to the next word-separator. */
-            while ((p = Curschar + 1) < Fileend) {
-                Curschar = p;
-                if (issepchar(*Curschar))
+            while ((p = vi_curs_char + 1) < vi_file_end) {
+                vi_curs_char = p;
+                if (issepchar(*vi_curs_char))
                     break;
             }
             /* Now go past any trailing white space */
-            while (isspace(*Curschar) && (Curschar + 1) < Fileend)
-                Curschar++;
+            while (isspace(*vi_curs_char) && (vi_curs_char + 1) < vi_file_end)
+                vi_curs_char++;
         }
         break;
     case '$':
@@ -126,30 +126,30 @@ void normal(int c)
     case 'x':
         /* Can't do it if we're on a blank line.  (Actually it */
         /* does work, but we want to match the real 'vi'...) */
-        if (*Curschar == '\n')
+        if (*vi_curs_char == '\n')
             beep();
         else {
-            addtobuff(Redobuff, 'x', 0, 0, 0, 0, 0);
+            addtobuff(vi_redo_buff, 'x', 0, 0, 0, 0, 0);
             /* To undo it, we insert the same character back. */
             resetundo();
-            addtobuff(Undobuff, 'i', *Curschar, '\033', 0, 0, 0);
-            Uncurschar = Curschar;
+            addtobuff(vi_undo_buff, 'i', *vi_curs_char, '\033', 0, 0, 0);
+            vi_uncurs_char = vi_curs_char;
             delchar();
             updatescreen();
         }
         break;
     case 'a':
         /* Works just like an 'i'nsert on the next character. */
-        if (Curschar < (Fileend - 1))
-            Curschar++;
+        if (vi_curs_char < (vi_file_end - 1))
+            vi_curs_char++;
         resetundo();
         startinsert("a");
         break;
     case 'A':
         while (oneright())
             ;
-        if (Curschar < (Fileend - 1) && *Curschar != '\n')
-            Curschar++;
+        if (vi_curs_char < (vi_file_end - 1) && *vi_curs_char != '\n')
+            vi_curs_char++;
         resetundo();
         startinsert("A");
         break;
@@ -159,9 +159,9 @@ void normal(int c)
         break;
     case 'I':
         beginline();
-        while (isspace(*Curschar) && *Curschar != '\n' &&
-               Curschar < (Fileend - 1))
-            Curschar++;
+        while (isspace(*vi_curs_char) && *vi_curs_char != '\n' &&
+               vi_curs_char < (vi_file_end - 1))
+            vi_curs_char++;
         resetundo();
         startinsert("I");
         break;
@@ -170,7 +170,7 @@ void normal(int c)
         opencmd();
         updatescreen();
         startinsert("o");
-        Ninsert = 1;
+        vi_ninsert = 1;
         break;
     case 'O':
         /* Open a new line above the current line, enter insert mode. */
@@ -178,39 +178,39 @@ void normal(int c)
         beginline();
         inschar('\n');
         /* Back up to the new blank line we just inserted above. */
-        Curschar--;
+        vi_curs_char--;
         updatescreen();
         startinsert("O");
-        Ninsert = 1;
+        vi_ninsert = 1;
         break;
     case 'd':
         nchar = vgetc();
-        n = (Prenum == 0 ? 1 : Prenum);
+        n = (vi_renum == 0 ? 1 : vi_renum);
         switch (nchar) {
         case 'd':
-            sprintf(Redobuff, "%ddd", n);
-            /* addtobuff(Redobuff,'d','d',NULL); */
+            sprintf(vi_redo_buff, "%ddd", n);
+            /* addtobuff(vi_redo_buff,'d','d',NULL); */
             beginline();
             resetundo();
-            Uncurschar = Curschar;
+            vi_uncurs_char = vi_curs_char;
             yankline(n);
             delline(n);
             beginline();
             updatescreen();
             /* If we have backed xyzzy, then we deleted the */
             /* last line(s) in the file. */
-            if (Curschar < Uncurschar) {
-                Uncurschar = Curschar;
+            if (vi_curs_char < vi_uncurs_char) {
+                vi_uncurs_char = vi_curs_char;
                 nchar = 'p';
             } else
                 nchar = 'P';
-            addtobuff(Undobuff, nchar, 0, 0, 0, 0, 0);
+            addtobuff(vi_undo_buff, nchar, 0, 0, 0, 0, 0);
             break;
         case 'w':
-            addtobuff(Redobuff, 'd', 'w', 0, 0, 0, 0);
+            addtobuff(vi_redo_buff, 'd', 'w', 0, 0, 0, 0);
             resetundo();
             delword(1);
-            Uncurschar = Curschar;
+            vi_uncurs_char = vi_curs_char;
             updatescreen();
             break;
         case '$':
@@ -227,7 +227,7 @@ void normal(int c)
             beginline();
             yankline(1);
             /* delete everything but the newline */
-            while (*Curschar != '\n')
+            while (*vi_curs_char != '\n')
                 delchar();
             startinsert("cc");
             updatescreen();
@@ -247,7 +247,7 @@ void normal(int c)
         nchar = vgetc();
         switch (nchar) {
         case 'y':
-            yankline(Prenum == 0 ? 1 : Prenum);
+            yankline(vi_renum == 0 ? 1 : vi_renum);
             break;
         default:
             beep();
@@ -255,7 +255,7 @@ void normal(int c)
         break;
     case '>':
         nchar = vgetc();
-        n = (Prenum == 0 ? 1 : Prenum);
+        n = (vi_renum == 0 ? 1 : vi_renum);
         switch (nchar) {
         case '>':
             tabinout(0, n);
@@ -267,7 +267,7 @@ void normal(int c)
         break;
     case '<':
         nchar = vgetc();
-        n = (Prenum == 0 ? 1 : Prenum);
+        n = (vi_renum == 0 ? 1 : vi_renum);
         switch (nchar) {
         case '<':
             tabinout(1, n);
@@ -288,13 +288,13 @@ void normal(int c)
     case 'C':
     do_C:
         deleol();
-        /* Clear Undobuff so insert-ESC undo (path 3: Undelchars)
+        /* Clear vi_undo_buff so insert-ESC undo (path 3: Undelchars)
          * fires on 'u', not the deleted-text replay from deleol(). */
-        *Undobuff = '\0';
+        *vi_undo_buff = '\0';
         /* After deleol(), cursor backed up one if line was non-empty.
          * Advance to append position (like 'a'). */
-        if (*Curschar != '\n')
-            Curschar++;
+        if (*vi_curs_char != '\n')
+            vi_curs_char++;
         updatescreen();
         startinsert("C");
         break;
@@ -306,29 +306,29 @@ void normal(int c)
     case 'r':
         nchar = vgetc();
         resetundo();
-        if (nchar == '\n' || (!Binary && nchar == '\r')) {
+        if (nchar == '\n' || (!vi_binary && nchar == '\r')) {
             /* Replacing a char with a newline breaks the */
             /* line in two, and is special. */
             nchar = '\n'; /* convert \r to \n */
             /* Save stuff necessary to undo it, by joining */
-            Uncurschar = Curschar - 1;
-            addtobuff(Undobuff, 'J', 'i', *Curschar, '\033', 0, 0);
+            vi_uncurs_char = vi_curs_char - 1;
+            addtobuff(vi_undo_buff, 'J', 'i', *vi_curs_char, '\033', 0, 0);
             /* Change current character. */
-            *Curschar = nchar;
+            *vi_curs_char = nchar;
             /* We don't want to end up on the '\n' */
-            if (Curschar > Filemem)
-                Curschar--;
-            else if (Curschar < Fileend)
-                Curschar++;
+            if (vi_curs_char > vi_file_mem)
+                vi_curs_char--;
+            else if (vi_curs_char < vi_file_end)
+                vi_curs_char++;
         } else {
             /* Replacing with a normal character */
-            addtobuff(Undobuff, 'r', *Curschar, 0, 0, 0, 0);
-            Uncurschar = Curschar;
+            addtobuff(vi_undo_buff, 'r', *vi_curs_char, 0, 0, 0, 0);
+            vi_uncurs_char = vi_curs_char;
             /* Change current character. */
-            *Curschar = nchar;
+            *vi_curs_char = nchar;
         }
         /* Save stuff necessary to redo it */
-        addtobuff(Redobuff, 'r', nchar, 0, 0, 0, 0);
+        addtobuff(vi_redo_buff, 'r', nchar, 0, 0, 0, 0);
         updatescreen();
         break;
     case 'p':
@@ -339,63 +339,63 @@ void normal(int c)
         break;
     case 'R':
         resetundo();
-        Uncurschar = Curschar;
-        Unrplchars = 0;
-        State = REPLACE;
+        vi_uncurs_char = vi_curs_char;
+        vi_unrpl_chars = 0;
+        vi_state = REPLACE;
         break;
     case 'J':
-        for (p = Curschar; *p != '\n' && p < (Fileend - 1); p++)
+        for (p = vi_curs_char; *p != '\n' && p < (vi_file_end - 1); p++)
             ;
-        if (p >= (Fileend - 1)) {
+        if (p >= (vi_file_end - 1)) {
             beep();
             break;
         }
-        Curschar = p;
+        vi_curs_char = p;
         delchar();
         resetundo();
-        Uncurschar = Curschar;
-        addtobuff(Undobuff, 'i', '\n', '\033', 0, 0, 0);
-        addtobuff(Redobuff, 'J', 0, 0, 0, 0, 0);
+        vi_uncurs_char = vi_curs_char;
+        addtobuff(vi_undo_buff, 'i', '\n', '\033', 0, 0, 0);
+        addtobuff(vi_redo_buff, 'J', 0, 0, 0, 0, 0);
         updatescreen();
         break;
     case '.':
-        stuffin(Redobuff);
+        stuffin(vi_redo_buff);
         break;
     case 'u':
-        if (Unrplchars > 0) {
+        if (vi_unrpl_chars > 0) {
             /* Undo Replace mode: restore original characters */
-            char *rp = Replbuf;
-            int k = Unrplchars;
-            Curschar = Uncurschar;
+            char *rp = vi_repl_buf;
+            int k = vi_unrpl_chars;
+            vi_curs_char = vi_uncurs_char;
             while (k-- > 0) {
-                *Curschar = *rp++;
-                Curschar++;
+                *vi_curs_char = *rp++;
+                vi_curs_char++;
             }
-            Curschar = Uncurschar;
-            Unrplchars = 0;
-            Changed = UndoChanged;
+            vi_curs_char = vi_uncurs_char;
+            vi_unrpl_chars = 0;
+            vi_changed = vi_undo_changed;
             updatescreen();
-        } else if (Uncurschar != NULL && *Undobuff != '\0') {
-            Curschar = Uncurschar;
-            stuffin(Undobuff);
-            *Undobuff = '\0';
-        } else if (Undelchars > 0) {
-            Curschar = Uncurschar;
-            /* construct the next Undobuff and Redobuff, which */
+        } else if (vi_uncurs_char != NULL && *vi_undo_buff != '\0') {
+            vi_curs_char = vi_uncurs_char;
+            stuffin(vi_undo_buff);
+            *vi_undo_buff = '\0';
+        } else if (vi_undel_chars > 0) {
+            vi_curs_char = vi_uncurs_char;
+            /* construct the next vi_undo_buff and vi_redo_buff, which */
             /* will re-insert the characters we're deleting. */
-            p = Undobuff;
-            q = Redobuff;
+            p = vi_undo_buff;
+            q = vi_redo_buff;
             *p++ = *q++ = 'i';
-            while (Undelchars-- > 0) {
-                *p++ = *q++ = *Curschar;
+            while (vi_undel_chars-- > 0) {
+                *p++ = *q++ = *vi_curs_char;
                 delchar();
             }
-            /* Finish constructing Uncursbuff, and Uncurschar */
+            /* Finish constructing vi_uncurs_buf, and vi_uncurse_char */
             /* is left unchanged. */
             *p++ = *q++ = '\033';
             *p = *q = '\0';
             /* Undelchars has been reset to 0 */
-            Changed = UndoChanged;
+            vi_changed = vi_undo_changed;
             updatescreen();
         } else {
             beep();
@@ -422,48 +422,48 @@ static void tabinout(int inout, int num) {
     char *savecurs, *p;
 
     beginline();
-    savecurs = Curschar;
+    savecurs = vi_curs_char;
     while (ntodo-- > 0) {
         beginline();
         if (inout == 0)
             inschar('\t');
         else {
-            if (*Curschar == '\t')
+            if (*vi_curs_char == '\t')
                 delchar();
         }
         if (ntodo > 0) {
-            if ((p = nextline(Curschar)) != NULL)
-                Curschar = p;
+            if ((p = nextline(vi_curs_char)) != NULL)
+                vi_curs_char = p;
             else
                 break;
         }
     }
     /* We want to end up where we started */
-    Curschar = savecurs;
+    vi_curs_char = savecurs;
     updatescreen();
     /* Construct re-do and un-do stuff */
-    sprintf(Redobuff, "%d%s", num, inout == 0 ? ">>" : "<<");
+    sprintf(vi_redo_buff, "%d%s", num, inout == 0 ? ">>" : "<<");
     resetundo();
-    Uncurschar = savecurs;
-    sprintf(Undobuff, "%d%s", num, inout == 0 ? "<<" : ">>");
+    vi_uncurs_char = savecurs;
+    sprintf(vi_undo_buff, "%d%s", num, inout == 0 ? "<<" : ">>");
 }
 
 static void startinsert(char *initstr)
 {
     char *p, c;
 
-    Insstart = Curschar;
-    Ninsert = 0;
-    Insptr = Insbuff;
+    vi_ins_start = vi_curs_char;
+    vi_ninsert = 0;
+    vi_ins_ptr = vi_ins_buff;
     for (p = initstr; (c = (*p++)) != '\0';)
-        *Insptr++ = c;
-    State = INSERT;
+        *vi_ins_ptr++ = c;
+    vi_state = INSERT;
     updatescreen();
 }
 
 void resetundo(void) {
-    UndoChanged = Changed;
-    Undelchars = 0;
-    *Undobuff = '\0';
-    Uncurschar = NULL;
+    vi_undo_changed = vi_changed;
+    vi_undel_chars = 0;
+    *vi_undo_buff = '\0';
+    vi_uncurs_char = NULL;
 }

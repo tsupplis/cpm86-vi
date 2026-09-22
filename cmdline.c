@@ -8,7 +8,7 @@
 #include <string.h>
 #include "stevie.h"
 
-static char *lastmess = NULL;
+static char *last_message = NULL;
 
 static void badcmd(void);
 static void gotocmd(int clr, int fresh, int firstc);
@@ -104,7 +104,7 @@ void readcmdline(int firstc) /* either ':', '/', or '?' */
     if (strcmp(cmd, "q!") == 0)
         getout();
     if (strcmp(cmd, "q") == 0) {
-        if (Changed)
+        if (vi_changed)
             message("File not written out.  Use 'q!' to override.");
         else
             getout();
@@ -112,19 +112,19 @@ void readcmdline(int firstc) /* either ':', '/', or '?' */
     }
     if (strcmp(cmd, "w") == 0) {
         if (arg == NULL) {
-            writeit(Filename);
+            writeit(vi_file_name);
             UNCHANGED;
         } else
             writeit(arg);
         return;
     }
     if (strcmp(cmd, "x") == 0) {
-        if (writeit(Filename))
+        if (writeit(vi_file_name))
             getout();
         return;
     }
     if (strcmp(cmd, "wq") == 0) {
-        if (writeit(Filename))
+        if (writeit(vi_file_name))
             getout();
         return;
     }
@@ -133,22 +133,22 @@ void readcmdline(int firstc) /* either ':', '/', or '?' */
         return;
     }
     if (strcmp(cmd, "e") == 0 || strcmp(cmd, "e!") == 0) {
-        if (cmd[1] != '!' && Changed) {
+        if (cmd[1] != '!' && vi_changed) {
             message("File not written out.  Use 'e!' to override.");
         } else {
             if (arg != NULL)
-                Filename = strsave(arg);
+                vi_file_name = strsave(arg);
             /* clear mem and read file */
-            Fileend = Topchar = Curschar = Filemem;
+            vi_file_end = vi_top_char = vi_curs_char = vi_file_mem;
             UNCHANGED;
-            p = nextline(Curschar);
-            readfile(Filename, Fileend, 0);
+            p = nextline(vi_curs_char);
+            readfile(vi_file_name, vi_file_end, 0);
             updatescreen();
         }
         return;
     }
     if (strcmp(cmd, "f") == 0) {
-        Filename = strsave(arg);
+        vi_file_name = strsave(arg);
         filemess("");
         return;
     }
@@ -160,7 +160,7 @@ void readcmdline(int firstc) /* either ':', '/', or '?' */
         }
         /* find the beginning of the next line and */
         /* read file in there */
-        pp = nextline(Curschar);
+        pp = nextline(vi_curs_char);
         readfile(arg, pp, 1);
         updatescreen();
         CHANGED;
@@ -168,14 +168,14 @@ void readcmdline(int firstc) /* either ':', '/', or '?' */
     }
     if (strcmp(cmd, ".=") == 0) {
         char messbuff[80];
-        sprintf(messbuff, "line %d   character %d", cntlines(Filemem, Curschar),
-                1 + (int)(Curschar - Filemem));
+        sprintf(messbuff, "line %d   character %d", cntlines(vi_file_mem, vi_curs_char),
+                1 + (int)(vi_curs_char - vi_file_mem));
         message(messbuff);
         return;
     }
     if (strcmp(cmd, "$=") == 0) {
         char messbuff[8];
-        sprintf(messbuff, "%d", cntlines(Filemem, Fileend) - 1);
+        sprintf(messbuff, "%d", cntlines(vi_file_mem, vi_file_end) - 1);
         message(messbuff);
         return;
     }
@@ -221,13 +221,13 @@ static void badcmd(void) { message("Unrecognized command"); }
 static void gotocmd(int clr, int fresh, int firstc) {
     int n;
 
-    windgoto(Rows - 1, 0);
+    windgoto(vi_rows - 1, 0);
     windcolor(2);
     if (clr) {
         /* clear the line */
-        for (n = 0; n < (Columns - 1); n++)
+        for (n = 0; n < (vi_columns - 1); n++)
             windputc(' ');
-        windgoto(Rows - 1, 0);
+        windgoto(vi_rows - 1, 0);
     }
     if (firstc)
         windputc(firstc);
@@ -239,10 +239,10 @@ void message(char *s)
 {
     char *p;
 
-    if (lastmess != NULL) {
-        if (strcmp(lastmess, s) == 0)
+    if (last_message != NULL) {
+        if (strcmp(last_message, s) == 0)
             return;
-        free(lastmess);
+        free(last_message);
     }
     gotocmd(1, 1, 0);
     /* take off any trailing newline */
@@ -250,16 +250,16 @@ void message(char *s)
         *p = '\0';
     windstr(s);
     windcolorreset();
-    lastmess = strsave(s);
+    last_message = strsave(s);
 }
 
 /* Forget the last message shown, so the next message() call always
  * redraws even if it repeats the previous one (e.g. two ':q' attempts
  * in a row on a dirty buffer should both show the warning). */
 void clearlastmess(void) {
-    if (lastmess != NULL)
-        free(lastmess);
-    lastmess = NULL;
+    if (last_message != NULL)
+        free(last_message);
+    last_message = NULL;
 }
 
 static int writeit(char *fname)
@@ -277,12 +277,12 @@ static int writeit(char *fname)
         return (0);
     }
 
-    for (n = 0, p = Filemem; p < Fileend; p++, n++) {
-        if (!Binary && *p == '\n')
+    for (n = 0, p = vi_file_mem; p < vi_file_end; p++, n++) {
+        if (!vi_binary && *p == '\n')
             putc('\r', f);
         putc(*p, f);
     }
-    if (!Binary)
+    if (!vi_binary)
         putc(0x1A, f);
     sprintf(buff, "\"%s\" %d characters", fname, n);
     fclose(f);
@@ -295,6 +295,6 @@ static int writeit(char *fname)
 void filemess(char *s)
 {
     char buff[128];
-    sprintf(buff, "\"%s\" %s", Filename, s);
+    sprintf(buff, "\"%s\" %s", vi_file_name, s);
     message(buff);
 }

@@ -68,8 +68,8 @@ void windinit(void)
 	stty.sg_flags = CRMOD|CBREAK;
 	ioctl(0, TIOCSETP, &stty);
 
-	Columns=80;
-	Rows=24;
+	vi_columns=80;
+	vi_rows=24;
 	/* Here we want no echo, disable line buffering / erase kill
 	   and no newline - curses noecho(), cbreak(), nonl() */
 }
@@ -189,13 +189,13 @@ void windinit(void)
 	 * (AH=0Fh/AH=0) hung or exited immediately on CGA/MDA adapters.
 	 * CP/M-86 and DOS both already leave the display in a valid 80x25
 	 * text mode (mono on MDA, colour on CGA/EGA/VGA) before we start. */
-	Columns=80;
+	vi_columns=80;
 	/* Match the 24-line convention of the vivt52/vivt100 CP/M-86 builds;
 	 * plain DOS gets the full 25-line BIOS text mode. */
 #if defined(__CPM86__)
-	Rows=24;
+	vi_rows=24;
 #else
-	Rows=25;
+	vi_rows=25;
 #endif
 	/* Force a known cursor position right away; don't rely on CP/M-86's
 	 * console (or the display page it may have left active) to have
@@ -240,7 +240,7 @@ static void windclreol(void)
 	 * background CP/M-86 update could have moved the real cursor. */
 	wp_row = cur_row;
 	wp_col = cur_col;
-	for ( wp_count = Columns - wp_col; wp_count > 0; wp_count-- )
+	for ( wp_count = vi_columns - wp_col; wp_count > 0; wp_count-- )
 		windputc(' ');
 	/* windputc() leaves the cursor after the last blank; restore it to
 	 * where clreol was actually called from. */
@@ -267,7 +267,7 @@ void windcolorreset(void)
 
 void windclear(void)
 {
-	clearbottom = Rows - 1;
+	clearbottom = vi_rows - 1;
 	/* AH=6: scroll up window. AL=0 ("clear") is a documented shortcut
 	 * that some non-genuine BIOS clones don't implement correctly;
 	 * AL=25 (>= window height) forces the real scroll path instead,
@@ -287,7 +287,7 @@ void windputc(int c)
 	 * AH=2 sets it, then AH=0eh writes the char and auto-advances. */
 #include "windputc.asm"
 	cur_col++;
-	if ( cur_col >= Columns ) {
+	if ( cur_col >= vi_columns ) {
 		cur_col = 0;
 		cur_row++;
 	}
