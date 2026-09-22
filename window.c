@@ -4,6 +4,7 @@
 
 #include "stevie.h"
 #include <stdio.h>
+#include <stdlib.h>
 #ifdef __CPM86__
 #include "sgtty.h"
 #endif
@@ -13,7 +14,7 @@
  * window.c is already compiled once per variant with the right macros.
  * Hierarchical: OS first (__CPM86__ / __PCDOS__=11 / __PCDOS__=20), then
  * screen/keyboard technique within it. */
-char *viversion()
+char *viversion(void)
 {
 	static char buf[80];
 
@@ -47,7 +48,7 @@ char *viversion()
 
 /* Usage message shown when no filename was given; wording depends on the
  * OS's path/drive syntax. Lives here (not main.c) to keep main.c OS-agnostic. */
-windusage()
+void windusage(void)
 {
 #if defined(__CPM86__)
 	fprintf(stderr,"Usage: vi [-xodb] [user/][drive:]file\n");
@@ -61,7 +62,7 @@ windusage()
 /* ------------------------------------------------------------------ */
 #if defined(__VTCMD__ )
 
-windinit()
+void windinit(void)
 {
 	struct sgttyb stty;
 	stty.sg_flags = CRMOD|CBREAK;
@@ -73,8 +74,7 @@ windinit()
 	   and no newline - curses noecho(), cbreak(), nonl() */
 }
 
-windgoto(r,c)
-int r,c;
+void windgoto(int r, int c)
 {
 #if defined(__VT52__)
 	printf("\033Y%c%c",r+0x20,c+0x20);
@@ -83,8 +83,7 @@ int r,c;
 #endif
 }
 
-windexit(r)
-int r;
+void windexit(int r)
 {
     windclear();
     windgoto(0,0);
@@ -93,7 +92,7 @@ int r;
 	exit(r);
 }
 
-windclreol()
+static void windclreol(void)
 {
 #if defined(__VT52__)
 	printf("\033K");
@@ -102,8 +101,7 @@ windclreol()
 #endif
 }
 
-windcursor(on)
-int on;
+void windcursor(int on)
 {
 #if defined(__VT52__)
 	/* ESC f = cursor off, ESC e = cursor on (CP/M-86 >= 2.2) */
@@ -113,8 +111,7 @@ int on;
 #endif
 }
 
-windcolor(fg)
-int fg;
+void windcolor(int fg)
 {
 #if defined(__VT52__)
 	/* ESC b <c> sets foreground colour (CGA: 2=green) */
@@ -125,7 +122,7 @@ int fg;
 #endif
 }
 
-windcolorreset()
+void windcolorreset(void)
 {
 #if defined(__VT52__)
 	/* Restore default foreground colour (white=7) */
@@ -135,7 +132,7 @@ windcolorreset()
 #endif
 }
 
-windclear()
+void windclear(void)
 {
 #if defined(__VT52__)
 	printf("\033E");
@@ -144,24 +141,22 @@ windclear()
 #endif
 }
 
-windstr(s)
-char *s;
+void windstr(char *s)
 {
 	printf("%s",s);
 }
 
-windputc(c)
-int c;
+void windputc(int c)
 {
 	putchar(c);
 }
 
-windrefresh()
+void windrefresh(void)
 {
 	/* Need a redraw here? */
 }
 
-beep()
+void beep(void)
 {
 	putchar('\007');
 }
@@ -179,7 +174,7 @@ static int wp_count;
 static int clearbottom;		/* Rows-1, for windclear()'s scroll region */
 static int cur_row, cur_col;	/* our own idea of where the cursor is */
 
-windinit()
+void windinit(void)
 {
 #if defined(__CPM86__)
 	struct sgttyb stty;
@@ -208,8 +203,7 @@ windinit()
 	windgoto(0,0);
 }
 
-windgoto(r,c)
-int r,c;
+void windgoto(int r, int c)
 {
 	int dummy;	/* forces a bp frame so [bp+N] addresses the args */
 
@@ -223,13 +217,12 @@ int r,c;
  * getch() to fight the background clock/status update at high frequency
  * while polling for a keystroke, instead of trusting a single BIOS call
  * to survive an arbitrarily long wait. */
-windrefreshcursor()
+void windrefreshcursor(void)
 {
 	windgoto(cur_row,cur_col);
 }
 
-windexit(r)
-int r;
+void windexit(int r)
 {
     windclear();
     windgoto(0,0);
@@ -241,7 +234,7 @@ int r;
 	exit(r);
 }
 
-windclreol()
+static void windclreol(void)
 {
 	/* Use our own tracked position rather than querying the BIOS: a
 	 * background CP/M-86 update could have moved the real cursor. */
@@ -254,8 +247,7 @@ windclreol()
 	windgoto(wp_row,wp_col);
 }
 
-windcursor(on)
-int on;
+void windcursor(int on)
 {
 	int dummy;	/* forces a bp frame so [bp+N] addresses the arg */
 
@@ -263,18 +255,17 @@ int on;
 #include "windcurs.asm"
 }
 
-windcolor(fg)
-int fg;
+void windcolor(int fg)
 {
 	curattr = fg & 0x0f;
 }
 
-windcolorreset()
+void windcolorreset(void)
 {
 	curattr = 7;
 }
 
-windclear()
+void windclear(void)
 {
 	clearbottom = Rows - 1;
 	/* AH=6: scroll up window. AL=0 ("clear") is a documented shortcut
@@ -285,8 +276,7 @@ windclear()
 #include "windclr.asm"
 }
 
-windputc(c)
-int c;
+void windputc(int c)
 {
 	int dummy;	/* forces a bp frame so [bp+N] addresses the arg */
 
@@ -303,19 +293,18 @@ int c;
 	}
 }
 
-windstr(s)
-char *s;
+void windstr(char *s)
 {
 	while ( *s )
 		windputc(*s++);
 }
 
-windrefresh()
+void windrefresh(void)
 {
 	/* Need a redraw here? */
 }
 
-beep()
+void beep(void)
 {
 	putchar('\007');
 }

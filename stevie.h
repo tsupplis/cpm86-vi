@@ -120,7 +120,21 @@ void beginline(void);
 int oneup(int n);
 int onedown(int n);
 
-windcursor(), windcolor(), windcolorreset();
+/* window.c */
+char *viversion(void);
+void windusage(void);
+void windinit(void);
+void windgoto(int r, int c);
+void windexit(int r);
+void windcursor(int on);
+void windcolor(int fg);
+void windcolorreset(void);
+void windclear(void);
+void windstr(char *s);
+void windputc(int c);
+void windrefresh(void);
+void beep(void);
+void windrefreshcursor(void);
 
 /* help.c */
 void help(void);
