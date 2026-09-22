@@ -121,4 +121,6 @@ int oneup(int n);
 int onedown(int n);
 
 windcursor(), windcolor(), windcolorreset();
-help();
+
+/* help.c */
+void help(void);

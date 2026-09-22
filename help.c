@@ -2,17 +2,16 @@
  * STevie - ST editor for VI enthusiasts.    ...Tim Thompson...twitch!tjt...
  */
 
-#include "ctype.h"
+#include <ctype.h>
 #include "stevie.h"
 
-static helpstr(s)
-char *s;
+static void helpstr(char *s)
 {
 	while (*s)
 		windputc(*s++);
 }
 
-help()
+void help(void)
 {
 	windclear();
 

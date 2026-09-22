@@ -295,34 +295,7 @@ int c;
 	 * the BIOS cursor while we're blocked waiting for a keystroke, so we
 	 * can't trust "wherever the cursor already is" to still be ours.
 	 * AH=2 sets it, then AH=0eh writes the char and auto-advances. */
-#asm
-    push ax
-    push cx
-    push dx
-    push bx
-    push sp     ; Pushes the original SP value (before AX was pushed)
-    push bp
-    push si
-    push di
-	mov dh, byte ptr cur_row_
-	mov dl, byte ptr cur_col_
-	mov bh, 0
-	mov ah, 2
-	int 10h
-
-	mov al, byte ptr [bp+4]
-	mov bh, 0
-	mov ah, 0eh
-	int 10h
-	pop di
-    pop si
-    pop bp
-    add sp, 2   ; Discards the saved SP value (replaces POP SP)
-    pop bx
-    pop dx
-    pop cx
-    pop ax
-#endasm
+#include "windputc.asm"
 	cur_col++;
 	if ( cur_col >= Columns ) {
 		cur_col = 0;
