@@ -9,12 +9,13 @@ remains as follow-up work.
 ## Overview
 
 The editor is a single-buffer, single-file, full-screen vi clone. The
-whole file being edited lives in one contiguous heap block (`Filemem` ..
-`Filemax`), and the screen is rendered by diffing a "next" frame against
-a "real" (currently displayed) frame buffer, only emitting the bytes that
-changed. There is no gap buffer, undo tree, or multi-file support — undo
-is a single-level "redo the opposite editop" scheme built from small
-fixed-size command buffers (`Undobuff`, `Redobuff`, `Insbuff`, `Replbuf`).
+whole file being edited lives in one contiguous heap block (`vi_file_mem`
+.. `vi_file_max`), and the screen is rendered by diffing a "next" frame
+against a "real" (currently displayed) frame buffer, only emitting the
+bytes that changed. There is no gap buffer, undo tree, or multi-file
+support — undo is a single-level "redo the opposite editop" scheme built
+from small fixed-size command buffers (`vi_undo_buff`, `vi_redo_buff`,
+`vi_ins_buff`, `vi_repl_buf`).
 
 Keyboard input and screen output are the only genuinely platform-specific
 parts of the program (`edit.c`'s `getch()`/`bioskey()`/`keyready()`, and
@@ -60,30 +61,33 @@ which is relied on implicitly in a few places — see Portability Notes).
 ## Data Model & Global State
 
 All cross-file shared state is declared `extern` in `stevie.h` and
-defined (without `extern`) in `main.c`. These use the original
-PascalCase naming and were **deliberately left unrenamed** in this pass
-(see Deferred/Future Work) — renaming them touches every file.
+defined (without `extern`) in `main.c`. These were originally PascalCase
+and deliberately left unrenamed by this modernization pass, but have
+since been renamed (outside this pass) to `vi_`-prefixed
+`lower_snake_case` throughout the codebase — see the current full list
+in the `extern` block near the top of `stevie.h`.
 
-- **File buffer**: `Filemem`/`Filemax`/`Fileend` — a single fixed-size
-  heap block (`FILELENG` = 24000 bytes, hardcoded) holding the whole
-  file as raw bytes; `Fileend` is the current logical end, `Filemax` the
-  allocated end. `Curschar` points at the cursor's byte. There is no gap
-  buffer — insert/delete shift the tail of the buffer up/down a byte at
-  a time (see Efficiency Findings Log).
-- **Screen buffers**: `Realscreen` (what's on-screen) and `Nextscreen`
-  (what should be on-screen), each `Rows*Columns` bytes, diffed by
+- **File buffer**: `vi_file_mem`/`vi_file_max`/`vi_file_end` — a single
+  fixed-size heap block (`FILELENG` = 24000 bytes, hardcoded) holding
+  the whole file as raw bytes; `vi_file_end` is the current logical end,
+  `vi_file_max` the allocated end. `vi_curs_char` points at the cursor's
+  byte. There is no gap buffer — insert/delete shift the tail of the
+  buffer up/down a byte at a time (see Efficiency Findings Log).
+- **Screen buffers**: `vi_real_scr` (what's on-screen) and `vi_next_scr`
+  (what should be on-screen), each `vi_rows*vi_columns` bytes, diffed by
   `nexttoscreen()` in `main.c` so only changed cells are redrawn.
-  `Topchar`/`Botchar` bound the visible slice of the file buffer.
-- **Editor state**: `State` (one of `NORMAL`/`INSERT`/`APPEND`/
-  `REPLACE`/... from `stevie.h`), `Prenum` (pending numeric count prefix
-  for a command), `Cursrow`/`Curscol`/`Cursvcol` (screen vs. virtual
-  cursor column, the latter differing on lines that wrap or contain
-  tabs).
-- **Undo/redo**: single-level, command-replay based. `Undobuff`/
-  `Redobuff`/`Insbuff`/`Replbuf` (1024-byte fixed buffers) hold a tiny
-  "mini-script" of characters that, if fed back through the normal-mode
-  or insert-mode interpreters, reproduce or reverse the last change.
-  `Uncurschar` is the cursor position to restore before replaying.
+  `vi_top_char`/`vi_bot_char` bound the visible slice of the file buffer.
+- **Editor state**: `vi_state` (one of `NORMAL`/`INSERT`/`APPEND`/
+  `REPLACE`/... from `stevie.h`), `vi_renum` (pending numeric count
+  prefix for a command), `vi_curs_row`/`vi_curs_col`/`vi_curs_vcol`
+  (screen vs. virtual cursor column, the latter differing on lines that
+  wrap or contain tabs).
+- **Undo/redo**: single-level, command-replay based. `vi_undo_buff`/
+  `vi_redo_buff`/`vi_ins_buff`/`vi_repl_buf` (1024-byte fixed buffers)
+  hold a tiny "mini-script" of characters that, if fed back through the
+  normal-mode or insert-mode interpreters, reproduce or reverse the last
+  change. `vi_uncurs_char` is the cursor position to restore before
+  replaying.
 - **`struct charinfo { char ch_size; char *ch_str; }`** (`stevie.h`) —
   one entry per byte value 0-255 (table in `hexchars.c`), giving the
   on-screen width and (for non-printable bytes) the placeholder string
@@ -99,22 +103,25 @@ the exact rationale on visibility (`static`) decisions.
 
 ### stevie.h
 Central shared header: mode/state constants, `struct charinfo`, the
-`extern` global declarations (PascalCase, unrenamed — deferred), and now
-a full set of ANSI prototypes for every cross-file function, grouped by
-the `.c` file that defines them (`/* cmdline.c */`, `/* linefunc.c */`,
-etc.). The old blanket K&R forward-declarations
-(`char *malloc(), *strchr(), *strsave(), *alloc(), *strcpy();`) were
-removed function-by-function as each file was converted; `strchr()`
-alone still uses the old empty-parens (unspecified-args) form — see
-Deferred/Future Work.
+`extern` global declarations (originally PascalCase, since renamed to
+`vi_`-prefixed lower_snake_case outside this pass — see Data Model &
+Global State), and now a full set of ANSI prototypes for every
+cross-file function, grouped by the `.c` file that defines them
+(`/* cmdline.c */`, `/* linefunc.c */`, etc.). The old blanket K&R
+forward-declarations (`char *malloc(), *strchr(), *strsave(), *alloc(),
+*strcpy();`) were removed function-by-function as each file was
+converted; `strchr()` alone still uses the old empty-parens
+(unspecified-args) form — see Deferred/Future Work.
 
 ### cmdline.c
 Parses and dispatches `:` command-line input, `/`/`?` search prefixes,
 and status-line messages. `badcmd()`, `gotocmd()`, `writeit()` are
 file-private (`static`); `readcmdline()`, `message()`, `clearlastmess()`,
-`filemess()` are the public surface. Efficiency: the `:` command
-dispatcher is a long sequential `strcmp()` chain (see Efficiency
-Findings Log — rated Low, not yet applied).
+`filemess()` are the public surface. The file-scope static originally
+named `lastmess` has since been renamed `last_message`. Efficiency: the
+`:` command dispatcher was a long sequential `strcmp()` chain, since
+rewritten as a `switch (cmd[0])` bucketed dispatch (see Efficiency
+Findings Log — rated Low, applied).
 
 ### linefunc.c
 Line/column navigation (`nextline`, `prevline`, `coladvance`) and
@@ -189,8 +196,8 @@ from `normal.c`/`linefunc.c`). The `#if defined(__PCBIOS__)` block's
 `bioskey()`/`keyready()` bodies are raw `#include`d `.asm` files with no
 parameters, so converting them to `static int name(void)` carries no
 `[bp+N]` stack-frame risk. Efficiency: `cursupdate()` re-scans from
-`Topchar` to `Curschar` on every keystroke to track the virtual column
-(Medium, deferred — see Efficiency Findings Log).
+`vi_top_char` to `vi_curs_char` on every keystroke to track the virtual
+column (Medium, deferred — see Efficiency Findings Log).
 
 ### window.c
 All screen/keyboard I/O, in two independent implementations gated by
@@ -226,11 +233,11 @@ a gap buffer or index rebuild — significant redesign risk).
 
 | Location | Issue | Rating | Status |
 |---|---|---|---|
-| `cmdline.c` `readcmdline()` | Long sequential `strcmp()` chain to dispatch `:` commands | Low | Identified, not applied — awaiting go-ahead |
+| `cmdline.c` `readcmdline()` | Long sequential `strcmp()` chain to dispatch `:` commands | Low | **Applied** — rewritten as a `switch (cmd[0])` bucketed dispatch |
 | `linefunc.c` `fwdsearch()`/`bcksearch()` | Naive O(n·m) character-by-character search, no early-exit optimizations (e.g. Boyer-Moore) | Medium | Documented only |
 | `misccmds.c` `inschar`/`appchar`/`delchar` (and everything built on them: `insstr`, `putline`, `delline`) | O(n) shift of the rest of the file buffer per single-character edit; O(n²) for multi-char operations | High | Documented only — true fix is a gap buffer, a significant architecture change |
 | `main.c` `readfile()` | O(n²) file load — shifts the whole in-memory buffer down for every character read | High | Documented only |
-| `edit.c` `cursupdate()` | Re-scans from `Topchar` to `Curschar` every keystroke to recompute the virtual column | Medium | Documented only |
+| `edit.c` `cursupdate()` | Re-scans from `vi_top_char` to `vi_curs_char` every keystroke to recompute the virtual column | Medium | Documented only |
 | `window.c` PCBIOS `windrefreshcursor()`/`windputc()` | Re-issues an `INT 10h` cursor-position call very frequently (by design, to fight a background clock update) | Low (intentional tradeoff) | Not a bug — documented for awareness only |
 
 ## Portability Notes
@@ -264,9 +271,9 @@ a gap buffer or index rebuild — significant redesign risk).
   treated as a leaf function with no frame) — already handled via a
   defensive `int dummy;` local in the 3 affected `window.c` functions.
 - **Fixed-size buffers**: `FILELENG` (24000 bytes) for the whole file,
-  and 1024-byte `Undobuff`/`Redobuff`/`Insbuff`/`Replbuf` — all
-  compile-time constants, not configurable, a direct consequence of the
-  target's limited RAM.
+  and 1024-byte `vi_undo_buff`/`vi_redo_buff`/`vi_ins_buff`/
+  `vi_repl_buf` — all compile-time constants, not configurable, a
+  direct consequence of the target's limited RAM.
 - **Row count**: 24 rows under CP/M-86 (`__CPM86__`), 25 under plain
   PC-DOS (`__PCDOS__`) — a real behavioral difference between variants,
   not just cosmetic (`window.c`'s `windinit()`).
@@ -275,11 +282,13 @@ a gap buffer or index rebuild — significant redesign risk).
 
 Explicitly out of scope for this pass, called out here for a follow-up:
 
-1. **Global PascalCase rename** — `State`, `Rows`, `Curschar`,
-   `Filemem`, etc. (all `extern` globals declared in `stevie.h`) were
-   left unrenamed. Renaming to `lower_snake_case` would touch every one
-   of the 9 `.c` files; deferred due to ripple-effect scope, not
-   difficulty.
+1. **Global PascalCase rename** — *(update: this has since been done,
+   outside of this modernization pass)* `State`, `Rows`, `Curschar`,
+   `Filemem`, etc. were originally left unrenamed by this pass, but were
+   subsequently renamed throughout the codebase to `vi_`-prefixed
+   `lower_snake_case` (`vi_state`, `vi_rows`, `vi_curs_char`,
+   `vi_file_mem`, ...; see the `extern` block in `stevie.h` for the
+   current full list). No longer open.
 2. **Public (non-`static`) function naming** — left as-is for the same
    reason (e.g. `windgoto`, `readcmdline`); only file-private (`static`)
    functions were renamed/normalized where needed in this pass (most
@@ -307,8 +316,8 @@ Explicitly out of scope for this pass, called out here for a follow-up:
    that the file is one contiguous array — worth a dedicated follow-up
    effort, not a quick patch.
 5. **Efficiency — Low-risk items** — the `cmdline.c` sequential
-   `strcmp()` dispatch chain was identified but not yet applied; still
-   awaiting explicit go-ahead per the agreed process.
+   `strcmp()` dispatch chain fix has been applied (see Efficiency
+   Findings Log above).
 
 ## Verification Record
 

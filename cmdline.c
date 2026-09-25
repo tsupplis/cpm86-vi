@@ -101,57 +101,118 @@ void readcmdline(int firstc) /* either ':', '/', or '?' */
         if (*arg == '\0')
             arg = NULL;
     }
-    if (strcmp(cmd, "q!") == 0)
-        getout();
-    if (strcmp(cmd, "q") == 0) {
-        if (vi_changed)
-            message("File not written out.  Use 'q!' to override.");
-        else
+    switch (cmd[0]) {
+    case 'q':
+        if (strcmp(cmd, "q!") == 0)
             getout();
-        return;
-    }
-    if (strcmp(cmd, "w") == 0) {
-        if (arg == NULL) {
-            writeit(vi_file_name);
-            UNCHANGED;
-        } else
-            writeit(arg);
-        return;
-    }
-    if (strcmp(cmd, "x") == 0) {
-        if (writeit(vi_file_name))
-            getout();
-        return;
-    }
-    if (strcmp(cmd, "wq") == 0) {
-        if (writeit(vi_file_name))
-            getout();
-        return;
-    }
-    if (strcmp(cmd, "f") == 0 && arg == NULL) {
-        fileinfo();
-        return;
-    }
-    if (strcmp(cmd, "e") == 0 || strcmp(cmd, "e!") == 0) {
-        if (cmd[1] != '!' && vi_changed) {
-            message("File not written out.  Use 'e!' to override.");
-        } else {
-            if (arg != NULL)
-                vi_file_name = strsave(arg);
-            /* clear mem and read file */
-            vi_file_end = vi_top_char = vi_curs_char = vi_file_mem;
-            UNCHANGED;
-            p = nextline(vi_curs_char);
-            readfile(vi_file_name, vi_file_end, 0);
-            updatescreen();
+        else if (strcmp(cmd, "q") == 0) {
+            if (vi_changed)
+                message("File not written out.  Use 'q!' to override.");
+            else
+                getout();
+            return;
         }
-        return;
+        break;
+    case 'w':
+        if (strcmp(cmd, "w") == 0) {
+            if (arg == NULL) {
+                writeit(vi_file_name);
+                UNCHANGED;
+            } else
+                writeit(arg);
+            return;
+        }
+        if (strcmp(cmd, "wq") == 0) {
+            if (writeit(vi_file_name))
+                getout();
+            return;
+        }
+        break;
+    case 'x':
+        if (strcmp(cmd, "x") == 0) {
+            if (writeit(vi_file_name))
+                getout();
+            return;
+        }
+        break;
+    case 'f':
+        if (strcmp(cmd, "f") == 0) {
+            if (arg == NULL)
+                fileinfo();
+            else {
+                vi_file_name = strsave(arg);
+                filemess("");
+            }
+            return;
+        }
+        break;
+    case 'e':
+        if (strcmp(cmd, "e") == 0 || strcmp(cmd, "e!") == 0) {
+            if (cmd[1] != '!' && vi_changed) {
+                message("File not written out.  Use 'e!' to override.");
+            } else {
+                if (arg != NULL)
+                    vi_file_name = strsave(arg);
+                /* clear mem and read file */
+                vi_file_end = vi_top_char = vi_curs_char = vi_file_mem;
+                UNCHANGED;
+                p = nextline(vi_curs_char);
+                readfile(vi_file_name, vi_file_end, 0);
+                updatescreen();
+            }
+            return;
+        }
+        break;
+    case '.':
+        if (strcmp(cmd, ".=") == 0) {
+            char messbuff[80];
+            sprintf(messbuff, "line %d   character %d", cntlines(vi_file_mem, vi_curs_char),
+                    1 + (int)(vi_curs_char - vi_file_mem));
+            message(messbuff);
+            return;
+        }
+        break;
+    case '$':
+        if (strcmp(cmd, "$=") == 0) {
+            char messbuff[8];
+            sprintf(messbuff, "%d", cntlines(vi_file_mem, vi_file_end) - 1);
+            message(messbuff);
+            return;
+        }
+        break;
+    case 's':
+        if (strcmp(cmd, "set") == 0) {
+            if (arg == NULL)
+                badcmd();
+            else if (strcmp(arg, "oct") == 0) {
+                octchars();
+                updatescreen();
+            } else if (strcmp(arg, "hex") == 0) {
+                hexchars();
+                updatescreen();
+            } else if (strcmp(arg, "dec") == 0) {
+                decchars();
+                updatescreen();
+            } else
+                badcmd();
+            return;
+        }
+        break;
+    case 'v':
+        if (strcmp(cmd, "v") == 0) {
+            message(viversion());
+            return;
+        }
+        break;
+    case 'h':
+        if (strcmp(cmd, "h") == 0 || strcmp(cmd, "help") == 0) {
+            help();
+            return;
+        }
+        break;
     }
-    if (strcmp(cmd, "f") == 0) {
-        vi_file_name = strsave(arg);
-        filemess("");
-        return;
-    }
+    /* "r"/".r" share their first character with other commands above,
+     * so they're checked separately rather than added as a new case. */
     if (strcmp(cmd, "r") == 0 || strcmp(cmd, ".r") == 0) {
         char *pp;
         if (arg == NULL) {
@@ -164,43 +225,6 @@ void readcmdline(int firstc) /* either ':', '/', or '?' */
         readfile(arg, pp, 1);
         updatescreen();
         CHANGED;
-        return;
-    }
-    if (strcmp(cmd, ".=") == 0) {
-        char messbuff[80];
-        sprintf(messbuff, "line %d   character %d", cntlines(vi_file_mem, vi_curs_char),
-                1 + (int)(vi_curs_char - vi_file_mem));
-        message(messbuff);
-        return;
-    }
-    if (strcmp(cmd, "$=") == 0) {
-        char messbuff[8];
-        sprintf(messbuff, "%d", cntlines(vi_file_mem, vi_file_end) - 1);
-        message(messbuff);
-        return;
-    }
-    if (strcmp(cmd, "set") == 0) {
-        if (arg == NULL)
-            badcmd();
-        else if (strcmp(arg, "oct") == 0) {
-            octchars();
-            updatescreen();
-        } else if (strcmp(arg, "hex") == 0) {
-            hexchars();
-            updatescreen();
-        } else if (strcmp(arg, "dec") == 0) {
-            decchars();
-            updatescreen();
-        } else
-            badcmd();
-        return;
-    }
-    if (strcmp(cmd, "v") == 0) {
-        message(viversion());
-        return;
-    }
-    if (strcmp(cmd, "h") == 0 || strcmp(cmd, "help") == 0) {
-        help();
         return;
     }
     /* :N  — go to line N (or last line if N exceeds the file) */

@@ -134,6 +134,10 @@ void windputc(int c);
 void windrefresh(void);
 void beep(void);
 void windrefreshcursor(void);
+#if defined(__CPM86__)
+int cpm_version_below(int major, int minor);
+int cpm_version_31(void);
+#endif
 
 /* help.c */
 void help(void);

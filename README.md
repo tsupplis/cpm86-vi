@@ -83,6 +83,8 @@ git checkout) as the version shown by the `:v` command; see `gitver.h`
 
 ## Command Reference
 
+![vi help running under CP/M-86](images/help.png)
+
 ### Movement
 
 | Command | Action |

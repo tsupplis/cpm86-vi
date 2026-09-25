@@ -57,6 +57,29 @@ void windusage(void)
 #endif
 }
 
+#if defined(__CPM86__)
+/* BDOS function 12 (Get System Version Number): AL holds the version
+ * packed as (major<<4)|minor in hex (e.g. 0x31 = 3.1); AH identifies the
+ * BDOS variant (CP/M-86, Concurrent CP/M-86, ...) and is ignored here. */
+int cpm_version_below(int major, int minor)
+{
+	int ver = bdos(12, 0) & 0xff;
+	int vmajor = (ver >> 4) & 0xf;
+	int vminor = ver & 0xf;
+	return (vmajor < major) || (vmajor == major && vminor < minor);
+}
+
+/* Cached wrapper around cpm_version_below(3, 1): the BDOS call only
+ * needs to happen once since the OS version can't change at runtime. */
+int cpm_version_31(void)
+{
+	static int cached = -1;
+	if (cached < 0)
+		cached = !cpm_version_below(3, 1);
+	return cached;
+}
+#endif
+
 /* ------------------------------------------------------------------ */
 /* VT52/VT100 terminal escape-code implementation                      */
 /* ------------------------------------------------------------------ */

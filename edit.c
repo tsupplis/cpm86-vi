@@ -90,7 +90,7 @@ static int getch(void) {
 static char getch_buffer[GETCH_BUFLEN];
 
 static int getch(void) {
-    int i, c, d;
+    /*int i, c, d;
     static int s = 0;
     static int o = 0;
 
@@ -101,15 +101,15 @@ static int getch(void) {
         o = o % GETCH_BUFLEN;
         return c;
     }
-    while (!(c = bdos(6, 255)))
+    while (!(c = bdos(6, 0xFF)))
         continue;
-    while (s < GETCH_BUFLEN && (d = bdos(6, 255))) {
+    while (s < GETCH_BUFLEN && (d = bdos(6, 0xFF))) {
         if (1) {
             getch_buffer[(o + s) % GETCH_BUFLEN] = d;
             s++;
         }
-    }
-    return c;
+    }*/
+    return bdos(6, 0xFD);
 }
 
 #endif /* __PCBIOS__ / __VTCMD__ */
