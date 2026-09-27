@@ -4,6 +4,7 @@ LD     = aztec42_link
 CPM86_LDFLAGS = -lc86
 DOS11_LDFLAGS = -ld11
 DOS20_LDFLAGS = -lc
+UPX = pcdev_upx
 
 # Flags common to both CP/M-86 builds
 CFLAGS =
@@ -34,9 +35,11 @@ all: vicp52.cmd vicp100.cmd vicpbios.cmd \
 # --------------------------------------------------------------------
 vicp52.cmd: $(SHARED_OBJS) edtcp52.o wincp52.o
 	$(LD) -o $@ $^ $(CPM86_LDFLAGS)
+	$(UPX) $@
 
 vicp100.cmd: $(SHARED_OBJS) edtcp100.o wincp100.o
 	$(LD) -o $@ $^ $(CPM86_LDFLAGS)
+	$(UPX) $@
 
 vid1bios.com: $(SHARED_OBJS) edtd1bio.o wind1bio.o
 	$(LD) -o $@ $^ $(DOS11_LDFLAGS)
@@ -48,6 +51,7 @@ vid2bios.com: $(SHARED_OBJS) edtd2bio.o wind2bio.o
 # escape codes, no BDOS console I/O) instead of the DOS API.
 vicpbios.cmd: $(SHARED_OBJS) edtcpbio.o wincpbio.o
 	$(LD) -o $@ $^ $(CPM86_LDFLAGS)
+	$(UPX) $@
 
 # --------------------------------------------------------------------
 # Scratch program: isolate windgoto/windputc from all of vi's own

@@ -90,7 +90,7 @@ static int getch(void) {
 static char getch_buffer[GETCH_BUFLEN];
 
 static int getch(void) {
-    /*int i, c, d;
+    int i, c, d;
     static int s = 0;
     static int o = 0;
 
@@ -108,8 +108,8 @@ static int getch(void) {
             getch_buffer[(o + s) % GETCH_BUFLEN] = d;
             s++;
         }
-    }*/
-    return bdos(6, 0xFD);
+    }
+    return c;
 }
 
 #endif /* __PCBIOS__ / __VTCMD__ */
