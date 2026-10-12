@@ -178,11 +178,11 @@ dostest.img: vid1bios.com vid2bios.com dosbase.img test.txt
 # --------------------------------------------------------------------
 # Binary zip
 # --------------------------------------------------------------------
-dist: vi-bin.zip
+dist: vi.zip
 
-vi-bin.zip: vicp52.cmd vicp100.cmd vicpbios.cmd vid1bios.com vid2bios.com
-	rm -f vi-bin.zip
-	zip vi-bin.zip vicp52.cmd vicp100.cmd vicpbios.cmd vid1bios.com vid2bios.com
+vi.zip: vicp52.cmd vicp100.cmd vicpbios.cmd vid1bios.com vid2bios.com
+	rm -f vi.zip
+	zip vi.zip vicp52.cmd vicp100.cmd vicpbios.cmd vid1bios.com vid2bios.com
 
 # --------------------------------------------------------------------
 # Utility
@@ -191,7 +191,7 @@ clean:
 	$(RM) cpmtest.img *.o gitver.h \
 	vicp52.cmd vicp100.cmd vicpbios.cmd \
 	vid1bios.com vid2bios.com \
-	vi-bin.zip
+	vi.zip
 
 test: cpm86test
 
