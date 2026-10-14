@@ -401,6 +401,30 @@ void normal(int c)
             beep();
         }
         break;
+    case '~':
+        /* Toggle case of [count] chars from cursor position */
+        n = (vi_renum == 0 ? 1 : vi_renum);
+        if (*vi_curs_char != '\n') {
+            resetundo();
+            vi_uncurs_char = vi_curs_char;
+            sprintf(vi_redo_buff, "%d~", n);
+            sprintf(vi_undo_buff, "%d~", n);  /* ~~ is its own inverse */
+            while (n-- > 0 && vi_curs_char < vi_file_end && *vi_curs_char != '\n') {
+                if (islower(*vi_curs_char))
+                    *vi_curs_char = toupper(*vi_curs_char);
+                else if (isupper(*vi_curs_char))
+                    *vi_curs_char = tolower(*vi_curs_char);
+                vi_curs_char++;
+            }
+            /* don't land on newline */
+            if (*vi_curs_char == '\n' && vi_curs_char > vi_uncurs_char)
+                vi_curs_char--;
+            CHANGED;
+            updatescreen();
+        } else {
+            beep();
+        }
+        break;
     case 'H':
         help();
         break;

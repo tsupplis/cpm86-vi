@@ -127,7 +127,7 @@ FORCE:
 # Shared object rules
 # --------------------------------------------------------------------
 cmdline.o: cmdline.c
-	$(CC) $(CFLAGS) -o $@ cmdline.c
+	$(CC) $(CFLAGS) -D__CPM86__ -o $@ cmdline.c
 	$(STRIP) $@
 
 help.o: help.c

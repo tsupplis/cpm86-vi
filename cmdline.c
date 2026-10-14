@@ -296,7 +296,19 @@ static int writeit(char *fname)
     sprintf(buff, "Writing %s...", fname);
     message(buff);
 
-    if ((f = fopen(fname, "w")) == NULL) {
+#if defined(__CPM86__)
+    /* Use "r+" (open existing for overwrite) instead of "w" to avoid
+     * O_TRUNC: fopen("w") issues BDOS Delete before Make, and Make fails
+     * if a same-named R/O file exists in another user area, leaving the
+     * file deleted and nothing written.  "r+" opens with BDOS Open only.
+     * Fall back to "w" only when the file doesn't exist yet (new file). */
+    f = fopen(fname, "r+");
+    if (f == NULL)
+        f = fopen(fname, "w");
+#else
+    f = fopen(fname, "w");
+#endif
+    if (f == NULL) {
         message("Unable to open file!");
         return (0);
     }

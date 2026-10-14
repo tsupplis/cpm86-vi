@@ -369,7 +369,14 @@ void edit(void) {
                     updatescreen();
                     break;
                 }
-                case 0x09:
+                case 0x16: /* ^V — insert next character literally */
+                    c = vgetc();
+                    inschar(c);
+                    vi_ninsert++;
+                    *vi_ins_ptr++ = c;
+                    updatescreen();
+                    break;
+                case 0x09: /* Tab — expand to spaces unless preceded by ^V */
                     insertchar(' ');
                     insertchar(' ');
                     insertchar(' ');
@@ -577,11 +584,7 @@ void cursupdate(void) {
                 vi_curs_col = vi_curs_vcol = wrapped = 0;
                 continue;
             }
-            /* A tab gets expanded, depending on the current column */
-            if (c == '\t')
-                inc = (8 - (vi_curs_col) % 8);
-            else
-                inc = chars[(unsigned)(c & 0xff)].ch_size;
+            inc = chars[(unsigned)(c & 0xff)].ch_size;
             vi_curs_col += inc;
             vi_curs_vcol += inc;
             if (vi_curs_col >= vi_columns) {

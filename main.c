@@ -213,12 +213,7 @@ static void filetonext(void) {
             /* when getting a character from the file, we */
             /* may have to turn it into something else on */
             /* the way to putting it into 'Nextscreen'. */
-            if (c == '\t') {
-                strcpy(extra, "        ");
-                /* tab amount depends on current column */
-                nextra = (7 - col % 8);
-                c = ' ';
-            } else if ((n = chars[c].ch_size) > 1) {
+            if ((n = chars[c].ch_size) > 1) {
                 char *p;
                 nextra = 0;
                 p = chars[c].ch_str;
