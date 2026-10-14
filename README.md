@@ -112,6 +112,7 @@ git checkout) as the version shown by the `:v` command; see `gitver.h`
 | `O` | Open new line above, enter insert mode |
 | `r <c>` | Replace single character under cursor with `<c>` |
 | `R` | Enter replace mode (overwrite); `ESC` to exit |
+| `^V <c>` | Insert next character literally (e.g. `^V Tab` inserts a real tab) |
 | `ESC` | Exit insert or replace mode, return to normal |
 
 ### Delete
@@ -146,6 +147,7 @@ git checkout) as the version shown by the `:v` command; see `gitver.h`
 | `u` | Undo last change |
 | `.` | Redo last insert or delete |
 | `J` | Join current line with next |
+| `[#]~` | Toggle case of `#` characters from cursor (default 1) |
 | `[#]>>` | Indent `#` lines right by one tab (default 1) |
 | `[#]<<` | Indent `#` lines left by one tab (default 1) |
 | `H` | Show built-in help screen |
