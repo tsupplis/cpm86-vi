@@ -111,6 +111,32 @@ int main(int argc, char **argv)
         exit(1);
     }
 
+#if defined(__CPM86__)
+    /* On CP/M-86 the filename may be prefixed with a user-area number,
+     * e.g. "4/B:FOO.TXT" or "4/FOO.TXT".  The C runtime's fopen() can
+     * handle that prefix for a single open, but it does NOT permanently
+     * change the current user area — so a later writeit() call on the
+     * same string may land in the wrong area (typically user 0).  Parse
+     * and strip the prefix here, issue one bdos(32,n) to set the user
+     * area for the entire session, and keep only the bare name in
+     * vi_file_name so every subsequent fopen() sees a clean path. */
+    {
+        char *p = argv[1];
+        int  unum = 0;
+        int  has_user = 0;
+        while (*p >= '0' && *p <= '9') {
+            unum = unum * 10 + (*p - '0');
+            p++;
+            has_user = 1;
+        }
+        if (has_user && *p == '/') {
+            p++;            /* skip the '/' */
+            bdos(32, unum); /* Set User Code for the session */
+            argv[1] = p;    /* point past the user prefix     */
+        }
+    }
+#endif
+
     vi_file_name = strsave(argv[1]);
 
     windinit();
