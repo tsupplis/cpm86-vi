@@ -9,6 +9,7 @@
 #include "sgtty.h"
 #endif
 #include "gitver.h"
+#include "keyboard.h"
 
 /* Build-variant version string for the ":v" command; lives here since
  * window.c is already compiled once per variant with the right macros.
@@ -91,6 +92,11 @@ void windinit(void)
 	stty.sg_flags = CRMOD|CBREAK;
 	ioctl(0, TIOCSETP, &stty);
 
+#if defined(__VT100__)
+    vi_key_init(1);
+#else
+    vi_key_init(0);
+#endif
 	vi_columns=80;
 	vi_rows=24;
 	/* Here we want no echo, disable line buffering / erase kill
@@ -108,6 +114,7 @@ void windgoto(int r, int c)
 
 void windexit(int r)
 {
+    vi_key_exit();
     windclear();
     windgoto(0,0);
     windrefresh();
@@ -212,6 +219,11 @@ void windinit(void)
 	 * (AH=0Fh/AH=0) hung or exited immediately on CGA/MDA adapters.
 	 * CP/M-86 and DOS both already leave the display in a valid 80x25
 	 * text mode (mono on MDA, colour on CGA/EGA/VGA) before we start. */
+#if defined(__VT100__)
+    vi_key_init(1);
+#else
+    vi_key_init(0);
+#endif
 	vi_columns=80;
 	/* Match the 24-line convention of the vivt52/vivt100 CP/M-86 builds;
 	 * plain DOS gets the full 25-line BIOS text mode. */
@@ -247,6 +259,7 @@ void windrefreshcursor(void)
 
 void windexit(int r)
 {
+    vi_key_exit();
     windclear();
     windgoto(0,0);
     windrefresh();
@@ -333,4 +346,3 @@ void beep(void)
 }
 
 #endif /* __PCBIOS__ */
-

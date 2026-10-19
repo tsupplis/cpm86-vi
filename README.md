@@ -270,9 +270,9 @@ so the two builds share the same escape-parsing code in `edit.c`.
 
 | Binary | CP/M-86 1.1 |  CCP/M-86 3.1 | CDOS 4.1 | DOS Plus 1.2 | PC-DOS 1.1 | DOS ≥ 2.0 | Emu2 |
 |--------|-------------|------------------------|---------------------|--------------|------------|-----------|------|
-| `vicpbios.cmd`             | ✅ | ❌ | ⚠️ (4) | ⚠️ (3) | — | — | ✅ |
-| `vicp52.cmd` | ✅ | ✅(1) | ✅(1) | ✅ | — | — | ✅(1) |
-| `vicp100.cmd` | ✅ | ✅(1) | ✅(1) | ✅ | — | — | ✅(1) |
+| `vicpbios.cmd`             | ✅ | ✅ | ✅  | ⚠️ (3) | — | — | ✅ |
+| `vicp52.cmd`               | ✅ | ✅ | ✅ | ✅ | — | — | ✅(1) |
+| `vicp100.cmd`              | ✅ | ✅ | ✅ | ✅ | — | — | ✅(1) |
 | `vid1bios.com`             | — | — | ✅ | ✅ | ✅ | ✅| ✅(2)|
 | `vid2bios.com`             | — | — | ✅  | ✅ | -  | ✅ | ✅(2) |
 
@@ -281,7 +281,46 @@ so the two builds share the same escape-parsing code in `edit.c`.
 3. cursor issues bdos/bios clashing, still experimental, dosplus xios
 4. no keyboard
 
---
+## Concurrent CP/M keyboard
+
+All CP/M builds, including `vicpbios.cmd`, use BDOS keyboard input on a
+concurrent system with BDOS >= 3.0. No INT 16h call is made on that input path.
+The adapter selects raw function keys with ESC 6 and synthesizes the existing
+VT52/VT100 editing sequences for arrows, Home/End, paging, Insert and Delete.
+Normal and explicit error exits restore expansion with ESC 7.
+
+Single-tasking CP/M retains each build's previous input path; DOS builds retain
+BIOS input. The BIOS build still uses its existing BIOS display routines;
+keyboard support does not make its display virtual-console safe. Prefer the
+VT52 build for the native Concurrent CP/M console.
+
+`make test-keys` tests the real adapter and input dispatch on the host with
+mocked BDOS calls and sanitizers. Verify physical arrows, paging, Home/End,
+Insert/Delete, literal Esc and normal function keys after exit on the target.
+
+VI is self-contained: local `keyos.c` detects concurrent systems using the
+minimal BDOS version/type wrappers in `os.asm`. Only CP/M binaries link these
+helpers; DOS binaries do not. No sibling repository, utility library or drive
+mapping is required. Linker response files avoid command tail truncation.
+
+## Viewport scrolling
+
+Up and down now reveal an off-screen cursor at the corresponding edge by
+moving only the necessary text rows. Neither direction recenters by half a
+screen. Page movement uses the document height (`vi_rows - 1`); half-page
+movement uses half that height. Both directions preserve the desired column.
+
+The final screen row remains the status/command row. Cursor positioning uses
+the same delayed wrapping as rendering, including exact-width lines and
+expanded control characters. Long lines can scroll by visible rows; EOF and
+blank lines do not push the document cursor into the status row.
+
+`make test-scroll` checks the actual movement/rendering functions with sanitizer
+and status-row guards: repeated movement in both directions, pages, wraps,
+blank/long lines, expanded final characters and EOF insertion. On the target,
+compare Up/Down and PgUp/PgDn near both edges and the document's final line.
+
+---
 
 ## Companion projects
 
@@ -308,4 +347,5 @@ so the two builds share the same escape-parsing code in `edit.c`.
 ## License
 
 MIT — see [LICENSE](LICENSE.md).
+
 

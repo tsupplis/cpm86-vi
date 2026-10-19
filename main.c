@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "stevie.h"
+#include "keyboard.h"
 
 static void filetonext(void);
 static void nexttoscreen(void);
@@ -108,6 +109,7 @@ int main(int argc, char **argv)
 
     if (argc <= 1) {
         windusage();
+        vi_key_exit();
         exit(1);
     }
 
@@ -196,7 +198,7 @@ static void filetonext(void) {
     endscreen = &screenp[(vi_rows - 1) * vi_columns];
 
     row = col = 0;
-    while (screenp < endscreen && memp < vi_file_end) {
+    while (screenp < endscreen && (memp < vi_file_end || nextra > 0)) {
 
         /* Get the next character to put on the screen. */
 
@@ -326,6 +328,7 @@ static void filealloc(void) {
     if ((vi_file_mem = malloc((unsigned)FILELENG)) == NULL) {
         fprintf(stderr, "Unable to allocate %d bytes for file memory!\n",
                 FILELENG);
+        vi_key_exit();
         exit(1);
     }
     vi_file_max = vi_file_mem + FILELENG;
@@ -366,6 +369,7 @@ int readfile(char *fname, char *fromp, int nochangename) /* if 1, don't change t
             unprint++;
         if (fromp >= vi_file_max) {
             fprintf(stderr, "File too long (limit is %d)!\n", FILELENG);
+            vi_key_exit();
             exit(1);
         }
         /* Insert the char at the current point by shifting

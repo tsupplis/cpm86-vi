@@ -5,11 +5,11 @@
 #include <ctype.h>
 #include <stdio.h>
 #include "stevie.h"
+#include "keyboard.h"
 
 static void donormal(int c);
 static void insertchar(int c);
 static int gethexchar(void);
-static void scrolldown(int nlines);
 
 /* ------------------------------------------------------------------ */
 /* Raw keyboard input                                                  */
@@ -95,7 +95,7 @@ static int getch(void) {
     static int o = 0;
 
     if (s > 0) {
-        c = getch_buffer[o];
+        c = (unsigned char)getch_buffer[o];
         s--;
         o++;
         o = o % GETCH_BUFLEN;
@@ -115,7 +115,10 @@ static int getch(void) {
 #endif /* __PCBIOS__ / __VTCMD__ */
 
 /* OS-independent wrapper around whichever getch() is active above. */
-int windgetc(void) { return (getch()); }
+int windgetc(void) {
+    if (vi_key_concurrent()) return vi_key_read();
+    return getch();
+}
 
 void edit(void) {
     int c, c1, c2;
@@ -526,89 +529,93 @@ void getout(void) {
     windexit(0);
 }
 
-void cursupdate(void) {
+/* Use the renderer's delayed wrap: a full row does not consume another
+ * row until the next display cell, and its newline must not wrap twice. */
+static void cursor_position(void)
+{
     char *p;
-    int inc, c, nlines;
-
-    /* special case: file is completely empty */
-    if (vi_file_end == vi_file_mem) {
-        vi_top_char = vi_curs_char = vi_file_mem;
-    } else if (vi_curs_char < vi_top_char) {
-        nlines = cntlines(vi_curs_char, vi_top_char);
-        if (nlines <= 3) {
-            while (vi_curs_char < vi_top_char) {
-                if ((p = prevline(vi_top_char)) == NULL)
-                    break;
-                vi_top_char = p;
-            }
-        } else {
-            vi_top_char = vi_curs_char;
-            scrolldown(vi_rows / 2);
-            if ((p = prevline(vi_top_char)) != NULL && (p = nextline(p)) != NULL) {
-                vi_top_char = p;
-            }
-        }
-        updatescreen();
-    } else if (vi_curs_char >= vi_bot_char && vi_curs_char < vi_file_end) {
-        nlines = cntlines(vi_bot_char, vi_curs_char);
-        if (nlines <= 3) {
-            while (vi_curs_char >= vi_bot_char && vi_top_char < vi_file_end) {
-                if ((p = nextline(vi_top_char)) == NULL)
-                    break;
-                vi_top_char = p;
-                updatescreen();
-            }
-        } else {
-            vi_top_char = vi_curs_char;
-            scrolldown(vi_rows / 2);
-            if ((p = prevline(vi_top_char)) != NULL && (p = nextline(p)) != NULL) {
-                vi_top_char = p;
-            }
-            updatescreen();
-        }
-    }
+    int c, n;
 
     vi_curs_row = vi_curs_col = vi_curs_vcol = 0;
-    {
-        int wrapped = 0;
-        for (p = vi_top_char; p < vi_curs_char; p++) {
-            c = *p;
-            if (c == '\n') {
-                /* If the previous line filled exactly Columns chars
-                 * the wrap already incremented Cursrow — don't do it
-                 * again for the \n or the cursor lands one row too low.
-                 * Two consecutive \n (blank line) still works because
-                 * wrapped is cleared after each \n. */
-                if (!wrapped)
+    for (p = vi_top_char; p < vi_curs_char; p++) {
+        c = (unsigned char)*p;
+        if (c == '\n') {
+            vi_curs_row++;
+            vi_curs_col = 0;
+        } else {
+            n = chars[c].ch_size;
+            while (n-- > 0) {
+                if (vi_curs_col == vi_columns) {
                     vi_curs_row++;
-                vi_curs_col = vi_curs_vcol = wrapped = 0;
-                continue;
-            }
-            inc = chars[(unsigned)(c & 0xff)].ch_size;
-            vi_curs_col += inc;
-            vi_curs_vcol += inc;
-            if (vi_curs_col >= vi_columns) {
-                vi_curs_col -= vi_columns;
-                vi_curs_row++;
-                wrapped = 1;
-            } else {
-                wrapped = 0;
+                    vi_curs_col = 0;
+                }
+                vi_curs_col++;
             }
         }
     }
+    if (vi_curs_col == vi_columns) {
+        if (vi_curs_char < vi_file_end && *vi_curs_char == '\n')
+            vi_curs_col--;      /* EOL after an exactly full row */
+        else {
+            vi_curs_row++;
+            vi_curs_col = 0;
+        }
+    }
+    /* The desired column belongs to the logical line, even when its first
+     * screen row has scrolled off the top. Match the displayed char widths. */
+    p = vi_curs_char;
+    while (p > vi_file_mem && p[-1] != '\n') p--;
+    while (p < vi_curs_char)
+        vi_curs_vcol += chars[(unsigned char)*p++].ch_size;
 }
 
-static void scrolldown(int nlines)
+/* Advance one visible text row, keeping expanded characters intact when
+ * one straddles the boundary. This also works for lines taller than a screen. */
+static char *next_screen_row(char *p)
 {
+    char *start = p;
+    int col = 0;
     int n;
-    char *p;
 
-    /* Scroll up 'nlines' lines. */
-    for (n = nlines; n > 0; n--) {
-        if ((p = prevline(vi_top_char)) == NULL)
-            break;
-        vi_top_char = p;
+    while (p < vi_file_end) {
+        if (*p == '\n') return p + 1;
+        n = chars[(unsigned char)*p].ch_size;
+        if (col + n > vi_columns && p > start) return p;
+        col += n;
+        p++;
+        if (col >= vi_columns) {
+            if (p < vi_file_end && *p == '\n') p++;
+            return p;
+        }
     }
+    return p;
+}
+
+void cursupdate(void)
+{
+    char *p;
+    char *oldtop = vi_top_char;
+
+    if (vi_file_end == vi_file_mem)
+        vi_top_char = vi_curs_char = vi_file_mem;
+    else if (vi_curs_char < vi_top_char) {
+        /* Reveal the row containing the cursor at the top, just as moving
+         * down reveals it at the bottom. Never recenter by half a screen. */
+        p = vi_curs_char;
+        while (p > vi_file_mem && p[-1] != '\n') p--;
+        vi_top_char = p;
+        while ((p = next_screen_row(vi_top_char)) > vi_top_char &&
+               p <= vi_curs_char)
+            vi_top_char = p;
+    }
+    cursor_position();
+    while (vi_curs_row >= vi_rows - 1) {
+        p = next_screen_row(vi_top_char);
+        if (p <= vi_top_char || p > vi_curs_char) break;
+        vi_top_char = p;
+        cursor_position();
+    }
+    if (vi_top_char != oldtop) updatescreen();
 }
 
 /*
@@ -663,10 +670,8 @@ int oneup(int n) {
         }
         p = np;
     }
-    vi_curs_char = p;
-    /* This makes sure Topchar gets updated so the complete line */
-    /* is one the screen. */
-    cursupdate();
+    /* Both directions leave viewport adjustment to the common cursupdate
+     * call, after the final desired column has been selected. */
     /* try to advance to the same (virtual) column */
     /* that we were at before. */
     vi_curs_char = coladvance(p, savevcol);

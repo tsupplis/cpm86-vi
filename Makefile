@@ -1,5 +1,6 @@
 CC     = aztec42_cc
 STRIP  = aztec42_sqz
+AS     = aztec42_as
 LD     = aztec42_link
 CPM86_LDFLAGS = -lc86
 DOS11_LDFLAGS = -ld11
@@ -32,38 +33,52 @@ all: vicp52.cmd vicp100.cmd vicpbios.cmd \
 # --------------------------------------------------------------------
 # Link targets
 # --------------------------------------------------------------------
-vicp52.cmd: $(SHARED_OBJS) edtcp52.o wincp52.o
-	$(LD) -o $@ $^ $(CPM86_LDFLAGS)
+vicp52.cmd: $(SHARED_OBJS) edtcp52.o wincp52.o keycp.o keyos.o os.o
+	printf '%s\n' '-o $@ $(filter %.o,$^)' > $(basename $@).lnk
+	$(LD) -f $(basename $@).lnk $(CPM86_LDFLAGS)
+	$(RM) $(basename $@).lnk
 
-vicp100.cmd: $(SHARED_OBJS) edtcp100.o wincp100.o
-	$(LD) -o $@ $^ $(CPM86_LDFLAGS)
+vicp100.cmd: $(SHARED_OBJS) edtcp100.o wincp100.o keycp.o keyos.o os.o
+	printf '%s\n' '-o $@ $(filter %.o,$^)' > $(basename $@).lnk
+	$(LD) -f $(basename $@).lnk $(CPM86_LDFLAGS)
+	$(RM) $(basename $@).lnk
 
-vid1bios.com: $(SHARED_OBJS) edtd1bio.o wind1bio.o
-	$(LD) -o $@ $^ $(DOS11_LDFLAGS)
+vid1bios.com: $(SHARED_OBJS) edtd1bio.o wind1bio.o keydos.o
+	printf '%s\n' '-o $@ $^' > $(basename $@).lnk
+	$(LD) -f $(basename $@).lnk $(DOS11_LDFLAGS)
+	$(RM) $(basename $@).lnk
 
-vid2bios.com: $(SHARED_OBJS) edtd2bio.o wind2bio.o
-	$(LD) -o $@ $^ $(DOS20_LDFLAGS)
+vid2bios.com: $(SHARED_OBJS) edtd2bio.o wind2bio.o keydos.o
+	printf '%s\n' '-o $@ $^' > $(basename $@).lnk
+	$(LD) -f $(basename $@).lnk $(DOS20_LDFLAGS)
+	$(RM) $(basename $@).lnk
 
 # CP/M-86 binary using the PC BIOS window/keyboard implementation (no VT
 # escape codes, no BDOS console I/O) instead of the DOS API.
-vicpbios.cmd: $(SHARED_OBJS) edtcpbio.o wincpbio.o
-	$(LD) -o $@ $^ $(CPM86_LDFLAGS)
+vicpbios.cmd: $(SHARED_OBJS) edtcpbio.o wincpbio.o keycp.o keyos.o os.o
+	printf '%s\n' '-o $@ $(filter %.o,$^)' > $(basename $@).lnk
+	$(LD) -f $(basename $@).lnk $(CPM86_LDFLAGS)
+	$(RM) $(basename $@).lnk
 
 # --------------------------------------------------------------------
 # Scratch program: isolate windgoto/windputc from all of vi's own
 # screen/timing logic, to check raw BIOS cursor positioning under CP/M-86.
 # --------------------------------------------------------------------
 
-curstest.cmd: curstest.o wincpbio.o
-	$(LD) -o $@ $^ $(CPM86_LDFLAGS)
+curstest.cmd: curstest.o wincpbio.o keycp.o keyos.o os.o
+	printf '%s\n' '-o $@ $(filter %.o,$^)' > $(basename $@).lnk
+	$(LD) -f $(basename $@).lnk $(CPM86_LDFLAGS)
+	$(RM) $(basename $@).lnk
 
 curstest.o: curstest.c
 	$(CC) $(CFLAGS) -o $@ curstest.c
 	$(STRIP) $@
 
 # Same diagnostic, linked for plain DOS, for direct comparison.
-curstest.com: curstestdos.o wind1bio.o
-	$(LD) -o $@ $^ $(DOS11_LDFLAGS)
+curstest.com: curstestdos.o wind1bio.o keydos.o
+	printf '%s\n' '-o $@ $^' > $(basename $@).lnk
+	$(LD) -f $(basename $@).lnk $(DOS11_LDFLAGS)
+	$(RM) $(basename $@).lnk
 
 curstestdos.o: curstest.c
 	$(CC) $(CFLAGS) -D__PCBIOS__ -D__PCDOS__==11 -o $@ $^
@@ -106,11 +121,11 @@ wind2bio.o: window.c gitver.h
 	$(STRIP) $@
 
 edtcpbio.o: edit.c
-	$(CC) -D__CPM86__ -D__PCBIOS__ -c -o $@ $<
+	$(CC) $(CFLAGS) -D__CPM86__ -D__PCBIOS__ -c -o $@ $<
 	$(STRIP) $@
 
 wincpbio.o: window.c gitver.h
-	$(CC) -D__CPM86__ -D__PCBIOS__ -c -o $@ $<
+	$(CC) $(CFLAGS) -D__CPM86__ -D__PCBIOS__ -c -o $@ $<
 	$(STRIP) $@
 
 # Checked against the current git state on every build, but only actually
@@ -209,3 +224,28 @@ cdos41test: cpmtest.img
 
 dosplustest: cpmtest.img
 	./dosplus
+
+main.o edtcp52.o edtcp100.o edtcpbio.o edtd1bio.o edtd2bio.o wincp52.o wincp100.o wincpbio.o wind1bio.o wind2bio.o: keyboard.h
+keycp.o: keyboard.c keyboard.h keyos.h
+	$(CC) $(CFLAGS) -D__CPM86__ -o $@ keyboard.c
+	$(STRIP) $@
+
+keydos.o: keyboard.c keyboard.h
+	$(CC) $(CFLAGS) -o $@ keyboard.c
+	$(STRIP) $@
+
+keyos.o: keyos.c keyos.h
+	$(CC) $(CFLAGS) -o $@ keyos.c
+	$(STRIP) $@
+
+os.o: os.asm
+	$(AS) $<
+	$(STRIP) $@
+
+.PHONY: test-keys
+test-keys:
+	python3 testkeys.py
+
+.PHONY: test-scroll
+test-scroll:
+	python3 testscroll.py

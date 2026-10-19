@@ -27,22 +27,22 @@ void normal(int c)
         break;
     case 04:
         /* control-d */
-        if (!onedown(10))
+        if (!onedown((vi_rows - 1) / 2))
             beep();
         break;
     case 025:
         /* control-u */
-        if (!oneup(10))
+        if (!oneup((vi_rows - 1) / 2))
             beep();
         break;
     case 06:
         /* control-f */
-        if (!onedown(vi_rows))
+        if (!onedown(vi_rows - 1))
             beep();
         break;
     case 02:
         /* control-b */
-        if (!oneup(vi_rows))
+        if (!oneup(vi_rows - 1))
             beep();
         break;
     case '\007':
