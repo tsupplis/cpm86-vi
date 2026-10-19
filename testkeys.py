@@ -16,7 +16,8 @@ source = r'''
 #include <string.h>
 static int version, inputs, nout, legacy_calls;
 static unsigned char output[32];
-static int input;
+static int input, crt_resets;
+int dosplus_crtreset(void) { crt_resets++; return 0; }
 static void check(int ok) { if (!ok) { fputs("keyboard check failed\n", stderr); exit(1); } }
 int osver(void) { return version & 255; }
 int ostype(void) { return version >> 8; }
@@ -57,6 +58,10 @@ int main(void) {
     vi_key_exit(); check(nout == 0);
     version = 0x1041; vi_key_init(0); check(!vi_key_concurrent());
     version = 0x1422; vi_key_init(0); check(!vi_key_concurrent());
+    version = 0x1041; vi_os_close(); check(crt_resets == 1);
+    version = 0x1441; vi_os_close(); check(crt_resets == 1);
+    version = 0x1431; vi_os_close(); check(crt_resets == 1);
+    version = 0x1022; vi_os_close(); check(crt_resets == 1);
     puts("PASS: VI raw keys, terminal sequences, unsigned bytes, legacy gate and no BIOS dispatch concurrently");
     return 0;
 }

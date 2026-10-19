@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #ifdef __CPM86__
 #include "sgtty.h"
+#include "keyos.h"
 #endif
 #include "gitver.h"
 #include "keyboard.h"
@@ -118,6 +119,9 @@ void windexit(int r)
     windclear();
     windgoto(0,0);
     windrefresh();
+#ifdef __CPM86__
+    vi_os_close();
+#endif
 	printf("Bye ...\n");
 	exit(r);
 }
@@ -263,6 +267,9 @@ void windexit(int r)
     windclear();
     windgoto(0,0);
     windrefresh();
+#ifdef __CPM86__
+    vi_os_close();
+#endif
 	printf("Bye ...\n");
 #if defined(__PCBIOS__) && defined(__CPM86__)
 	printf("\033E\033Y%c%cBye...\n",0x20,0x20);

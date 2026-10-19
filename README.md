@@ -270,7 +270,7 @@ so the two builds share the same escape-parsing code in `edit.c`.
 
 | Binary | CP/M-86 1.1 |  CCP/M-86 3.1 | CDOS 4.1 | DOS Plus 1.2 | PC-DOS 1.1 | DOS ≥ 2.0 | Emu2 |
 |--------|-------------|------------------------|---------------------|--------------|------------|-----------|------|
-| `vicpbios.cmd`             | ✅ | ✅ | ✅  | ⚠️ (3) | — | — | ✅ |
+| `vicpbios.cmd`             | ✅ | ✅ | ✅ | ✅ | — | — | ✅ |
 | `vicp52.cmd`               | ✅ | ✅ | ✅ | ✅ | — | — | ✅(1) |
 | `vicp100.cmd`              | ✅ | ✅ | ✅ | ✅ | — | — | ✅(1) |
 | `vid1bios.com`             | — | — | ✅ | ✅ | ✅ | ✅| ✅(2)|
@@ -278,74 +278,21 @@ so the two builds share the same escape-parsing code in `edit.c`.
 
 1. keyboard navigation keys need to be configured
 2. 25 lines terminal needed
-3. cursor issues bdos/bios clashing, still experimental, dosplus xios
-4. no keyboard
 
 ## Concurrent CP/M keyboard
 
-All CP/M builds, including `vicpbios.cmd`, use BDOS keyboard input on a
-concurrent system with BDOS >= 3.0. No INT 16h call is made on that input path.
-The adapter selects raw function keys with ESC 6 and synthesizes the existing
-VT52/VT100 editing sequences for arrows, Home/End, paging, Insert and Delete.
-Normal and explicit error exits restore expansion with ESC 7.
-
-Single-tasking CP/M retains each build's previous input path; DOS builds retain
-BIOS input. The BIOS build still uses its existing BIOS display routines;
-keyboard support does not make its display virtual-console safe. Prefer the
-VT52 build for the native Concurrent CP/M console.
-
-`make test-keys` tests the real adapter and input dispatch on the host with
-mocked BDOS calls and sanitizers. Verify physical arrows, paging, Home/End,
-Insert/Delete, literal Esc and normal function keys after exit on the target.
-
-VI is self-contained: local `keyos.c` detects concurrent systems using the
-minimal BDOS version/type wrappers in `os.asm`. Only CP/M binaries link these
-helpers; DOS binaries do not. No sibling repository, utility library or drive
-mapping is required. Linker response files avoid command tail truncation.
+On concurrent BDOS >= 3.0, all CP/M builds use BDOS input for navigation keys
+and restore normal function-key expansion on exit. Legacy CP/M and DOS input
+paths are preserved. VI includes its own small OS helpers and needs no utility
+library. The BIOS build still uses BIOS display calls; prefer VT52 for native
+Concurrent CP/M consoles.
 
 ## Viewport scrolling
 
-Up and down now reveal an off-screen cursor at the corresponding edge by
-moving only the necessary text rows. Neither direction recenters by half a
-screen. Page movement uses the document height (`vi_rows - 1`); half-page
-movement uses half that height. Both directions preserve the desired column.
+Up/Down scroll only as far as needed to keep the cursor visible. Page and
+half-page movement use the document area, reserving the last row for status
+and commands, including with wrapped lines and at EOF.
 
-The final screen row remains the status/command row. Cursor positioning uses
-the same delayed wrapping as rendering, including exact-width lines and
-expanded control characters. Long lines can scroll by visible rows; EOF and
-blank lines do not push the document cursor into the status row.
-
-`make test-scroll` checks the actual movement/rendering functions with sanitizer
-and status-row guards: repeated movement in both directions, pages, wraps,
-blank/long lines, expanded final characters and EOF insertion. On the target,
-compare Up/Down and PgUp/PgDn near both edges and the document's final line.
-
----
-
-## Companion projects
-
-| Project | Description |
-|---------|-------------|
-| [cpm86-kernel](https://github.com/tsupplis/cpm86-kernel)     | CP/M-86 1.1 distribution rebuilt from patched and reconstituted sources |
-| [ccpm86-y2k](https://github.com/tsupplis/ccpm86-y2k)         | CCP/M-86 3.1 distribution rebuilt from patched and reconstituted sources |
-| [cpm86-crossdev](https://github.com/tsupplis/cpm86-crossdev) | Unix CP/M-86 cross development project (compilers, emulation and tools) |
-| [cpm86-hacking](https://github.com/tsupplis/cpm86-hacking)   | CP/M-86 miscellaneous tools and PCE emulator helpers |
-| [cpm86-cmdtools](https://github.com/tsupplis/cpm86-cmdtools) | CP/M-86 `.cmd` file manipulation tools |
-| [cpm86-ports](https://github.com/tsupplis/cpm86-ports)       | CP/M-86 application ports in C and assembler |
-| [cpm86-vi](https://github.com/tsupplis/cpm86-vi)             | STevie vi port for CP/M-86 and PC-DOS 1.1 |
-| [cpm86-msbasic](https://github.com/tsupplis/cpm86-msbasic)   | A recreaction of msbasic-86 for CP/M-86 and PC-DOS 1.1 from gwbasic sources |
-| [cpm86-menu](https://github.com/tsupplis/cpm86-menu)   | A submit replacement and a menu system for submit orchestration for CP/M-86 1.1 |
-| [cpm86-make](https://github.com/tsupplis/cpm86-make)   | A simple submit based make tool for CP/M-86 1.1 |
-| [pcdos11-hacking](https://github.com/tsupplis/pcdos11-hacking) | PC-DOS 1.1 distribution, tools and notes |
-
-
-## Credits
-
-- **Tim Thompson** — original STevie for the Atari ST
-- **Jon Bradbury** — CP/M-80 port for the Philips P2000C
-
-## License
-
-MIT — see [LICENSE](LICENSE.md).
-
-
+Run `make test-keys test-scroll` for keyboard, OS-gating and viewport checks.
+On DOS Plus, CP/M builds reset the text mode on close to restore the XIOS
+scrolling origin and cursor state.
