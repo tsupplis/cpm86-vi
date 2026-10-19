@@ -224,7 +224,7 @@ VT-100 cursor keys send a three-byte sequence: `ESC [` followed by a letter.
 > End and PgDn arrive as bare control codes with no ESC prefix on both
 > terminal types, as sent by the IBM-PC CP/M-86 BDOS keyboard handler.
 
-### PC BIOS (`vibios.cmd`, `vidos.com`)
+### PC BIOS (`vicpbios.cmd`, `vidosX.com`)
 
 There's no real terminal here — `getch()` reads `INT 16h` scan codes
 directly and synthesizes the same lone `ESC` + letter sequences as VT-52,
