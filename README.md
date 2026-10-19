@@ -191,7 +191,7 @@ git checkout) as the version shown by the `:v` command; see `gitver.h`
 The arrow keys, Home, PgUp, PgDn and End send different byte sequences
 depending on the terminal type.
 
-### VT-52 (`vivt52.cmd`)
+### VT-52 (`vicp52.cmd`)
 
 VT-52 cursor keys send a two-byte sequence: `ESC` followed by a single letter.
 
@@ -206,7 +206,7 @@ VT-52 cursor keys send a two-byte sequence: `ESC` followed by a single letter.
 | End     | `^Z` (0x1A) | `$` — end of line |
 | PgDn    | `^J` (0x0A) | `^F` — forward one screen |
 
-### VT-100 / ANSI (`vivt100.cmd`)
+### VT-100 / ANSI (`vicp100.cmd`)
 
 VT-100 cursor keys send a three-byte sequence: `ESC [` followed by a letter.
 
