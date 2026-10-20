@@ -296,3 +296,10 @@ and commands, including with wrapped lines and at EOF.
 Run `make test-keys test-scroll` for keyboard, OS-gating and viewport checks.
 On DOS Plus, CP/M builds reset the text mode on close to restore the XIOS
 scrolling origin and cursor state.
+
+--
+
+## License
+
+The whole repository is as public domain. (License)[LICENSE.md] unless specified otherwise in a subdirectory.
+
