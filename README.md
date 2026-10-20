@@ -317,5 +317,5 @@ scrolling origin and cursor state.
 
 ## License
 
-The whole repository is as public domain. (License)[LICENSE.md] unless specified otherwise in a subdirectory.
+The whole repository is as public domain. [License](LICENSE.md) unless specified otherwise in a subdirectory.
 
