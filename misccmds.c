@@ -98,25 +98,24 @@ void yankline(int n) {
     savep = vi_curs_char;
     /* go to the beginning of the current line. */
     beginline();
-    /* compute length of line */
-    for (p = vi_curs_char, leng = 0;; p++) {
-        if (*p == '\n') {
-            /* keep going until we've seen 'n' lines */
+    /* The last line may end at logical EOF, without a newline. */
+    savedcount = 0;
+    for (p = vi_curs_char; p < vi_file_end; ) {
+        if (*p++ == '\n') {
+            savedcount++;
             if (--n <= 0)
                 break;
         }
-        leng++;
     }
-    /* save a copy of it */
-    savedline = malloc((unsigned)(leng + 2));
+    if (p > vi_curs_char && p[-1] != '\n')
+        savedcount++;
+    leng = p - vi_curs_char;
+    savedline = malloc((unsigned)(leng + 1));
     for (p = vi_curs_char, q = savedline, k = 0; k < leng; k++)
         *q++ = *p++;
-    /* get the final newline */
-    *q++ = *p;
     *q = '\0';
     vi_curs_char = savep;
-    savednum = leng + 1;
-    savedcount = (vi_renum == 0 ? 1 : vi_renum);
+    savednum = leng;
 }
 
 /*
@@ -128,35 +127,39 @@ void yankline(int n) {
 
 void putline(int k)
 {
-    char *p;
-    int n;
+    char *p, *insertp, *first;
+    int n, prefix, suffix;
 
-    if (savedline == NULL)
+    if (savedline == NULL || savednum == 0)
         return;
-    /* Bail out without disturbing undo state if there is no room */
-    if (!canincrease(savednum))
+    insertp = vi_curs_char;
+    prefix = 0;
+    if (k == 0) {
+        while (insertp < vi_file_end && *insertp != '\n')
+            insertp++;
+        if (insertp < vi_file_end)
+            insertp++;
+        else if (insertp > vi_file_mem && insertp[-1] != '\n')
+            prefix = 1;
+    } else {
+        beginline();
+        insertp = vi_curs_char;
+    }
+    /* Separate a nonterminated yank from existing following text. At EOF
+     * preserve its missing newline, including when undo restores dd. */
+    suffix = insertp < vi_file_end && savedline[savednum - 1] != '\n';
+    if (!canincrease(savednum + prefix + suffix))
         return;
     message("Inserting saved stuff...");
-    if (k == 0) {
-        /* get to the end of the current line */
-        while (vi_curs_char < vi_file_end && *vi_curs_char != '\n')
-            vi_curs_char++;
-    } else
-        beginline();
-    /* append or insert the characters of the saved line */
-    for (p = savedline, n = 0; n < savednum; p++, n++) {
-        if (k == 0)
-            appchar(*p);
-        else
-            inschar(*p);
-    }
-    /* We want to end up at the beginning of the line. */
-    while (n-- > 1)
-        vi_curs_char--;
-    if (k == 1)
-        vi_curs_char--;
-    beginline();
-    /* Set up undo: deleting the pasted line(s) undoes the paste. */
+    vi_curs_char = insertp;
+    if (prefix)
+        inschar('\n');
+    first = vi_curs_char;
+    for (p = savedline, n = 0; n < savednum; p++, n++)
+        inschar(*p);
+    if (suffix)
+        inschar('\n');
+    vi_curs_char = first;
     resetundo();
     vi_uncurs_char = vi_curs_char;
     sprintf(vi_undo_buff, "%ddd", savedcount);
@@ -342,8 +345,10 @@ void delline(int nlines) {
     message("Deleting...");
     while (nlines-- > 0) {
         /* Count the characters in the line */
-        for (nchars = 1, p = vi_curs_char; p < vi_file_end && *p != '\n'; p++, nchars++)
+        for (nchars = 0, p = vi_curs_char; p < vi_file_end && *p != '\n'; p++, nchars++)
             ;
+        if (p < vi_file_end)
+            nchars++; /* Include a newline only when one actually exists. */
         /* Delete the characters of the line */
         /* by moving everything else in the file down. */
         q = vi_curs_char;
