@@ -7,9 +7,9 @@ DOS11_LDFLAGS = -ld11
 DOS20_LDFLAGS = -lc
 
 # Flags common to both CP/M-86 builds
-CFLAGS =
-DOS_CFLAGS = -D__PCBIOS__
-PCBIOS_CFLAGS = -D__PCBIOS__
+CFLAGS = -I. +F +0
+DOS_CFLAGS = -I. +F +0 -D__PCBIOS__
+PCBIOS_CFLAGS = -I. +F +0 -D__PCBIOS__
 
 GIT_VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo unknown)
 
