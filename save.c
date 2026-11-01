@@ -15,15 +15,19 @@ extern int bdosver(void);
 int open(const char *, int, ...);
 
 #ifdef __CPM86__
-/* Exact known identities, not a guessed version threshold. Unknown/remote
- * systems use replacement. LRBC interpretation is enabled only for DOS Plus. */
+/* Decode BDOS 12: AH high nibble is CPU, low nibble is OS family;
+ * AL is the packed BDOS version. Concurrent variants include networking. */
 static int capabilities(int identity)
 {
-    switch(identity) {
-    case 0x1031: case 0x1431: return 1; /* record truncate */
-    case 0x1041: return 3;             /* DOS Plus: used-byte LRBC */
-    default: return 0;
-    }
+    int cpu, family, version;
+    cpu=(identity>>12)&15;
+    family=(identity>>8)&15;
+    version=identity&255;
+    if(cpu!=1) return 0;
+    if((family==4 || family==6) && version>=0x31) return 3;
+    if(family==0 && version==0x41) return 3; /* DOS Plus */
+    if(family==0 && version==0x31) return 1; /* CP/M-86 Plus: records */
+    return 0;
 }
 
 static int newname(const char *name, char *out, const char *ext)
@@ -196,7 +200,7 @@ const char *vi_save_file(const char *name, const char *start,
 }
 
 /* Query before opening the stream: CP/M I/O itself remains record-oriented.
- * Only DOS Plus has a verified used-byte LRBC convention in this policy. */
+ * Concurrent BDOS 3.1+ and DOS Plus use the used-byte LRBC convention. */
 long vi_file_length(const char *name)
 {
 #ifdef __CPM86__

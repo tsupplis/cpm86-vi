@@ -111,16 +111,27 @@ int main(void) {
  seed();fail_flush=1;assert(vi_save_file("FILE.TST",text,text+3,0));fail_flush=0;
  seed();fail_close=1;assert(vi_save_file("FILE.TST",text,text+3,0));fail_close=0;
 #ifdef __CPM86__
- assert(capabilities(0x1031)==1 && capabilities(0x1431)==1);
+ assert(capabilities(0x1031)==1 && capabilities(0x1431)==3);
  assert(capabilities(0x1041)==3 && capabilities(0x1042)==0);
  assert(capabilities(0x1231)==0 && capabilities(0x1022)==0);
+ assert(capabilities(0x1430)==0 && capabilities(0x0431)==0);
+ assert(capabilities(0x1441)==3 && capabilities(0x1450)==3);
+ assert(capabilities(0x1631)==3 && capabilities(0x1641)==3);
+ assert(capabilities(0x1131)==0 && capabilities(0x1531)==0);
  seed();rename_count=0;fail_rename=2;
  assert(vi_save_file("FILE.TST",text,text+3,0));fail_rename=0;
  /* Both failed install and failed restoration retain the original backup. */
  assert(access("FILE.TST",F_OK)!=0);
  seed();identity=0x1031;truncate_calls=0;
  assert(!vi_save_file("FILE.TST",text,text+3,0));assert(truncate_calls==1);assert(size()==128);
- seed();identity=0x1431;assert(!vi_save_file("FILE.TST",text,text+3,0));assert(size()==128);
+ seed();identity=0x1431;attr_calls=0;
+ assert(!vi_save_file("FILE.TST",text,text+3,0));assert(attr_calls==1);
+ assert(vi_file_length("FILE.TST")==5 && size()==5);
+ seed();identity=0x1441;
+ assert(!vi_save_file("FILE.TST",binary,binary+4,1));
+ assert(vi_file_length("FILE.TST")==4 && size()==4);
+ seed();identity=0x1631;
+ assert(!vi_save_file("FILE.TST",text,text+3,0));assert(vi_file_length("FILE.TST")==5);
  seed();identity=0x1041;attr_calls=0;
  assert(!vi_save_file("FILE.TST",text,text+3,0));assert(attr_calls==1);expect("a\r\nb\032",5,5,0);assert(vi_file_length("FILE.TST")==5);
  seed();fail_resize=1;assert(vi_save_file("FILE.TST",text,text+3,0));fail_resize=0;

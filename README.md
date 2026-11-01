@@ -339,15 +339,15 @@ CP/M save policy uses the complete AX returned by BDOS function 12:
 | Identity | Save policy |
 | --- | --- |
 | 1031h: CP/M-86 Plus | BDOS 99 record truncation after closing |
-| 1431h: Concurrent CP/M 3.1 | BDOS 99 record truncation after closing |
+| 8086 Concurrent family 4 or 6, BDOS >= 3.1 | Record truncation plus used-byte LRBC metadata |
 | 1041h: DOS Plus | Record truncation plus used-byte LRBC metadata |
 | Classic CP/M-86 and other identities | Temporary-file replacement |
 
-No broad version threshold is assumed. Network variants and unknown releases
-use replacement. BDOS 99 identifies the last retained record, not a byte count.
+The version threshold applies only to Concurrent families, including networking.
+Other unknown identities use replacement. BDOS 99 identifies the last retained record, not a byte count.
 Empty binary saves use replacement even on native-truncate systems.
 Text output has a Ctrl-Z terminator and deliberate record padding; binary
-padding is zero. DOS Plus binary reads honor its exact byte-count metadata.
+padding is zero. Concurrent BDOS 3.1+ and DOS Plus binary reads honor exact LRBC metadata.
 Other CP/M binary files remain rounded to 128-byte records.
 
 Replacement files (`VI000000.TMP` onward) and backup names (`VI000000.BAK`
@@ -364,16 +364,17 @@ Validation:
 ```
 make test-save          # host files, mocked BDOS, injected I/O/rename failures
 make test-save-runtime  # actual Aztec DOS 1.1, DOS 2 and classic CP/M libraries
-make test-save-pce      # private DOS 1.1 and DOS Plus images under PCE
+make test-save-pce      # private DOS 1.1, DOS Plus, CCP/M 3.1 and CDOS 4.1 images
 ```
 
 `CROSSDEV` selects the crossdev checkout; `SAVE_EMULATOR` can select a corrected
 emu2. Otherwise the runtime test builds the crossdev DOS 1.1 emulator fixture
 in a temporary directory. PCE testing needs the DOS 1.1 checkout at
 `~/Projects/DOS/pcdos11-hacking` (override `DOS11_SOURCE`) and this checkout's
-DOS Plus image/ROM files. Original images are never modified.
-The CP/M Plus and Concurrent 3.1 identities are covered by mocked BDOS tests;
-real-kernel native truncation is validated on DOS Plus, not those two kernels.
+DOS Plus, CCP/M and CDOS image/ROM files, plus the sibling ref checkout's
+`diskdefs` and `scripts/cpm86twist`. Original images are never modified.
+The LRBC kernels must return exact lengths in the probe; record-rounded fallback
+cannot pass. CP/M-86 Plus and network-family selection have mocked coverage only.
 
 Reference: Digital Research's CP/M-86 Plus Programmer's Guide, functions 12,
 30 and 99, and the supplied DOS Plus 1.2 kernel exercised under PCE.
