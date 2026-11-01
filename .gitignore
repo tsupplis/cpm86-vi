@@ -19,6 +19,7 @@ dos20
 *.img
 *.sym
 *.lst
+!cpmbase.img
 .vscode
 ibmxt.lock
 gitver.h
