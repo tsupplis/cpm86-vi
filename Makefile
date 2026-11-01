@@ -15,7 +15,6 @@ GIT_VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo 
 
 # Objects shared by both terminal builds (window.o and edit.o excluded)
 SHARED_OBJS = \
-	cmdline.o  \
 	help.o     \
 	hexchars.o \
 	linefunc.o \
@@ -33,29 +32,29 @@ all: vicp52.cmd vicp100.cmd vicpbios.cmd \
 # --------------------------------------------------------------------
 # Link targets
 # --------------------------------------------------------------------
-vicp52.cmd: $(SHARED_OBJS) edtcp52.o wincp52.o keycp.o keyos.o os.o
+vicp52.cmd: $(SHARED_OBJS) cmdline.o savecp.o edtcp52.o wincp52.o keycp.o keyos.o os.o
 	printf '%s\n' '-o $@ $(filter %.o,$^)' > $(basename $@).lnk
 	$(LD) -f $(basename $@).lnk $(CPM86_LDFLAGS)
 	$(RM) $(basename $@).lnk
 
-vicp100.cmd: $(SHARED_OBJS) edtcp100.o wincp100.o keycp.o keyos.o os.o
+vicp100.cmd: $(SHARED_OBJS) cmdline.o savecp.o edtcp100.o wincp100.o keycp.o keyos.o os.o
 	printf '%s\n' '-o $@ $(filter %.o,$^)' > $(basename $@).lnk
 	$(LD) -f $(basename $@).lnk $(CPM86_LDFLAGS)
 	$(RM) $(basename $@).lnk
 
-vid1bios.com: $(SHARED_OBJS) edtd1bio.o wind1bio.o keydos.o
+vid1bios.com: $(SHARED_OBJS) cmddos.o savedos.o edtd1bio.o wind1bio.o keydos.o
 	printf '%s\n' '-o $@ $^' > $(basename $@).lnk
 	$(LD) -f $(basename $@).lnk $(DOS11_LDFLAGS)
 	$(RM) $(basename $@).lnk
 
-vid2bios.com: $(SHARED_OBJS) edtd2bio.o wind2bio.o keydos.o
+vid2bios.com: $(SHARED_OBJS) cmddos.o savedos.o edtd2bio.o wind2bio.o keydos.o
 	printf '%s\n' '-o $@ $^' > $(basename $@).lnk
 	$(LD) -f $(basename $@).lnk $(DOS20_LDFLAGS)
 	$(RM) $(basename $@).lnk
 
 # CP/M-86 binary using the PC BIOS window/keyboard implementation (no VT
 # escape codes, no BDOS console I/O) instead of the DOS API.
-vicpbios.cmd: $(SHARED_OBJS) edtcpbio.o wincpbio.o keycp.o keyos.o os.o
+vicpbios.cmd: $(SHARED_OBJS) cmdline.o savecp.o edtcpbio.o wincpbio.o keycp.o keyos.o os.o
 	printf '%s\n' '-o $@ $(filter %.o,$^)' > $(basename $@).lnk
 	$(LD) -f $(basename $@).lnk $(CPM86_LDFLAGS)
 	$(RM) $(basename $@).lnk
@@ -251,3 +250,24 @@ test-keys:
 .PHONY: test-scroll
 test-scroll:
 	python3 testscroll.py
+
+# Save policy must match the linked runtime; never share the CP/M command object.
+cmddos.o: cmdline.c save.h
+	$(CC) $(CFLAGS) -o $@ cmdline.c
+	$(STRIP) $@
+savecp.o: save.c save.h
+	$(CC) $(CFLAGS) -D__CPM86__ -o $@ save.c
+	$(STRIP) $@
+savedos.o: save.c save.h
+	$(CC) $(CFLAGS) -o $@ save.c
+	$(STRIP) $@
+cmdline.o: save.h
+
+.PHONY: test-save test-save-runtime test-save-pce
+test-save:
+	python3 test/test_save.py
+test-save-runtime:
+	sh test/saveruntime
+test-save-pce:
+	python3 test/test_save_pce.py
+main.o: save.h

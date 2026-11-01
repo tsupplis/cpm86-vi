@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "stevie.h"
+#include "save.h"
 
 static char *last_message = NULL;
 
@@ -288,44 +289,20 @@ void clearlastmess(void) {
 
 static int writeit(char *fname)
 {
-    FILE *f;
     char buff[128];
-    char *p;
-    int n;
-
-    sprintf(buff, "Writing %s...", fname);
+    const char *error;
+    snprintf(buff, sizeof buff, "Writing %s...", fname);
     message(buff);
-
-#if defined(__CPM86__)
-    /* Use "r+" (open existing for overwrite) instead of "w" to avoid
-     * O_TRUNC: fopen("w") issues BDOS Delete before Make, and Make fails
-     * if a same-named R/O file exists in another user area, leaving the
-     * file deleted and nothing written.  "r+" opens with BDOS Open only.
-     * Fall back to "w" only when the file doesn't exist yet (new file). */
-    f = fopen(fname, "r+");
-    if (f == NULL)
-        f = fopen(fname, "w");
-#else
-    f = fopen(fname, "w");
-#endif
-    if (f == NULL) {
-        message("Unable to open file!");
-        return (0);
+    error=vi_save_file(fname,vi_file_mem,vi_file_end,vi_binary);
+    if(error) {
+        message((char *)error);
+        return 0;
     }
-
-    for (n = 0, p = vi_file_mem; p < vi_file_end; p++, n++) {
-        if (!vi_binary && *p == '\n')
-            putc('\r', f);
-        putc(*p, f);
-    }
-    if (!vi_binary)
-        putc(0x1A, f);
-    sprintf(buff, "\"%s\" %d characters", fname, n);
-    fclose(f);
-
+    snprintf(buff, sizeof buff, "\"%s\" %u characters", fname,
+             (unsigned)(vi_file_end-vi_file_mem));
     message(buff);
     UNCHANGED;
-    return (1);
+    return 1;
 }
 
 void filemess(char *s)

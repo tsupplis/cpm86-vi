@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "stevie.h"
+#include "save.h"
 #include "keyboard.h"
 
 static void filetonext(void);
@@ -346,6 +347,7 @@ int readfile(char *fname, char *fromp, int nochangename) /* if 1, don't change t
     char *p;
     int c, n;
     int unprint = 0;
+    long remaining;
 
     sprintf(buff, "Reading %s...", fname);
     message(buff);
@@ -353,13 +355,15 @@ int readfile(char *fname, char *fromp, int nochangename) /* if 1, don't change t
     if (!nochangename)
         vi_file_name = strsave(fname);
 
+    remaining=vi_binary ? vi_file_length(fname) : -1L;
     if ((f = fopen(fname, "r")) == NULL) {
         vi_file_end = vi_file_mem;
         return (1);
     }
 
     /* Read file into buffer until EOF or CP/M SUB char */
-    for (n = 0; (c = getc(f)) != EOF && c != 0x1A; n++) {
+    for (n = 0; remaining != 0L && (c = getc(f)) != EOF && (vi_binary || c != 0x1A); n++) {
+        if(remaining>0L) remaining--;
         /* Skip CR; lines are terminated by LF alone internally */
         if (!vi_binary && c == '\r') {
             n--;

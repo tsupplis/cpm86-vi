@@ -36,6 +36,12 @@ ostype_     endp
 
 	        public	osver_
 osver_  	proc	near
+            call bdosver_
+            xor ah,ah
+            ret
+osver_      endp
+            public bdosver_
+bdosver_ proc near
             push	bp
             mov 	bp,sp
             push    ds
@@ -46,7 +52,6 @@ osver_  	proc	near
             push    cx
             mov     cx,0Ch
             int     0E0h
-            xor     ah,ah
             pop     cx
             pop     bx
             pop	    si
@@ -55,7 +60,7 @@ osver_  	proc	near
             pop     ds
             pop     bp
             ret
-osver_      endp
+bdosver_    endp
 
 ; DOS Plus retains a hardware scrolling origin independently of BIOS cursor
 ; coordinates. Re-enter the current text mode through its installed INT 10h

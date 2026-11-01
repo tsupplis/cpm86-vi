@@ -319,3 +319,58 @@ scrolling origin and cursor state.
 
 The whole repository is as public domain. [License](LICENSE.md) unless specified otherwise in a subdirectory.
 
+
+
+## Saving files
+
+The command-line and save objects are built separately for DOS and CP/M.
+DOS 1.1 and DOS 2 use the Aztec runtime's `ftruncate` after flushing output,
+with the number of physical bytes actually written (including inserted CRs).
+DOS text does not need a trailing Ctrl-Z. Binary reads preserve embedded 1Ah.
+A failed write, flush, size update, or close leaves the editor marked modified.
+An in-place save is not crash-atomic and may already have overwritten data
+when an error is reported.
+
+CP/M save policy uses the complete AX returned by BDOS function 12:
+
+| Identity | Save policy |
+| --- | --- |
+| 1031h: CP/M-86 Plus | BDOS 99 record truncation after closing |
+| 1431h: Concurrent CP/M 3.1 | BDOS 99 record truncation after closing |
+| 1041h: DOS Plus | Record truncation plus used-byte LRBC metadata |
+| Classic CP/M-86 and other identities | Temporary-file replacement |
+
+No broad version threshold is assumed. Network variants and unknown releases
+use replacement. BDOS 99 identifies the last retained record, not a byte count.
+Empty binary saves use replacement even on native-truncate systems.
+Text output has a Ctrl-Z terminator and deliberate record padding; binary
+padding is zero. DOS Plus binary reads honor its exact byte-count metadata.
+Other CP/M binary files remain rounded to 128-byte records.
+
+Replacement files (`VI000000.TMP` onward) and backup names (`VI000000.BAK`
+onward) are created exclusively in the target drive/user area. The completed
+temporary file is closed before the original is renamed. Failed installation
+attempts restore the original name; if restoration also fails, both recovery
+files remain and the error reports their names. Original read-only files are
+rejected. Replacement does not promise preservation of timestamps or other
+extended file metadata. No failed open is followed by a destructive create.
+The original user area is restored on every returning path.
+
+Validation:
+
+```
+make test-save          # host files, mocked BDOS, injected I/O/rename failures
+make test-save-runtime  # actual Aztec DOS 1.1, DOS 2 and classic CP/M libraries
+make test-save-pce      # private DOS 1.1 and DOS Plus images under PCE
+```
+
+`CROSSDEV` selects the crossdev checkout; `SAVE_EMULATOR` can select a corrected
+emu2. Otherwise the runtime test builds the crossdev DOS 1.1 emulator fixture
+in a temporary directory. PCE testing needs the DOS 1.1 checkout at
+`~/Projects/DOS/pcdos11-hacking` (override `DOS11_SOURCE`) and this checkout's
+DOS Plus image/ROM files. Original images are never modified.
+The CP/M Plus and Concurrent 3.1 identities are covered by mocked BDOS tests;
+real-kernel native truncation is validated on DOS Plus, not those two kernels.
+
+Reference: Digital Research's CP/M-86 Plus Programmer's Guide, functions 12,
+30 and 99, and the supplied DOS Plus 1.2 kernel exercised under PCE.

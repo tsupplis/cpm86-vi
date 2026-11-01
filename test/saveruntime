@@ -1,0 +1,38 @@
+#!/bin/sh
+set -eu
+root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
+bin=$(CDPATH= cd -- "${CROSSDEV:-$root/../cpm86-crossdev}/bin" && pwd)
+work=$(mktemp -d "${TMPDIR:-/tmp}/visave.XXXXXX")
+trap 'rm -rf "$work"' EXIT HUP INT TERM
+cp "$root/save.c" "$root/save.h" "$root/os.asm" "$root/test/saveprobe.c" "$work/"
+# Test DOS 1.1's documented zero-count FCB write using the existing fixture.
+if [ -z "${SAVE_EMULATOR:-}" ]; then
+    mkdir "$work/emulator"
+    cp -R "$bin/../archive/emu2/src" "$work/emulator/"
+    cp "$bin/../archive/emu2/GNUmakefile" "$bin/../archive/emu2/platform.mk" "$work/emulator/"
+    (cd "$work/emulator"
+     git apply --no-index "$bin/../src/aztecreg/emu2-truncate.patch"
+     "${MAKE:-make}" -j4)
+    SAVE_EMULATOR="$work/emulator/emu2"
+fi
+cd "$work"
+"$bin/aztec42_as" os.asm
+for target in c d11 c86; do
+    flags=
+    case $target in
+        c) output=save.exe; extra=;;
+        d11) output=save.com; extra=;;
+        c86) output=save.cmd; flags=-D__CPM86__; extra=os.o;;
+    esac
+    "$bin/aztec42_cc" -I. +F +0 $flags -o save.o save.c
+    "$bin/aztec42_cc" -I. +F +0 $flags -o probe.o saveprobe.c
+    "$bin/aztec42_link" -o "$output" probe.o save.o $extra -l"$target"
+    output_text=$(EMU2_CPM_VER=2.2 "$SAVE_EMULATOR" "$output")
+    printf '%s\n' "$output_text"
+    printf '%s\n' "$output_text" | tr -d '\r' | grep -qx 'VI SAVE PASS: 0 failures'
+    if [ -n "${SAVE_TEST_OUTPUT:-}" ]; then
+        mkdir -p "$SAVE_TEST_OUTPUT"
+        cp "$output" "$SAVE_TEST_OUTPUT/"
+    fi
+    echo "VI SAVE RUNTIME PASS: $target"
+done
