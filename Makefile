@@ -5,6 +5,7 @@ LD     = aztec42_link
 CPM86_LDFLAGS = -lc86
 DOS11_LDFLAGS = -ld11
 DOS20_LDFLAGS = -lc
+RM=rm -f
 
 # Flags common to both CP/M-86 builds
 CFLAGS = -I. +F +0
