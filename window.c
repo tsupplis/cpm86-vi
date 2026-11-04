@@ -185,6 +185,12 @@ void windputc(int c)
 	putchar(c);
 }
 
+void windputrun(const char *text, unsigned length)
+{
+	while (length--)
+		windputc((unsigned char)*text++);
+}
+
 void windrefresh(void)
 {
 	/* Need a redraw here? */
@@ -340,6 +346,22 @@ void windstr(char *s)
 {
 	while ( *s )
 		windputc(*s++);
+}
+
+/* Runs stay within one row. Set the BIOS data-area cursor before every byte
+ * so background console updates cannot redirect the rest of the run. AH=0Ah
+ * preserves cell attributes; the hardware cursor is updated once at the end. */
+void windputrun(const char *text, unsigned length)
+{
+	int dummy;
+
+#include "windrun.asm"
+	cur_col += length;
+	if (cur_col >= vi_columns) {
+		cur_col -= vi_columns;
+		cur_row++;
+	}
+	windgoto(cur_row,cur_col);
 }
 
 void windrefresh(void)

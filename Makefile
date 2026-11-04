@@ -251,6 +251,7 @@ dosplustest: cpmtest.img
 main.o edtcp52.o edtcp100.o edtcpbio.o edtd1bio.o edtd2bio.o wincp52.o wincp100.o wincpbio.o wind1bio.o wind2bio.o: keyboard.h
 $(SHARED_OBJS) cmdline.o cmddos.o edtcp52.o edtcp100.o edtcpbio.o edtd1bio.o edtd2bio.o wincp52.o wincp100.o wincpbio.o wind1bio.o wind2bio.o: stevie.h
 wincp52.o wincp100.o wincpbio.o: keyos.h
+wincpbio.o wind1bio.o wind2bio.o: windrun.asm
 
 keycp.o: keyboard.c keyboard.h keyos.h
 	$(CC) $(CFLAGS) -D__CPM86__ -o $@ keyboard.c
@@ -322,6 +323,14 @@ test-buffer-runtime:
 .PHONY: test-dos1-pce
 test-dos1-pce:
 	python3 -B test/test_dos1_pce.py
+
+.PHONY: test-display-pce
+test-display-pce:
+	python3 -B test/test_display_pce.py
+
+.PHONY: test-display-compat
+test-display-compat:
+	python3 -B test/test_display_pce.py --compat-only
 
 .PHONY: test-capacity-runtime
 test-capacity-runtime:

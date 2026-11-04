@@ -192,6 +192,44 @@ allocation respectively, then compares the saved bytes.
 clearing/diffing, and 500 frame/Botchar comparisons against the previous renderer
 under host sanitizers.
 
+### Display output
+
+The renderer groups adjacent changed cells into row-bounded output runs.
+BIOS builds use the original PC BIOS character-only service (INT 10h/AH=0Ah),
+batching repeated characters with its repeat count. This preserves existing
+cell attributes and avoids teletype's per-character cursor updates. The BIOS
+data-area page-zero cursor is set before each BIOS write, so background console
+cursor changes do not redirect subsequent writes; the hardware cursor is
+updated at the end of each run. There are no direct video-memory writes.
+Status messages and other single-character callers retain the original output
+path. VT52/VT100 retain their existing character-output semantics.
+
+`make test-display-pce` compares a frozen old diff/output path with the new
+path on private DOS 1.1 and DOS Plus images, using a standard-speed 8088
+configuration (`speed = 1`). It checks physical characters, attributes, cursor
+position, status-row protection and simulated background cursor changes.
+Full repaint, row-shifted repaint, single-cell edits and long runs are measured
+with BIOS clock ticks. This deliberately runs slower than accelerated tests.
+`make test-display-compat` runs the functional checks at accelerated speed,
+including the Concurrent DOS 4.1 BIOS build.
+
+Measured bulk-output totals (four full repaints, four row-shifted repaints and
+sixteen long-row updates; smaller is better):
+
+| Kernel/build | Video | Old ticks | New ticks | Speedup |
+|---|---|---:|---:|---:|
+| DOS 1.1 `.COM` | CGA | 436 | 125 | 3.49x |
+| DOS 1.1 `.COM` | MDA | 360 | 109 | 3.30x |
+| DOS 1.1 `.EXE` | CGA | 437 | 124 | 3.52x |
+| DOS 1.1 `.EXE` | MDA | 362 | 108 | 3.35x |
+| DOS Plus CP/M BIOS `.CMD` | CGA | 526 | 136 | 3.87x |
+| DOS Plus DOS 2 `.EXE` | CGA | 540 | 140 | 3.86x |
+
+These are diff/output benchmarks with prebuilt desired frames, not whole-editor
+or disk-I/O speedups. Timed runs include invalidating the old screen image and
+exclude the interrupt-counting/injection hook. Single-cell timings were
+essentially unchanged. No equivalent XIOS/VT throughput gain is claimed.
+
 `make test-capacity-runtime` checks unsigned byte spans, capacity rejection,
 EOF reservation and large tail copies at 32,000, 32,767, 32,768, 40,000 and
 40,064 bytes

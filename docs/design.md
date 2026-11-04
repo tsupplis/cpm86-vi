@@ -249,7 +249,17 @@ a gap buffer or index rebuild — significant redesign risk).
 | `misccmds.c` `inschar`/`appchar`/`delchar` (and everything built on them: `insstr`, `putline`, `delline`) | O(n) shift of the rest of the file buffer per single-character edit; O(n²) for multi-char operations | High | Documented only — true fix is a gap buffer, a significant architecture change |
 | `main.c` `readfile()` | O(n²) file load — shifts the whole in-memory buffer down for every character read | High | Documented only |
 | `edit.c` `cursupdate()` | Re-scans from `vi_top_char` to `vi_curs_char` every keystroke to recompute the virtual column | Medium | Documented only |
-| `window.c` PCBIOS `windrefreshcursor()`/`windputc()` | Re-issues an `INT 10h` cursor-position call very frequently (by design, to fight a background clock update) | Low (intentional tradeoff) | Not a bug — documented for awareness only |
+| `main.c` `nexttoscreen()` / `window.c` `windputrun()` | Per-character BIOS output repeated cursor positioning and teletype work | Medium | **Applied** — row-bounded changed runs use AH=0Ah, coalesce repeated characters, set the BIOS data-area cursor before each write and update the hardware cursor once per run. Existing cell attributes are preserved. |
+| `window.c` PCBIOS `windrefreshcursor()`/`windputc()` | Re-issues an `INT 10h` cursor-position call for single-character/UI output and idle cursor recovery | Low (intentional tradeoff) | Retained for these callers; bulk renderer output uses `windputrun()`. |
+
+The run backend uses the standard page-zero cursor word at `0040:0050`.
+Runs must not cross a row or include a newline; the renderer supplies bounded
+display cells, not NUL-terminated strings. BIOS handles the actual video writes,
+including CGA synchronization. VT52/VT100 runs retain the existing per-character
+terminal output path. Native display probes compare against the frozen
+single-character renderer and check physical screen cells, attributes, cursor
+coordinates and recovery after simulated background cursor changes.
+See the README display-output section for benchmark scope and results.
 
 ## Portability Notes
 

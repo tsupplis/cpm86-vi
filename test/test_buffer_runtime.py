@@ -161,7 +161,7 @@ def run(args, work):
         raise
 
 
-def build(work, programs=PROGRAMS):
+def build(work, programs=PROGRAMS, probe=PROBE):
     for pattern in ('*.c', '*.h', '*.asm', 'Makefile'):
         for path in ROOT.glob(pattern):
             shutil.copyfile(path, work / path.name)
@@ -173,7 +173,7 @@ def build(work, programs=PROGRAMS):
         depth += (source[end] == '{') - (source[end] == '}')
         end += 1
     (work / 'editor.c').write_text(source[:start] + source[end:])
-    (work / 'main.c').write_text(PROBE)
+    (work / 'main.c').write_text(probe)
     edit = work / 'edit.c'
     edit.write_text(edit.read_text() +
                     '\nvoid vi_test_donormal(int c) { donormal(c); }\n')

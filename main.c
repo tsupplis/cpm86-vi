@@ -304,7 +304,7 @@ static void filetonext(void) {
 
 static void nexttoscreen(void) {
     char nc;
-    int row, col, changed;
+    int row, col, first, changed;
     int gorow = -1, gocol = -1;
 
     for (row = 0; row < vi_rows - 1; row++) {
@@ -312,7 +312,7 @@ static void nexttoscreen(void) {
             !vi_screen_load(VI_SCREEN_REAL, row, screen_previous))
             screenerror();
         changed = 0;
-        for (col = 0; col < vi_columns; col++) {
+        for (col = 0; col < vi_columns; ) {
             if ((nc = screen_line[col]) != screen_previous[col]) {
                 changed = 1;
                 if (!(gorow == row && gocol == col))
@@ -321,11 +321,18 @@ static void nexttoscreen(void) {
                     windcolor(2);
                     windputc(nc);
                     windcolorreset();
+                    col++;
                 } else {
-                    windputc(nc);
+                    first = col;
+                    do {
+                        col++;
+                    } while (col < vi_columns &&
+                             screen_line[col] != screen_previous[col]);
+                    windputrun(screen_line + first, (unsigned)(col - first));
                 }
-                gocol++;
-            }
+                gocol = col;
+            } else
+                col++;
         }
         if (changed && !vi_screen_store(VI_SCREEN_REAL, row, screen_line))
             screenerror();

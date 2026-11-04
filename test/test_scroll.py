@@ -29,7 +29,7 @@ static char screen_line[VI_SCREEN_MAX_COLUMNS], screen_previous[VI_SCREEN_MAX_CO
 static char file[4096], screen[VI_SCREEN_IMAGE_SIZE], reference_screen[VI_SCREEN_IMAGE_SIZE];
 static char displayed[VI_SCREEN_IMAGE_SIZE];
 static char displays[256][17];
-static int renders, terminal_position, writes;
+static int renders, terminal_position, writes, runs;
 static void check(int ok, char *why) { if (!ok) { fprintf(stderr,"FAIL: %s\n",why); exit(1); } }
 static void screenerror(void) { check(0,"external screen storage"); }
 void windgoto(int r, int c) {
@@ -40,6 +40,12 @@ void windputc(int c) {
     check(terminal_position<(vi_rows-1)*vi_columns,"no terminal writes in status row");
     displayed[terminal_position++]=(char)c;
     writes++;
+}
+void windputrun(const char *text, unsigned length) {
+    check(length>0 && length<=vi_columns-terminal_position%vi_columns,
+          "output runs stay within one row");
+    runs++;
+    while(length--) windputc((unsigned char)*text++);
 }
 void windclear(void) { memset(displayed,' ',sizeof displayed); }
 void windcolor(int color) { check(color==2,"tilde color"); }
@@ -59,7 +65,7 @@ static void reset_display(void) {
         check(vi_screen_store(VI_SCREEN_NEXT,row,screen_line),"seed next screen");
     }
     memset(displayed,'Z',sizeof displayed);
-    writes=0;
+    writes=runs=0;
 }
 static void guard(void) {
     int i;
@@ -149,6 +155,12 @@ int main(void) {
     }
     chars[1].ch_size=2; chars[1].ch_str="^A";
     chars[9].ch_size=8; chars[9].ch_str="        ";
+    load("abcdefghij\nklmnopqrst\n");
+    check(runs==vi_rows-1,"one output run per changed row");
+    runs=writes=0;
+    file[4]='X';
+    updatescreen();
+    check(runs==1 && writes==1,"single-cell edit writes one short run");
     lines[0]=0; for(i=0;i<20;i++) strcat(lines,"01234\n");
     load(lines);
     for(i=1;i<20;i++) {

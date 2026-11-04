@@ -135,6 +135,7 @@ void windcolorreset(void);
 void windclear(void);
 void windstr(char *s);
 void windputc(int c);
+void windputrun(const char *text, unsigned length);
 void windrefresh(void);
 void beep(void);
 void windrefreshcursor(void);
