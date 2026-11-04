@@ -30,7 +30,7 @@ SHARED_OBJS = \
 # Top-level targets
 # --------------------------------------------------------------------
 all: vicp52.cmd vicp100.cmd vicpbios.cmd \
- vid1bios.com vid2bios.exe \
+ vid1bios.com vid1bios.exe vid2bios.exe \
  cpmtest.img 
 
 # --------------------------------------------------------------------
@@ -50,7 +50,12 @@ vicp100.cmd: $(SHARED_OBJS) yankcp.o cmdline.o savecp.o edtcp100.o wincp100.o ke
 	$(CMDMOD) -t EXTRA -n 10000 -m 10000 $@ 2
 	$(RM) $(basename $@).lnk
 
-vid1bios.com: $(filter-out main.o,$(SHARED_OBJS)) maind1.o yankd11.o cmddos.o savedos.o edtd1bio.o wind1bio.o keydos.o
+vid1bios.com: $(filter-out main.o,$(SHARED_OBJS)) maind1.o yankd1c.o cmddos.o savedos.o edtd1bio.o wind1bio.o keydos.o
+	printf '%s\n' '-o $@ $^' > $(basename $@).lnk
+	$(LD) -f $(basename $@).lnk $(DOS11_LDFLAGS)
+	$(RM) $(basename $@).lnk
+
+vid1bios.exe: $(SHARED_OBJS) yankd11.o cmddos.o savedos.o edtd1bio.o wind1bio.o keydos.o
 	printf '%s\n' '-o $@ $^' > $(basename $@).lnk
 	$(LD) -f $(basename $@).lnk $(DOS11_LDFLAGS)
 	$(RM) $(basename $@).lnk
@@ -172,8 +177,8 @@ main.o: main.c
 	$(CC) $(CFLAGS) -o $@ main.c
 	$(STRIP) $@
 
-maind1.o: main.c stevie.h keyboard.h yankmem.h save.h
-	$(CC) $(CFLAGS) -D__PCDOS__=11 -o $@ $<
+maind1.o: main.c stevie.h yankmem.h keyboard.h save.h
+	$(CC) $(CFLAGS) -DVI_DOS1_COM -o $@ main.c
 	$(STRIP) $@
 
 misccmds.o: misccmds.c
@@ -185,21 +190,23 @@ normal.o: normal.c
 	$(STRIP) $@
 
 cpmtest.img: vicp52.cmd vicp100.cmd vicpbios.cmd cpmbase.img test.txt \
-    vid2bios.exe
+    vid1bios.com vid2bios.exe
 	cp cpmbase.img cpmtest.img
 	cpmrm -f ibmpc-514ss cpmtest.img 0:*.cmd
 	cpmrm -f ibmpc-514ss cpmtest.img 0:test.txt
 	cpmcp -f ibmpc-514ss cpmtest.img vicp52.cmd 0:
-	cpmcp -f ibmpc-514ss cpmtest.img vicp100.cmd 0:
 	cpmcp -f ibmpc-514ss cpmtest.img vicpbios.cmd 0:
+	cpmcp -f ibmpc-514ss cpmtest.img vid1bios.com 0:
 	cpmcp -f ibmpc-514ss cpmtest.img vid2bios.exe 0:
 	cpmcp -f ibmpc-514ss cpmtest.img test.txt 0:
 	cpmls -F -f ibmpc-514ss cpmtest.img 0:*.*
 
-dostest.img: vid1bios.com vid2bios.exe dosbase.img test.txt
+dostest.img: vid1bios.com vid1bios.exe vid2bios.exe dosbase.img test.txt
 	cp dosbase.img dostest.img
 	mcopy -i dostest.img vid1bios.com  ::VID1BIOS.COM
 	mcopy -i dostest.img vid1bios.com  ::VI.COM
+	mcopy -i dostest.img vid1bios.exe  ::VID1BIOS.EXE
+	mcopy -i dostest.img vid1bios.exe  ::VI.EXE
 	mcopy -i dostest.img vid2bios.exe  ::VID2BIOS.EXE
 	mcopy -i dostest.img test.txt  ::TEST.TXT
 	mdir -i dostest.img ::
@@ -209,9 +216,11 @@ dostest.img: vid1bios.com vid2bios.exe dosbase.img test.txt
 # --------------------------------------------------------------------
 dist: vi.zip
 
-vi.zip: vicp52.cmd vicp100.cmd vicpbios.cmd vid1bios.com vid2bios.exe
+vi.zip: vicp52.cmd vicp100.cmd vicpbios.cmd vid1bios.com vid1bios.exe vid2bios.exe
 	rm -f vi.zip
-	zip vi.zip vicp52.cmd vicp100.cmd vicpbios.cmd vid1bios.com vid2bios.exe
+	zip vi.zip vicp52.cmd vicp100.cmd vicpbios.cmd vid1bios.com vid1bios.exe vid2bios.exe
+
+cpmtest.img dostest.img vi.zip: Makefile
 
 # --------------------------------------------------------------------
 # Utility
@@ -219,7 +228,7 @@ vi.zip: vicp52.cmd vicp100.cmd vicpbios.cmd vid1bios.com vid2bios.exe
 clean:
 	$(RM) cpmtest.img *.o gitver.h \
 	vicp52.cmd vicp100.cmd vicpbios.cmd \
-	vid1bios.com vid2bios.com vid2bios.exe \
+	vid1bios.com vid1bios.exe vid2bios.com vid2bios.exe \
 	vi.zip
 
 test: cpm86test
@@ -267,6 +276,10 @@ yankcopy.o yankcp.o yankd11.o yankd20.o: %.o: %.asm
 	$(AS) $<
 	$(STRIP) $@
 
+yankd1c.o: yankd1c.asm yankd11.asm
+	$(AS) yankd1c.asm
+	$(STRIP) $@
+
 main.o misccmds.o: yankmem.h
 
 .PHONY: test-keys
@@ -305,6 +318,10 @@ test-editor-state:
 .PHONY: test-buffer-runtime
 test-buffer-runtime:
 	python3 test/test_buffer_runtime.py
+
+.PHONY: test-dos1-pce
+test-dos1-pce:
+	python3 -B test/test_dos1_pce.py
 
 .PHONY: test-capacity-runtime
 test-capacity-runtime:

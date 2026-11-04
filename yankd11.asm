@@ -17,7 +17,11 @@ vi_yseg_init_ proc near
     add ax,1000h
     jc yd1_missing
     mov bx,ax
+ifdef VI_DOS1_COM
     add bx,800h
+else
+    add bx,1000h
+endif
     jc yd1_missing
     cmp bx,dx
     ja yd1_missing
@@ -33,7 +37,11 @@ vi_yseg_init_ endp
 
     public vi_yseg_capacity_
 vi_yseg_capacity_ proc near
+ifdef VI_DOS1_COM
     mov ax,24000
+else
+    mov ax,38016
+endif
     ret
 vi_yseg_capacity_ endp
 

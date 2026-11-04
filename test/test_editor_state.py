@@ -704,11 +704,7 @@ static void check_large_binary_put(void) {
 }
 static void check_full_buffer(void) {
     int i;
-#if defined(__PCDOS__) && __PCDOS__ == 11
-    assert(FILELENG == 24000);
-#else
-    assert(FILELENG == 40064U);
-#endif
+    assert(FILELENG == VI_YANK_CAPACITY);
     load("");
     memset(vi_file_mem, 'a', FILELENG);
     vi_file_mem[FILELENG-1] = '\n';
@@ -802,7 +798,7 @@ int main(int argc, char **argv) {
 
 def main():
     source = (ROOT / 'main.c').read_text()
-    globals_ = source[source.index('int vi_rows;'):source.index('int main(')]
+    globals_ = source[source.index('#ifdef VI_DOS1_COM'):source.index('int main(')]
     readfile = function(source, 'int readfile(char *fname, char *fromp,')
     misc = (ROOT / 'misccmds.c').read_text()
     primitives = ('static int canincrease(unsigned n);\n'
@@ -844,7 +840,9 @@ def main():
                            '\n#undef getc\n#undef ferror\n#undef fclose\n' + CHECKS)
         binary = work / 'check'
         failed = []
-        for profile, flags in (('40064', []), ('DOS1-24000', ['-D__PCDOS__=11'])):
+        for profile, flags in (
+                ('38016', []), ('DOS1-EXE-38016', ['-D__PCDOS__=11']),
+                ('DOS1-COM-24000', ['-D__PCDOS__=11', '-DVI_DOS1_COM'])):
             subprocess.run([
                 os.environ.get('CC_HOST', 'cc'), '-std=c99', '-g',
                 '-fsanitize=address,undefined', *flags, '-I', str(ROOT), str(harness),

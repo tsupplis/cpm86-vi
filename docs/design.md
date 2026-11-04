@@ -28,14 +28,17 @@ logic) is portable C operating purely on the in-memory file buffer.
 One source tree produces 5 binaries, selected entirely by preprocessor
 macros passed on the compiler command line (see `Makefile`). `edit.c` and
 `window.c` are compiled once per variant; every other `.c` file is
-compiled once and shared (`SHARED_OBJS` in the Makefile) across all 5.
+compiled once and shared (`SHARED_OBJS` in the Makefile) across all six.
+`main.c` is also compiled separately with `VI_DOS1_COM` for the compact
+DOS 1 `.COM`; its private `FILELENG` definition selects the editing limit.
 
 | Binary            | OS               | Screen/keyboard technique         | Macros |
 |-------------------|------------------|------------------------------------|--------|
 | `vicp52.cmd`      | CP/M-86          | VT-52 escape sequences             | `__CPM86__ __VTCMD__ __VT52__` |
 | `vicp100.cmd`     | CP/M-86          | VT-100/ANSI escape sequences       | `__CPM86__ __VTCMD__ __VT100__` |
 | `vicpbios.cmd`    | CP/M-86          | Direct PC BIOS (INT 10h/16h)       | `__CPM86__ __PCBIOS__` |
-| `vid1bios.com`    | PC-DOS 1.1       | Direct PC BIOS (INT 10h/16h)       | `__PCDOS__=11 __PCBIOS__` |
+| `vid1bios.com`    | PC-DOS 1.1       | Direct PC BIOS (INT 10h/16h)       | DOS 1 BIOS objects, `VI_DOS1_COM` for `main.c` |
+| `vid1bios.exe`    | PC-DOS 1.1       | Direct PC BIOS (INT 10h/16h)       | `__PCDOS__=11 __PCBIOS__` |
 | `vid2bios.exe`    | PC-DOS 2.0       | Direct PC BIOS (INT 10h/16h)       | `__PCDOS__=20 __PCBIOS__` |
 
 Macro meanings:
@@ -68,7 +71,7 @@ since been renamed (outside this pass) to `vi_`-prefixed
 in the `extern` block near the top of `stevie.h`.
 
 - **File buffer**: `vi_file_mem`/`vi_file_max`/`vi_file_end` — a single
-  fixed-size heap block (`FILELENG` = 40064 bytes, or 24000 on DOS 1) holding
+  fixed-size heap block (`FILELENG` = 38016 bytes, or 24000 in the DOS 1 `.COM`) holding
   the whole file as raw bytes; `vi_file_end` is the current logical end,
   `vi_file_max` the allocated end. `vi_curs_char` points at the cursor's
   byte. There is no gap buffer — insert/delete shift the tail of the
@@ -77,8 +80,12 @@ in the `extern` block near the top of `stevie.h`.
   desired screen images follow the yank region. `nexttoscreen()` in
   `main.c` loads and compares rows through two 80-byte near buffers, so
   only changed cells are redrawn. CP/M-86 and DOS 2 reserve a 64 KiB
-  external segment with a 40,064-byte yank region; DOS 1 retains a 32 KiB
-  segment with a 24,000-byte yank region. No screen-image heap allocation
+  external segment with a 38,016-byte yank region; DOS 1 `.EXE` uses the same
+  layout in process-owned memory above its 64 KiB near-data window. DOS 1
+  `.COM` reserves 32 KiB there, with a 24,000-byte yank region.
+  Both DOS 1 adapters share `yankd11.asm`; `yankd1c.asm` selects the compact
+  constants. No DOS 2 memory
+  allocation calls are needed on DOS 1. No screen-image heap allocation
   remains. Maximum dimensions are 25 rows by 80 columns.
   `vi_top_char`/`vi_bot_char` bound the visible slice of the file buffer.
 - **Editor state**: `vi_state` (one of `NORMAL`/`INSERT`/`APPEND`/
@@ -274,7 +281,8 @@ a gap buffer or index rebuild — significant redesign risk).
   in the function (a bare `#asm`-only body with no params/locals is
   treated as a leaf function with no frame) — already handled via a
   defensive `int dummy;` local in the 3 affected `window.c` functions.
-- **Fixed-size buffers**: `FILELENG` (40064 bytes, or 24000 on DOS 1) for the whole file,
+- **Fixed-size buffers**: private `FILELENG` in `main.c` (38016 bytes, or
+  24000 in the DOS 1 `.COM`) for the whole file,
   and 1024-byte `vi_undo_buff`/`vi_redo_buff`/`vi_ins_buff`/
   `vi_repl_buf` — all compile-time constants, not configurable, a
   direct consequence of the target's limited RAM.
@@ -330,8 +338,8 @@ Explicitly out of scope for this pass, called out here for a follow-up:
 - After every file's conversion, the affected `.o` target(s) were
   rebuilt in isolation (`make clean && make <file>.o [...]`) and
   checked for zero new warnings/errors.
-- Final state: `make clean && make` (full rebuild of all 5 binaries —
-  `vicp52.cmd`, `vicp100.cmd`, `vicpbios.cmd`, `vid1bios.com`,
+- Final state: `make clean && make` (full rebuild of all 6 binaries —
+  `vicp52.cmd`, `vicp100.cmd`, `vicpbios.cmd`, `vid1bios.com`, `vid1bios.exe`,
   `vid2bios.exe`) succeeds with **zero warnings and zero errors**.
 - Functional/manual smoke-testing in the emulator (emu2/PCE) is the
   user's responsibility per the agreed process, not automated here.

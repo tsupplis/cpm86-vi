@@ -57,7 +57,7 @@ int main(int argc, char **argv)
     }
     check(vi_yank_init());
     capacity = vi_yank_capacity();
-    check(capacity == 24000U || capacity == VI_YANK_CAPACITY);
+    check(capacity == VI_YANK_CAPACITY);
     printf("VI YANK CAPACITY: %u\n", capacity);
     source = malloc(capacity);
     if (source == NULL) {

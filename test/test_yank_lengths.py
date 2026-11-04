@@ -33,6 +33,7 @@ static void check(int ok, int line, char *expression) {
     }
 }
 #define CHECK(ok) check((ok), __LINE__, #ok)
+#define TEST_CAPACITY 40064U
 
 #define vi_yank_load actual_yank_load
 #include "yankmem.c"
@@ -48,7 +49,7 @@ int vi_yank_load(unsigned offset, char *destination, unsigned length) {
 
 CHECKS = r'''
 static void state(unsigned length) {
-    vi_file_max = vi_file_mem + VI_YANK_CAPACITY + 10U;
+    vi_file_max = vi_file_mem + TEST_CAPACITY + 10U;
     vi_file_end = vi_file_mem + length;
     vi_curs_char = vi_file_mem;
     vi_uncurs_char = vi_file_mem + 1;
@@ -212,7 +213,7 @@ static void line_counts(void) {
 int main(void) {
     static unsigned sizes[] = {24000U, 32767U, 32768U, 40000U, VI_YANK_CAPACITY};
     unsigned j;
-    vi_file_mem = malloc(VI_YANK_CAPACITY + 11U);
+    vi_file_mem = malloc(TEST_CAPACITY + 11U);
     if (!vi_file_mem || !vi_yank_init()) {
         puts("VI YANK LENGTH ALLOCATION FAILED");
         return 1;
@@ -269,7 +270,7 @@ def main():
         run(['aztec42_cc', '-I.', '+F', '+0', '-o', 'length.o', 'length.c'], work)
         run(['aztec42_as', 'yankcopy.asm'], work)
         for library, adapter, extension in (
-                ('c86', 'yankcp', 'cmd'), ('d11', 'yankd11', 'com'),
+                ('c86', 'yankcp', 'cmd'), ('d11', 'yankd11', 'exe'),
                 ('c', 'yankd20', 'exe')):
             run(['aztec42_as', adapter + '.asm'], work)
             program = 'length.' + extension
@@ -280,7 +281,7 @@ def main():
                      '-m', '10000', program, '2'], work)
             result = run([os.environ.get('EMU2', 'emu2'), program], work)
             assert 'VI YANK LENGTH PASS: 0 failures' in result.stdout, result.stdout
-            capacity = 24000 if library == 'd11' else 40064
+            capacity = 38016
             assert f'YANK CAPACITY: {capacity}' in result.stdout, result.stdout
             assert f'YANK ROUNDTRIP: {capacity}' in result.stdout, result.stdout
             print('YANK LENGTH PASS:', library, f'({capacity}-byte yank)',

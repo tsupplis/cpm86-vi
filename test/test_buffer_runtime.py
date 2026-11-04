@@ -9,7 +9,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 PROGRAMS = ('vicp52.cmd', 'vicp100.cmd', 'vicpbios.cmd',
-            'vid1bios.com', 'vid2bios.exe')
+            'vid1bios.com', 'vid1bios.exe', 'vid2bios.exe')
 
 PROBE = r'''
 #include "editor.c"
@@ -55,12 +55,12 @@ int main(int argc, char **argv) {
         else
             REQUIRE(0);
     }
-    spare_size = minimum ? 2048 : 4096;
-#if defined(__PCDOS__) && __PCDOS__ == 11
+#ifdef VI_DOS1_COM
     spare_size = 1024;
-    REQUIRE(FILELENG == 24000);
+    REQUIRE(FILELENG == 24000U);
 #else
-    REQUIRE(FILELENG == 40064U);
+    spare_size = minimum ? 2048 : 4096;
+    REQUIRE(FILELENG == 38016U);
 #endif
     REQUIRE(vi_yank_init());
     REQUIRE(vi_yank_capacity() == FILELENG);
@@ -161,27 +161,31 @@ def run(args, work):
         raise
 
 
+def build(work, programs=PROGRAMS):
+    for pattern in ('*.c', '*.h', '*.asm', 'Makefile'):
+        for path in ROOT.glob(pattern):
+            shutil.copyfile(path, work / path.name)
+    source = (work / 'main.c').read_text()
+    start = source.index('int main(')
+    end = source.index('{', start) + 1
+    depth = 1
+    while depth:
+        depth += (source[end] == '{') - (source[end] == '}')
+        end += 1
+    (work / 'editor.c').write_text(source[:start] + source[end:])
+    (work / 'main.c').write_text(PROBE)
+    edit = work / 'edit.c'
+    edit.write_text(edit.read_text() +
+                    '\nvoid vi_test_donormal(int c) { donormal(c); }\n')
+    run(['make', '-j1', *programs], work)
+
+
 def main():
     with tempfile.TemporaryDirectory(prefix='vi-buffer-runtime-') as directory:
         work = Path(directory)
-        for pattern in ('*.c', '*.h', '*.asm', 'Makefile'):
-            for path in ROOT.glob(pattern):
-                shutil.copyfile(path, work / path.name)
-        source = (work / 'main.c').read_text()
-        start = source.index('int main(')
-        end = source.index('{', start) + 1
-        depth = 1
-        while depth:
-            depth += (source[end] == '{') - (source[end] == '}')
-            end += 1
-        (work / 'editor.c').write_text(source[:start] + source[end:])
-        (work / 'main.c').write_text(PROBE)
-        edit = work / 'edit.c'
-        edit.write_text(edit.read_text() +
-                        '\nvoid vi_test_donormal(int c) { donormal(c); }\n')
-        run(['make', *PROGRAMS], work)
+        build(work)
         for program in PROGRAMS:
-            allocations = [(None, 1024 if program == 'vid1bios.com' else 4096)]
+            allocations = [(None, 1024 if program.endswith('.com') else 4096)]
             if program.endswith('.cmd'):
                 data = struct.unpack_from('<BHHHH', (work / program).read_bytes(), 9)
                 assert (data[0], data[3] * 16, data[4] * 16) == (2, 61440, 65536), program
@@ -194,7 +198,7 @@ def main():
                 if maximum is not None:
                     run(['pcdev_cmdmod', '-m', format(maximum, 'x'), program, '1'], work)
                     args.append('MINIMUM')
-                capacity = 24000 if program == 'vid1bios.com' else 40064
+                capacity = 24000 if program.endswith('.com') else 38016
                 fixtures = (
                     ([], bytes(10 if i % 64 == 63 else 97 + i % 23
                                for i in range(capacity))),

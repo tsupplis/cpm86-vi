@@ -17,6 +17,12 @@ static void filealloc(void);
 static void screenalloc(void);
 static void screenerror(void);
 
+#ifdef VI_DOS1_COM
+#define FILELENG 24000U
+#else
+#define FILELENG 38016U
+#endif
+
 int vi_rows;    /* Number of Rows and Columns */
 int vi_columns; /* in the current window. */
 

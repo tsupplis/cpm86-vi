@@ -2,8 +2,8 @@
 #include <string.h>
 #include "yankmem.h"
 
-#if defined(__PCDOS__) && __PCDOS__ == 11
-unsigned char test_yank_memory[32768UL];
+#ifdef VI_DOS1_COM
+unsigned char test_yank_memory[32768U];
 #else
 unsigned char test_yank_memory[65536UL];
 #endif
@@ -15,11 +15,7 @@ unsigned vi_yseg_init(void)
 
 unsigned vi_yseg_capacity(void)
 {
-#if defined(__PCDOS__) && __PCDOS__ == 11
-    return 24000U;
-#else
     return VI_YANK_CAPACITY;
-#endif
 }
 
 int vi_yseg_free(unsigned segment)

@@ -32,7 +32,7 @@ vi_yseg_init_ endp
 
     public vi_yseg_capacity_
 vi_yseg_capacity_ proc near
-    mov ax,40064
+    mov ax,38016
     ret
 vi_yseg_capacity_ endp
 

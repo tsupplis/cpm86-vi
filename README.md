@@ -39,14 +39,15 @@ emulator, no ANSI.SYS required.
     blocking, so the cursor position can be re-asserted while waiting (see
     below)
 - Composite / extended key support: arrow keys, Home, End, PgUp, PgDn
-- Five build variants:
+- Six build variants:
 
 | Binary | Screen/keyboard | Build flags |
 |--------|-----------------|-------------|
 | `vicp52.cmd`    | VT-52 escape sequences (CP/M-86)         | `-D__CPM86__ -D__VTCMD__ -D__VT52__` |
 | `vicp100.cmd`   | ANSI / VT-100 escape sequences (CP/M-86) | `-D__CPM86__ -D__VTCMD__ -D__VT100__` |
 | `vicpbios.cmd`  | Direct PC BIOS, CP/M-86 `.cmd` binary    | `-D__CPM86__ -D__PCBIOS__` |
-| `vid1bios.com`  | Direct PC BIOS, PC-DOS 1.1 `.com` binary | `-D__PCDOS__=11 -D__PCBIOS__` |
+| `vid1bios.com`  | Direct PC BIOS, PC-DOS 1.1 compact `.com` | `-DVI_DOS1_COM` for `main.c`, DOS 1 BIOS objects |
+| `vid1bios.exe`  | Direct PC BIOS, PC-DOS 1.1 small-model `.exe` | `-D__PCDOS__=11 -D__PCBIOS__` |
 | `vid2bios.exe`  | Direct PC BIOS, PC-DOS 2.0 `.exe` binary | `-D__PCDOS__=20 -D__PCBIOS__` |
 
 ---
@@ -61,7 +62,7 @@ and **cpmtools** (`cpmcp`, `cpmrm`, `cpmls`) for CP/M-86 disk image
 management (DOS 1.1 images use `mtools`' `mcopy`/`mdir` instead).
 
 ```sh
-# Build all five variants
+# Build all six variants
 make
 
 # Build and package as a zip for distribution
@@ -77,9 +78,12 @@ make dostest.img
 make cpm86test
 ```
 
-The CP/M test disk includes the three `.CMD` builds and the DOS 2 `.EXE`
-for DOS Plus. The DOS test disk includes both DOS builds; DOS 1 is also
-installed there as `VI.COM`.
+The small CP/M test disk includes the VT52 and BIOS `.CMD` builds, the
+DOS 1 `.COM` and the DOS 2 `.EXE` for DOS-compatible kernels. All six builds
+are in the ZIP. The DOS test disk includes both DOS 1 formats and DOS 2;
+DOS 1 is also installed there as `VI.COM` and `VI.EXE`. DOS chooses `.COM`
+first when an extension is omitted: use `VI.EXE` or `VID1BIOS.EXE` explicitly
+for the larger buffer.
 
 Each build embeds the current `git describe` output (or `unknown` outside a
 git checkout) as the version shown by the `:v` command; see `gitver.h`
@@ -89,7 +93,7 @@ git checkout) as the version shown by the `:v` command; see `gitver.h`
 
 Run `make test-editor-state` with a host C compiler (`cc`, or `CC_HOST`)
 supporting AddressSanitizer and UndefinedBehaviorSanitizer. These tests cover
-both the 40,064-byte and DOS 1 24,000-byte buffer configurations, including
+the 38,016-byte default/DOS 1 `.EXE` and 24,000-byte DOS 1 `.COM` buffers, including
 exact-limit reads, oversized-read rollback, and full-buffer delete/undo.
 They also cover
 failed saves retaining the modified flag, failed `:r` leaving the buffer
@@ -118,33 +122,37 @@ mode) prompts for two digits without temporarily modifying the file.
 Undo/repeat replays the recorded bytes without adding another EOF newline.
 
 Yanked/deleted lines and both screen images share an external memory segment,
-not the near C heap. The editing buffer holds 40,064 bytes on CP/M-86 and DOS 2,
-and 24,000 bytes on DOS 1. A full-buffer yank therefore no longer needs a
-second near-heap allocation. All builds remain small model. DOS 1 retains
-its `.COM` layout; DOS 2 uses `.EXE` with separate code and data segments
-to make room for the larger buffer. Segment reservation is platform-specific:
+not the near C heap. The editing buffer holds 38,016 bytes, or 24,000 bytes
+in the DOS 1 `.COM`. `FILELENG` is defined only in `main.c`; `VI_DOS1_COM`
+selects the compact limit.
+A full-buffer yank therefore no longer needs a second near-heap allocation.
+All builds use small code/data compilation. DOS `.EXE` builds have separate
+code and data segments; the DOS 1 `.COM` combines them in one 64 KiB window.
+Both DOS 1 formats link the DOS 1.1 `d11` runtime, not the DOS 2
+runtime. Segment reservation is platform-specific:
 
 - CP/M-86: `pcdev_cmdmod` adds a zero-image EXTRA group after linking,
   reserving 64 KiB at load time without adding 64 KiB to the executable.
   The DATA group requests a minimum of 60 KiB (61,440 bytes), up to 65,536 bytes,
-  for near data, heap and stack; the editing buffer uses 40,064 bytes.
+  for near data, heap and stack; the editing buffer uses 38,016 bytes.
 - DOS 1.x: use process-owned memory above the entire 64 KiB near data
   segment, after checking the PSP's memory ceiling; no DOS 2 calls. The
-  external reservation remains 32 KiB.
+  external reservation is 32 KiB for `.COM`, 64 KiB for `.EXE`. DOS 1.1
+  tests use 128 KiB RAM for `.COM` and 256 KiB for `.EXE`; the larger layout
+  does not fit the 128 KiB configuration.
 - DOS 2.x: allocate 4,096 paragraphs (64 KiB) with INT 21h/AH=48h and release
   them with AH=49h on exit.
 
-The yank region is 40,064 bytes on CP/M-86 and DOS 2, and 24,000 bytes on DOS 1,
-where it still holds the entire editing buffer. Two 2,000-byte screen slots
+The yank region matches the editing limit: 38,016 bytes, or 24,000 bytes in
+the DOS 1 `.COM`. Two 2,000-byte screen slots
 follow it. Rendering uses two 80-byte near row buffers instead of allocating
 two full screens on the near heap. This removes 3,840 bytes of screen heap
 allocations on CP/M-86 and 4,000 bytes on DOS, at the cost of the row buffers,
 small bookkeeping, and additional code. Screens are limited to 80 columns
 and 25 rows; unsupported dimensions fail explicitly.
-DOS 1 also pays for the added code inside its shared `.COM` window, so its
-net near-memory gain is approximately 3 KiB rather than the full 4,000 bytes.
 
-The 40,064-byte limit is the first 128-byte CP/M record boundary above 40,000.
+The 38,016-byte limit leaves 2,048 additional bytes of near-heap headroom
+compared with 40,064, while remaining aligned to 128-byte CP/M records.
 This alignment lets a full binary buffer be saved and reopened without
 record padding exceeding the editing limit. Line deletion scans the selected
 range once and shifts the remaining tail once, including for files with
@@ -158,11 +166,11 @@ including embedded NULs and an unterminated final line.
 Bulk paste can fill the editing buffer exactly, including when undo
 restores a full-file deletion. Character insertion still reserves a byte.
 
-`make test-buffer-runtime` builds all five variants with a test
+`make test-buffer-runtime` builds all six variants with a test
 entry point and runs them under `emu2`, without scripted keyboard input. It checks
 full-buffer loading, yank/delete/undo (including numeric replay), rejected
 growth, and byte-exact saving/reopening for text, all-newline and binary files,
-while holding an additional 4 KiB heap allocation (1 KiB on DOS 1).
+while holding an additional 4 KiB heap allocation (1 KiB in the DOS 1 `.COM`).
 The CP/M checks also verify the DATA header limits and repeat with allocation
 capped at the 60 KiB minimum, holding an additional 2 KiB heap allocation.
 
@@ -173,6 +181,12 @@ and independence, and rejection of missing/undersized CP/M EXTRA groups.
 DOS Plus (both CMD and DOS EXE), Concurrent CP/M and Concurrent DOS.
 It requires PCE, mtools/cpmtools and the same local kernel fixtures as the
 save-runtime tests.
+
+`make test-dos1-pce` runs both full DOS 1 editor probes on private DOS 1.1
+boot images: 24,000 bytes on 128 KiB RAM for `.COM`, 38,016 bytes on 256 KiB
+RAM for `.EXE`. It verifies binary read/yank/delete/undo/save/reopen cycles
+and rejected oversized input while holding an additional 1 KiB/4 KiB heap
+allocation respectively, then compares the saved bytes.
 
 `make test-scroll` checks scrolling, paging, status-row protection, screen
 clearing/diffing, and 500 frame/Botchar comparisons against the previous renderer
@@ -202,7 +216,7 @@ directly because the native runtime's `strlen` stops below 32 KiB.
 separator/capacity rejection, failed-yank preservation, partial-load rollback
 over a large tail, and 40,000-byte insertion/deletion boundaries under host
 sanitizers and all three native runtimes. These tests use the production
-40,064-byte CP/M/DOS 2 yank regions and 24,000-byte DOS 1 yank region.
+38,016-byte yank regions on all three native runtimes.
 
 Search bounds use unsigned byte spans. Command counts, linewise operations
 and their replay strings support counts through 65,535; larger numeric prefixes
@@ -215,12 +229,11 @@ binary characters. `G` also reaches an unterminated final line.
 40,000/40,064-byte and line boundaries, virtual columns above 65,535, and numeric
 prefix parsing on the host and all three native runtimes. Host editor tests
 add oversized-command cancellation, unsigned count replay and undo checks;
-the five production probes also verify count rejection and 65,535-count
+the six production probes also verify count rejection and 65,535-count
 delete/toggle operations.
 
-Production editing and yank limits are 40,064 bytes on CP/M-86 and DOS 2,
-and 24,000 bytes on DOS 1. Standalone arithmetic tests also exercise larger
-test buffers on the DOS 1 runtime without increasing its production limit.
+Production editing and yank limits are 38,016 bytes, or 24,000 bytes in
+the DOS 1 `.COM`.
 
 Searches wrap within the file only, handle overlapping matches, and start
 after/before the cursor in the selected direction before wrapping.
@@ -417,11 +430,18 @@ so the two builds share the same escape-parsing code in `edit.c`.
 | `vicpbios.cmd`             | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | ✅ |
 | `vicp52.cmd`               | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | ✅(1) |
 | `vicp100.cmd`              | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | ✅(1) |
-| `vid1bios.com`             | — | — | ✅ | ✅ | ✅ | ✅ | ✅| ✅(2)|
+| `vid1bios.com`             | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅(2)|
+| `vid1bios.exe`             | — | — | ? | ? | ? | ✅ | ? | ✅(2)|
 | `vid2bios.exe`             | — | — | — | ✅  | ✅ | — | ✅ | ✅(2) |
 
 1. keyboard navigation keys need to be configured
 2. 25 lines terminal needed
+
+The DOS 1 `.COM` is freshly verified on PC-DOS 1.1 with 128 KiB RAM;
+its other kernel entries retain earlier `.COM` compatibility results.
+The DOS 1 `.EXE` is verified on PC-DOS 1.1 with 256 KiB RAM and under
+`emu2`. Other DOS-compatible kernels marked `?` have not yet been rechecked
+with the `.EXE` build.
 
 ## Concurrent CP/M keyboard
 

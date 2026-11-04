@@ -23,22 +23,26 @@ def main():
     with tempfile.TemporaryDirectory(prefix='vi-yank-runtime-') as directory:
         work = Path(directory)
         for name in ('yankmem.c', 'yankmem.h', 'yankcopy.asm', 'yankcp.asm',
-                     'yankd11.asm', 'yankd20.asm'):
+                     'yankd11.asm', 'yankd1c.asm', 'yankd20.asm'):
             shutil.copyfile(ROOT / name, work / name)
         shutil.copyfile(ROOT / 'test/yankprobe.c', work / 'yankprobe.c')
         try:
-            for source in ('yankcopy', 'yankcp', 'yankd11', 'yankd20'):
+            for source in ('yankcopy', 'yankcp', 'yankd11', 'yankd1c', 'yankd20'):
                 run(['aztec42_as', source + '.asm'], work)
             for source in ('yankmem', 'yankprobe'):
                 run(['aztec42_cc', '-I.', '+F', '+0', '-o', source + '.o',
                      source + '.c'], work)
-            for library, adapter, extension in (
-                    ('c86', 'yankcp', 'cmd'), ('d11', 'yankd11', 'com'),
-                    ('c', 'yankd20', 'exe')):
-                output = 'yank.' + extension
-                run(['aztec42_link', '-o', output, 'yankprobe.o', 'yankmem.o',
+            run(['aztec42_cc', '-I.', '+F', '+0', '-DVI_DOS1_COM',
+                 '-o', 'yankpc.o', 'yankprobe.c'], work)
+            for library, adapter, output, capacity in (
+                    ('c86', 'yankcp', 'yank.cmd', 38016),
+                    ('d11', 'yankd11', 'yank11.exe', 38016),
+                    ('d11', 'yankd1c', 'yank11.com', 24000),
+                    ('c', 'yankd20', 'yank.exe', 38016)):
+                probe = 'yankpc.o' if output.endswith('.com') else 'yankprobe.o'
+                run(['aztec42_link', '-o', output, probe, 'yankmem.o',
                      'yankcopy.o', adapter + '.o', '-l' + library], work)
-                if extension == 'cmd':
+                if output.endswith('.cmd'):
                     rejected = run(['emu2', output, 'REJECT'], work)
                     assert 'VI YANK INIT REJECTED' in rejected.stdout
                     run(['pcdev_cmdmod', '-t', 'EXTRA', '-n', '4000',
@@ -53,9 +57,8 @@ def main():
                          '-m', '10000', output, '2'], work)
                 result = run(['emu2', output], work)
                 assert 'VI YANK PASS: 0 failures' in result.stdout, result.stdout
-                capacity = 24000 if library == 'd11' else 40064
                 assert f'VI YANK CAPACITY: {capacity}' in result.stdout, result.stdout
-                print('VI YANK RUNTIME PASS:', library)
+                print('VI YANK RUNTIME PASS:', output)
                 if os.environ.get('YANK_TEST_OUTPUT'):
                     destination = Path(os.environ['YANK_TEST_OUTPUT'])
                     destination.mkdir(parents=True, exist_ok=True)

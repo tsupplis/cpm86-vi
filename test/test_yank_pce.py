@@ -25,7 +25,9 @@ def main():
         run('python3', str(ROOT / 'test/test_yank_runtime.py'), env=env)
         for target, image, config, program, exitprog in (
             ('dos11', dos / 'pcdos_base.img', dos / 'pcdos.cfg',
-             'yank.com', dos / 'pce/pceexit.com'),
+             'yank11.exe', dos / 'pce/pceexit.com'),
+            ('dos11com', dos / 'pcdos_base.img', dos / 'pcdos.cfg',
+             'yank11.com', dos / 'pce/pceexit.com'),
             ('dosplus', ROOT / 'dosplus.img', ROOT / 'dosplus.cfg',
              'yank.cmd', exitcmd),
             ('dosplus2', ROOT / 'dosplus.img', ROOT / 'dosplus.cfg',
@@ -41,6 +43,8 @@ def main():
             text = config.read_text()
             if target == 'cdos41':
                 text = text.replace('size    = 384K', 'size    = 640K')
+            if target == 'dos11':
+                text = text.replace('size    = 128K', 'size    = 256K')
             text = re.sub(r'^path = .*', f'path = "{config.parent}/rom"',
                           text, count=1)
             text = re.sub(
@@ -76,7 +80,8 @@ def main():
                         'startup1.bat', '0:', cwd=dest)
                 run(twist, 'twist', str(dest / 'logical.img'), boot)
             else:
-                (dest / 'autoexec.bat').write_bytes(b'YANK\r\nPCEEXIT\r\n')
+                (dest / 'autoexec.bat').write_bytes(
+                    (Path(program).stem.upper() + '\r\nPCEEXIT\r\n').encode())
                 for path in (work / 'programs' / program, exitprog,
                              dest / 'autoexec.bat'):
                     run('mcopy', '-o', '-i', boot, str(path),
