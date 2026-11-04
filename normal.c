@@ -166,6 +166,10 @@ void normal(int c)
         startinsert("I");
         break;
     case 'o':
+        if (vi_file_max - vi_file_end <= 1) {
+            message("Can't add anything, file is too big!");
+            break;
+        }
         resetundo();
         opencmd();
         updatescreen();
@@ -174,6 +178,10 @@ void normal(int c)
         break;
     case 'O':
         /* Open a new line above the current line, enter insert mode. */
+        if (vi_file_max - vi_file_end <= 1) {
+            message("Can't add anything, file is too big!");
+            break;
+        }
         resetundo();
         beginline();
         inschar('\n');
@@ -207,9 +215,9 @@ void normal(int c)
             addtobuff(vi_undo_buff, nchar, 0, 0, 0, 0, 0);
             break;
         case 'w':
+            if (!delword(1))
+                break;
             addtobuff(vi_redo_buff, 'd', 'w', 0, 0, 0, 0);
-            resetundo();
-            delword(1);
             vi_uncurs_char = vi_curs_char;
             updatescreen();
             break;
@@ -233,8 +241,8 @@ void normal(int c)
             updatescreen();
             break;
         case 'w':
-            resetundo();
-            delword(0);
+            if (!delword(0))
+                break;
             startinsert("cw");
             updatescreen();
             break;
@@ -287,13 +295,14 @@ void normal(int c)
         break;
     case 'C':
     do_C:
-        deleol();
+        if (!deleol())
+            break;
         /* Clear vi_undo_buff so insert-ESC undo (path 3: Undelchars)
          * fires on 'u', not the deleted-text replay from deleol(). */
         *vi_undo_buff = '\0';
         /* After deleol(), cursor backed up one if line was non-empty.
          * Advance to append position (like 'a'). */
-        if (*vi_curs_char != '\n')
+        if (vi_curs_char < vi_file_end && *vi_curs_char != '\n')
             vi_curs_char++;
         updatescreen();
         startinsert("C");
@@ -377,10 +386,15 @@ void normal(int c)
             vi_changed = vi_undo_changed;
             updatescreen();
         } else if (vi_uncurs_char != NULL && *vi_undo_buff != '\0') {
+            if (!stuffin(vi_undo_buff))
+                break;
             vi_curs_char = vi_uncurs_char;
-            stuffin(vi_undo_buff);
             *vi_undo_buff = '\0';
         } else if (vi_undel_chars > 0) {
+            if (vi_undel_chars > UNDO_LIMIT) {
+                message("Undo too big; command rejected!");
+                break;
+            }
             vi_curs_char = vi_uncurs_char;
             /* construct the next vi_undo_buff and vi_redo_buff, which */
             /* will re-insert the characters we're deleting. */

@@ -17,7 +17,7 @@ static int writeit(char *fname);
 
 void readcmdline(int firstc) /* either ':', '/', or '?' */
 {
-    int c;
+    int c, overflow = 0;
     char buff[100];
     char *p, *q, *cmd, *arg;
 
@@ -41,6 +41,7 @@ void readcmdline(int firstc) /* either ':', '/', or '?' */
         if (c == '\b' || c == '\177') {
             if (p > buff) {
                 p--;
+                overflow = 0;
                 gotocmd(1, 0, firstc == ':' ? ':' : 0);
                 for (q = buff; q < p; q++)
                     windputc(*q);
@@ -57,7 +58,13 @@ void readcmdline(int firstc) /* either ':', '/', or '?' */
         }
         if (c == '@' || c == '\025') { /* @ or ^U kills the line */
             p = buff;
+            overflow = 0;
             gotocmd(1, 1, firstc);
+            continue;
+        }
+        if (p >= buff + sizeof buff - 1) {
+            overflow = 1;
+            message("Command line full; use Backspace or Escape.");
             continue;
         }
         windputc(c);
@@ -67,6 +74,10 @@ void readcmdline(int firstc) /* either ':', '/', or '?' */
     *p = '\0';
     windcolorreset();
     clearlastmess();
+    if (overflow) {
+        message("Command line too long; command cancelled!");
+        return;
+    }
 
     /* skip any initial white space */
     for (cmd = buff; isspace(*cmd); cmd++)
@@ -310,6 +321,6 @@ static int writeit(char *fname)
 void filemess(char *s)
 {
     char buff[128];
-    sprintf(buff, "\"%s\" %s", vi_file_name, s);
+    snprintf(buff, sizeof buff, "\"%s\" %s", vi_file_name, s);
     message(buff);
 }

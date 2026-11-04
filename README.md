@@ -90,6 +90,27 @@ searches retaining a valid pattern. They do not require an emulator.
 They also check word deletion at EOF, bulk insertion, and `:r` insertion at
 the middle/end of a buffer. Oversized imports and read/close failures cancel
 the entire insertion and preserve the original buffer and modified state.
+The same tests exercise buffer limits, recovery with Backspace/Escape,
+undo/repeat at the insertion limit, and search wraparound at file boundaries.
+
+### Editing limits
+
+The editor keeps its fixed 1024-byte undo, insertion and replay buffers.
+`D`/`d$`, `dw`, `C`/`c$` and `cw` reject deletions over 1021 bytes before
+changing the text or undo state. Insert sessions accept at most 1020 bytes
+(slightly fewer for two-key commands or opened lines), reserving space for
+an automatic EOF newline and replay terminators. Excess input produces a
+warning; Backspace and Escape remain available.
+
+Command lines hold 99 bytes after `:` (98 after `/` or `?`). If input
+overflows, Enter cancels the command rather than executing a truncated name.
+Backspace or Ctrl-U allows editing to resume, and Escape cancels. Status
+messages truncate long filenames safely. Hex-byte entry (`Ctrl-X` in insert
+mode) prompts for two digits without temporarily modifying the file.
+Undo/repeat replays the recorded bytes without adding another EOF newline.
+
+Searches wrap within the file only, handle overlapping matches, and start
+after/before the cursor in the selected direction before wrapping.
 
 ## Command Reference
 

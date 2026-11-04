@@ -68,13 +68,13 @@ int vi_debug = 0;
 int vi_binary = 0; /* Set to 1 if the file should be read and written */
                 /* in binary mode (no cr-lf translation). */
 
-char vi_redo_buff[1024]; /* Each command should stuff characters into this */
+char vi_redo_buff[CMDSIZE]; /* Each command should stuff characters into this */
                      /* buffer that will re-execute itself. */
 
-char vi_undo_buff[1024]; /* Each command should stuff characters into this */
+char vi_undo_buff[CMDSIZE]; /* Each command should stuff characters into this */
                      /* buffer that will undo its effects. */
 
-char vi_ins_buff[1024]; /* Each insertion gets stuffed into this buffer. */
+char vi_ins_buff[CMDSIZE]; /* Each insertion gets stuffed into this buffer. */
 
 char *vi_uncurs_char = NULL; /* Curschar is restored to this before undoing. */
 
@@ -82,7 +82,7 @@ int vi_ninsert = 0;    /* Number of characters in the current insertion. */
 int vi_undel_chars = 0; /* Number of characters to delete, when undoing. */
 char *vi_ins_ptr = NULL;
 
-char vi_repl_buf[1024]; /* Original chars saved during Replace mode. */
+char vi_repl_buf[CMDSIZE]; /* Original chars saved during Replace mode. */
 int vi_unrpl_chars = 0; /* Number of chars to restore on undo. */
 
 int main(int argc, char **argv)
@@ -351,7 +351,7 @@ int readfile(char *fname, char *fromp, int nochangename) /* if 1, don't change t
     int unprint = 0;
     long remaining;
 
-    sprintf(buff, "Reading %s...", fname);
+    snprintf(buff, sizeof buff, "Reading %s...", fname);
     message(buff);
 
     if (!nochangename)
@@ -407,21 +407,31 @@ int readfile(char *fname, char *fromp, int nochangename) /* if 1, don't change t
         p = "\"%s\" %d characters (%d un-printable)  (Press 'H' for help)";
     else
         p = "\"%s\" %d characters  (Press 'H' for help)";
-    sprintf(buff, p, fname, n, unprint);
+    snprintf(buff, sizeof buff, p, fname, n, unprint);
     message(buff);
     return (0);
 }
 
-static char getcbuff[1024];
+static char getcbuff[CMDSIZE];
 static char *getcnext = NULL;
+static int getc_stuffed;
 
-void stuffin(char *s)
+int stuffin(char *s)
 {
-    if (getcnext == NULL) {
-        strcpy(getcbuff, s);
-        getcnext = getcbuff;
-    } else
-        strcat(getcbuff, s);
+    unsigned pending = getcnext == NULL ? 0 : strlen(getcnext);
+    unsigned length = strlen(s);
+
+    if (length == 0)
+        return 1;
+    if (length > sizeof getcbuff - 1 - pending) {
+        message("Replay buffer full; command rejected!");
+        return 0;
+    }
+    if (pending)
+        memmove(getcbuff, getcnext, pending);
+    memcpy(getcbuff + pending, s, length + 1);
+    getcnext = getcbuff;
+    return 1;
 }
 
 void addtobuff(char *s, int c1, int c2, int c3, int c4, int c5, int c6)
@@ -443,14 +453,20 @@ void addtobuff(char *s, int c1, int c2, int c3, int c4, int c5, int c6)
 
 int vgetc(void) {
     if (getcnext != NULL) {
-        int nextc = *getcnext++;
+        int nextc = (unsigned char)*getcnext++;
+        getc_stuffed = 1;
         if (*getcnext == '\0') {
             *getcbuff = '\0';
             getcnext = NULL;
         }
         return (nextc);
     }
+    getc_stuffed = 0;
     return (windgetc());
+}
+
+int vstuffed(void) {
+    return getc_stuffed;
 }
 
 int vpeekc(void) {

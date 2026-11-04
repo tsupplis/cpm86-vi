@@ -11,6 +11,8 @@
 #define TCAP 1 /* For termcap-based terminals */
 
 #define FILELENG 24000
+#define CMDSIZE 1024
+#define UNDO_LIMIT (CMDSIZE - 3)
 #define NORMAL 0
 #define CMDLINE 1
 #define INSERT 2
@@ -52,10 +54,10 @@ extern int vi_debug;
 extern int vi_changed;
 extern int vi_undo_changed;
 extern int vi_binary;
-extern char vi_redo_buff[], vi_undo_buff[], vi_ins_buff[];
+extern char vi_redo_buff[CMDSIZE], vi_undo_buff[CMDSIZE], vi_ins_buff[CMDSIZE];
 extern char *vi_uncurs_char, *vi_ins_ptr;
 extern int vi_ninsert, vi_undel_chars;
-extern char vi_repl_buf[];
+extern char vi_repl_buf[CMDSIZE];
 extern int vi_unrpl_chars;
 
 
@@ -84,8 +86,8 @@ void putline(int k);
 void inschar(int c);
 void insstr(char *s);
 void delchar(void);
-void deleol(void);
-void delword(int deltrailing);
+int deleol(void);
+int delword(int deltrailing);
 void delline(int nlines);
 
 /* normal.c */
@@ -102,9 +104,10 @@ int hextoint(int c);
 void updatescreen(void);
 void screenclear(void);
 int readfile(char *fname, char *fromp, int nochangename);
-void stuffin(char *s);
+int stuffin(char *s);
 void addtobuff(char *s, int c1, int c2, int c3, int c4, int c5, int c6);
 int vgetc(void);
+int vstuffed(void);
 int vpeekc(void);
 int anyinput(void);
 

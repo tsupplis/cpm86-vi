@@ -226,6 +226,7 @@ dosplustest: cpmtest.img
 	./dosplus
 
 main.o edtcp52.o edtcp100.o edtcpbio.o edtd1bio.o edtd2bio.o wincp52.o wincp100.o wincpbio.o wind1bio.o wind2bio.o: keyboard.h
+$(SHARED_OBJS) cmdline.o cmddos.o edtcp52.o edtcp100.o edtcpbio.o edtd1bio.o edtd2bio.o wincp52.o wincp100.o wincpbio.o wind1bio.o wind2bio.o: stevie.h
 wincp52.o wincp100.o wincpbio.o: keyos.h
 
 keycp.o: keyboard.c keyboard.h keyos.h

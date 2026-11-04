@@ -9,6 +9,8 @@
 
 static void donormal(int c);
 static void insertchar(int c);
+static int insertroom(int n, int reserve_eof);
+static int insertbyte(int c, int reserve_eof);
 static int gethexchar(void);
 
 /* ------------------------------------------------------------------ */
@@ -125,7 +127,7 @@ void edit(void) {
     char *p, *q;
     /* Buffer to save original chars overwritten in Replace mode,
      * so backspace can restore them. */
-    static char replbuf[1024];
+    static char replbuf[CMDSIZE];
     static char *replptr = NULL;
 
     vi_renum = 0;
@@ -294,14 +296,17 @@ void edit(void) {
                 /* We're in insert mode. */
                 switch (c) {
                 case '\033': /* an ESCape ends input mode */
-
+                    c1 = 1;
                     /* If we're past the end of the file, (which should */
                     /* only happen when we're editing a new file or a */
                     /* file that doesn't have a newline at the end of */
                     /* the line), add a newline automatically. */
                     if (vi_curs_char >= vi_file_end) {
-                        insertchar('\n');
-                        vi_curs_char--;
+                        if (!vstuffed() &&
+                            (vi_file_end == vi_file_mem || vi_file_end[-1] != '\n'))
+                            c1 = insertbyte('\n', 0);
+                        if (vi_curs_char > vi_file_mem)
+                            vi_curs_char--;
                     }
 
                     /* Don't end up on a '\n' if you can help it. */
@@ -310,7 +315,8 @@ void edit(void) {
                         vi_curs_char--;
                     }
                     vi_state = NORMAL;
-                    message("");
+                    if (c1)
+                        message("");
                     vi_uncurs_char = vi_ins_start;
                     vi_undel_chars = vi_ninsert;
                     /* Undobuff[0] = '\0'; */
@@ -343,43 +349,29 @@ void edit(void) {
                     break;
                 case '\030': /* control-x */
                 {
-                    int wasnewline = 0;
-                    char *p1;
-                    p1 = vi_curs_char;
-                    if (*vi_curs_char == '\n')
-                        wasnewline = 1;
-                    inschar('[');
-                    inschar('x');
-                    cursupdate();
-                    updatescreen();
+                    message("Hex byte: enter two hexadecimal digits");
                     c1 = gethexchar();
-                    inschar(c1);
-                    cursupdate();
-                    updatescreen();
                     c2 = gethexchar();
-                    vi_curs_char = p1;
-                    delchar();
-                    delchar();
-                    delchar();
                     c = 16 * hextoint(c1) + hextoint(c2);
                     if (vi_debug)
                         printf("(c=%d)", c);
-                    if (wasnewline)
-                        vi_curs_char++;
-                    inschar(c);
-                    vi_ninsert++;
-                    *vi_ins_ptr++ = c;
+                    if (insertbyte(c, !vstuffed()))
+                        message("Insert Mode");
                     updatescreen();
                     break;
                 }
                 case 0x16: /* ^V — insert next character literally */
                     c = vgetc();
-                    inschar(c);
-                    vi_ninsert++;
-                    *vi_ins_ptr++ = c;
+                    insertbyte(c, !vstuffed());
                     updatescreen();
                     break;
                 case 0x09: /* Tab — expand to spaces unless preceded by ^V */
+                    if (!insertroom(4, !vstuffed()))
+                        break;
+                    if (vi_file_max - vi_file_end <= 5) {
+                        message("Can't add anything, file is too big!");
+                        break;
+                    }
                     insertchar(' ');
                     insertchar(' ');
                     insertchar(' ');
@@ -449,6 +441,8 @@ void edit(void) {
                             }
                             cursupdate();
                             updatescreen();
+                        } else {
+                            message("Replace buffer full; use Backspace or Escape.");
                         }
                     }
                     break;
@@ -479,27 +473,61 @@ static void donormal(int c)
     vi_renum = 0;
 }
 
+static int insertroom(int n, int reserve_eof)
+{
+    int reserve = reserve_eof ? 3 : 2;
+
+    /* Reserve the replay terminator and a possible automatic EOF newline. */
+    if (vi_ins_ptr - vi_ins_buff > CMDSIZE - reserve - n ||
+        vi_ninsert > UNDO_LIMIT - (reserve_eof ? 1 : 0) - n) {
+        message("Insert buffer full; use Backspace or Escape.");
+        return 0;
+    }
+    return 1;
+}
+
+static int insertbyte(int c, int reserve_eof)
+{
+    if (!insertroom(1, reserve_eof))
+        return 0;
+    if (vi_file_max - vi_file_end <= (reserve_eof ? 2 : 1)) {
+        message("Can't add anything, file is too big!");
+        return 0;
+    }
+    inschar(c);
+    *vi_ins_ptr++ = c;
+    vi_ninsert++;
+    return 1;
+}
+
 static void insertchar(int c)
 {
     char *p;
+    int n = 0;
 
     if (!anyinput()) {
-        inschar(c);
-        *vi_ins_ptr++ = c;
-        vi_ninsert++;
+        insertbyte(c, !vstuffed());
     } else {
         /* If there's any pending input, grab */
         /* it all at once. */
         p = vi_ins_ptr;
-        *vi_ins_ptr++ = c;
-        vi_ninsert++;
-        while ((c = vpeekc()) != '\033') {
+        for (;;) {
+            if (insertroom(1, 0)) {
+                if (vi_file_max - vi_file_end > n + 1) {
+                    *vi_ins_ptr++ = c;
+                    vi_ninsert++;
+                    n++;
+                } else {
+                    message("Can't add anything, file is too big!");
+                }
+            }
+            if (vpeekc() == '\033' || vpeekc() == -1)
+                break;
             c = vgetc();
-            *vi_ins_ptr++ = c;
-            vi_ninsert++;
         }
         *vi_ins_ptr = '\0';
-        insstr(p);
+        if (n)
+            insstr(p);
     }
     updatescreen();
 }

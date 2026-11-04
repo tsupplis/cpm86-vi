@@ -163,70 +163,41 @@ void repsearch(void) {
 
 static char *fwdsearch(char *str)
 {
-    register char *sofar = str;
-    register char *infile = vi_curs_char + 1;
     int leng = strlen(str);
-    char *stopit;
+    char *p, *last;
 
-    /* search forward to the end of the file */
-    for (; infile < vi_file_end && *sofar != '\0'; infile++) {
-        if (*infile == *sofar)
-            sofar++;
-        else
-            sofar = str;
-    }
-    if (*sofar == '\0')
-        return (infile - strlen(str));
-    /* search from the beginning of the file to Curschar */
-    infile = vi_file_mem;
-    sofar = str;
-    stopit = vi_curs_char + leng;
-    for (; infile <= stopit && *sofar != '\0'; infile++) {
-        if (*infile == *sofar)
-            sofar++;
-        else
-            sofar = str;
-    }
-    if (*sofar == '\0')
-        return (infile - leng);
-    else
-        return (NULL);
+    if (leng == 0 || leng > vi_file_end - vi_file_mem)
+        return NULL;
+    last = vi_file_end - leng;
+    p = vi_curs_char < vi_file_end ? vi_curs_char + 1 : vi_file_end;
+    for (; p <= last; p++)
+        if (memcmp(p, str, (unsigned)leng) == 0)
+            return p;
+    for (p = vi_file_mem; p <= last && p <= vi_curs_char; p++)
+        if (memcmp(p, str, (unsigned)leng) == 0)
+            return p;
+    return NULL;
 }
 
 static char *bcksearch(char *str)
 {
     int leng = strlen(str);
-    char *infile = vi_curs_char + 1;
-    char *endofstr, *sofar, *stopit;
+    char *p, *last;
 
-    /* make sure str isn't empty before getting pointer to */
-    /* its last character. */
-    if (leng == 0)
-        return (NULL);
-    endofstr = &str[leng - 1];
-    sofar = endofstr;
-    /* search backward to the beginning of the file */
-    for (; infile >= vi_file_mem && sofar >= str; infile--) {
-        if (*infile == *sofar)
-            sofar--;
-        else
-            sofar = endofstr;
+    if (leng == 0 || leng > vi_file_end - vi_file_mem)
+        return NULL;
+    last = vi_file_end - leng;
+    p = vi_curs_char > last ? last + 1 : vi_curs_char;
+    while (p > vi_file_mem) {
+        p--;
+        if (memcmp(p, str, (unsigned)leng) == 0)
+            return p;
     }
-    if (sofar < str)
-        return (++infile);
-
-    /* search backward from the end of the file */
-    sofar = endofstr;
-    infile = vi_file_end - 1;
-    stopit = vi_curs_char - leng;
-    for (; infile >= stopit && sofar >= str; infile--) {
-        if (*infile == *sofar)
-            sofar--;
-        else
-            sofar = endofstr;
+    p = last + 1;
+    while (p > vi_curs_char) {
+        p--;
+        if (memcmp(p, str, (unsigned)leng) == 0)
+            return p;
     }
-    if (sofar < str)
-        return (++infile);
-    else
-        return (NULL);
+    return NULL;
 }

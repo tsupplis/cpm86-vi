@@ -24,11 +24,14 @@ HARNESS = r'''
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <setjmp.h>
 #include "stevie.h"
 
 static const char *input;
 static int quit_calls, reject_save;
 static char last_output[256];
+static jmp_buf input_done;
+static int editing, limit_messages;
 void windgoto(int r, int c) {}
 void windcolor(int fg) {}
 void windcolorreset(void) {}
@@ -36,6 +39,8 @@ void windputc(int c) {}
 void windrefresh(void) {}
 void windstr(char *s) {
     snprintf(last_output, sizeof last_output, "%s", s);
+    if(strstr(s, "full") || strstr(s, "too long") || strstr(s, "too big"))
+        limit_messages++;
 }
 void updatescreen(void) {}
 void cursupdate(void) {}
@@ -45,7 +50,10 @@ void help(void) {}
 void getout(void) { quit_calls++; }
 void vi_key_exit(void) { assert(0); }
 char *viversion(void) { return "test"; }
-int vgetc(void) { assert(input && *input); return (unsigned char)*input++; }
+int windgetc(void) {
+    if(editing && (!input || !*input)) longjmp(input_done, 1);
+    assert(input && *input); return (unsigned char)*input++;
+}
 void beginline(void) {
     while(vi_curs_char > vi_file_mem && vi_curs_char[-1] != '\n')
         vi_curs_char--;
@@ -61,25 +69,17 @@ int cntlines(char *a, char *b) {
     while(a < b) if(*a++ == '\n') n++;
     return n;
 }
-void fileinfo(void) {}
 void gotoline(int n) {}
 void yankline(int n) { assert(0); }
 void putline(int n) { assert(0); }
-void inschar(int c) { assert(0); }
-void deleol(void) { assert(0); }
 void delline(int n) { assert(0); }
-void stuffin(char *s) { assert(0); }
 void octchars(void) {}
 void hexchars(void) {}
 void decchars(void) {}
-void addtobuff(char *s, int a, int b, int c, int d, int e, int f) {
-    int values[6], i;
-    values[0]=a; values[1]=b; values[2]=c;
-    values[3]=d; values[4]=e; values[5]=f;
-    for(i=0; i<6; i++) {
-        *s++ = values[i];
-        if(!values[i]) return;
-    }
+int hextoint(int c) {
+    if(c >= '0' && c <= '9') return c-'0';
+    if(c >= 'a' && c <= 'f') return c-'a'+10;
+    return -1;
 }
 const char *vi_save_file(const char *n, const char *a, const char *b, int binary) {
     assert(a == vi_file_mem && b == vi_file_end);
@@ -106,6 +106,7 @@ static void load(const char *s) {
     vi_file_end = vi_file_mem + strlen(s);
     vi_top_char = vi_curs_char = vi_file_mem;
     vi_changed = vi_binary = vi_renum = 0;
+    vi_state = NORMAL;
     resetundo();
 }
 static void command(const char *s) {
@@ -315,6 +316,207 @@ static void check_bulk_insert(void) {
     vi_file_max = vi_file_end + 2;
     insstr("XYZ"); expect("abcd"); assert(!vi_changed);
 }
+static void check_search_bounds(void) {
+    char *before;
+    int i, dir;
+    for(dir=FORWARD; dir<=BACKWARD; dir++) {
+        load(""); dosearch(dir, "long pattern"); expect("");
+        load("a"); before=vi_curs_char;
+        dosearch(dir, "long pattern"); assert(vi_curs_char == before);
+        dosearch(dir, ""); assert(vi_curs_char == before);
+        dosearch(dir, "a"); assert(vi_curs_char == vi_file_mem);
+        load("aaab");
+        dosearch(dir, "aab"); assert(vi_curs_char == vi_file_mem+1);
+        load("a a a");
+        vi_curs_char = vi_file_mem + 2;
+        dosearch(dir, "a");
+        assert(vi_curs_char == vi_file_mem + (dir == FORWARD ? 4 : 0));
+        repsearch();
+        assert(vi_curs_char == vi_file_mem + (dir == FORWARD ? 0 : 4));
+    }
+    memset(vi_file_mem, 'a', FILELENG);
+    vi_file_end = vi_file_max;
+    vi_curs_char = vi_file_end-1;
+    dosearch(FORWARD, "zzzzzz");
+    dosearch(BACKWARD, "zzzzzz");
+    for(i=0; i<20; i++) repsearch();
+    assert(vi_curs_char == vi_file_end-1);
+}
+static void check_command_limits(void) {
+    char command_text[1200];
+    int before = quit_calls;
+    load("abc\n");
+    memset(command_text, ' ', 99);
+    command_text[0]='v'; command_text[99]='\n'; command_text[100]=0;
+    command(command_text); assert(!strcmp(last_output, "test"));
+    memset(command_text, ' ', 1100);
+    command_text[0]='q'; command_text[1]='!';
+    command_text[1100]='\n'; command_text[1101]=0;
+    command(command_text); assert(quit_calls == before);
+    assert(strstr(last_output, "cancelled"));
+    memset(command_text, 'a', 100);
+    strcpy(command_text+100, "\025v\n");
+    command(command_text); assert(!strcmp(last_output, "test"));
+    memset(command_text, 'a', 100);
+    memset(command_text+100, '\b', 99);
+    strcpy(command_text+199, "v\n");
+    command(command_text); assert(!strcmp(last_output, "test"));
+    memset(command_text, 'a', 100);
+    strcpy(command_text+100, "\033");
+    input=command_text; readcmdline(':');
+    assert(vi_state == NORMAL);
+    memset(command_text, 'a', 98); command_text[98]='\n'; command_text[99]=0;
+    load("");
+    memset(vi_file_mem, 'a', 98); vi_file_end=vi_file_mem+98;
+    input=command_text; readcmdline('/');
+    assert(!strstr(last_output, "cancelled"));
+    memset(command_text, 'a', 99); command_text[99]='\n'; command_text[100]=0;
+    input=command_text; readcmdline('?');
+    assert(strstr(last_output, "cancelled"));
+}
+static void long_word(int n) {
+    load("");
+    memset(vi_file_mem, 'a', n);
+    vi_file_mem[n]='\n';
+    vi_file_end=vi_file_mem+n+1;
+}
+static void run_edit(const char *s);
+static void check_delete_limits(void) {
+    char *cursor;
+    int mode;
+    for(mode=0; mode<4; mode++) {
+        long_word(1022);
+        strcpy(vi_undo_buff, "rZ"); strcpy(vi_redo_buff, "rX");
+        vi_uncurs_char=vi_file_mem+1; cursor=vi_curs_char;
+        if(mode==0) normal('D');
+        else if(mode==1) { input="w"; normal('d'); }
+        else if(mode==2) normal('C');
+        else { input="w"; normal('c'); }
+        assert(vi_file_end == vi_file_mem+1023 && !vi_changed);
+        assert(vi_curs_char == cursor && vi_state == NORMAL);
+        assert(!strcmp(vi_undo_buff, "rZ") && !strcmp(vi_redo_buff, "rX"));
+        assert(vi_uncurs_char == vi_file_mem+1);
+    }
+    long_word(1021); normal('D'); expect("\n");
+    assert(strlen(vi_undo_buff) == 1023 && vi_changed);
+    long_word(1021); input="w"; normal('d'); expect("\n");
+    assert(strlen(vi_undo_buff) == 1023 && vi_changed);
+    long_word(1022);
+    vi_uncurs_char=vi_file_mem; vi_undel_chars=1022;
+    normal('u');
+    assert(vi_undel_chars == 1022 && vi_file_end == vi_file_mem+1023);
+    assert(!vi_changed);
+}
+static void run_edit(const char *s) {
+    input=s; editing=1;
+    if(!setjmp(input_done)) edit();
+    editing=0;
+}
+static void check_insert_limits(void) {
+    char script[1600];
+    load("\n");
+    script[0]='i'; memset(script+1, 'a', 1500);
+    strcpy(script+1501, "\bZ\033");
+    run_edit(script);
+    assert(vi_state == NORMAL && limit_messages > 0);
+    assert(vi_ninsert == 1020 && vi_ins_ptr-vi_ins_buff == 1021);
+    assert(vi_file_end == vi_file_mem+1021 && vi_file_mem[1019] == 'Z');
+    assert(strlen(vi_redo_buff) == 1022);
+    load("");
+    script[0]='i'; memset(script+1, 'a', 1500);
+    strcpy(script+1501, "\033");
+    run_edit(script);
+    assert(vi_ninsert == 1021 && vi_file_end == vi_file_mem+1021);
+    assert(vi_file_end[-1] == '\n' && strlen(vi_redo_buff) == 1023);
+    run_edit("u"); expect("");
+    run_edit("."); assert(vi_file_end == vi_file_mem+1021);
+    assert(vi_file_end[-1] == '\n');
+    long_word(1021);
+    normal('D'); expect("\n");
+    run_edit("u");
+    assert(vi_file_end == vi_file_mem+1022);
+    assert(vi_file_mem[1020] == 'a' && vi_file_mem[1021] == '\n');
+    long_word(1021);
+    vi_file_end--;
+    normal('D'); expect("");
+    run_edit("u");
+    assert(vi_file_end == vi_file_mem+1021 && vi_file_end[-1] == 'a');
+    load("z\n");
+    script[0]='c'; script[1]='w'; memset(script+2, 'a', 1500);
+    strcpy(script+1502, "\033");
+    run_edit(script);
+    assert(vi_ninsert == 1019 && vi_ins_ptr-vi_ins_buff == 1021);
+    assert(vi_file_end == vi_file_mem+1020 && vi_state == NORMAL);
+}
+static void check_literal_limits(void) {
+    char script[1600];
+    load("\n");
+    script[0]='i'; memset(script+1, 'a', 1020);
+    strcpy(script+1021, "\026Z\03041\033");
+    run_edit(script);
+    assert(vi_ninsert == 1020 && vi_file_end == vi_file_mem+1021);
+    assert(vi_file_end[-2] == 'a' && vi_state == NORMAL);
+    load("\n");
+    run_edit("i\026\t\03041\033");
+    expect("\tA\n");
+    assert(vi_ninsert == 2);
+    load("\n");
+    script[0]='i'; memset(script+1, '\t', 300);
+    strcpy(script+301, "\033");
+    run_edit(script);
+    assert(vi_ninsert == 1020 && vi_file_end == vi_file_mem+1021);
+}
+static void check_file_insert_limits(void) {
+    load("abc\n");
+    vi_file_max=vi_file_end+3;
+    run_edit("iXY\bZ\033");
+    expect("Zabc\n");
+    assert(limit_messages > 0 && vi_state == NORMAL);
+    vi_file_max=vi_file_end+1;
+    strcpy(vi_undo_buff, "rX");
+    normal('O');
+    assert(vi_state == NORMAL && vi_curs_char >= vi_file_mem);
+    assert(!strcmp(vi_undo_buff, "rX"));
+    normal('o'); expect("Zabc\n");
+    assert(!strcmp(vi_undo_buff, "rX"));
+}
+static void check_long_messages(void) {
+    char name[400];
+    memset(name, 'a', sizeof name-1); name[sizeof name-1]=0;
+    load("abc\n");
+    vi_file_name=name; vi_changed=1;
+    fileinfo(); assert(strlen(last_output) < 128);
+    filemess("message"); assert(strlen(last_output) < 128);
+    assert(readfile(name, vi_file_mem, 1));
+    assert(!strcmp(last_output, "Unable to open file for reading!"));
+    expect("abc\n");
+    vi_file_name="TEST.TXT";
+}
+static void check_replay_limits(void) {
+    char text[1024];
+    int i;
+    memset(text, 'a', 1023); text[1023]=0;
+    load("abc\n");
+    stuffin("");
+    assert(!anyinput());
+    stuffin(text); assert(anyinput());
+    stuffin("x");
+    for(i=0; i<800; i++) assert(vgetc() == 'a');
+    text[800]=0;
+    stuffin(text);
+    for(i=0; i<1023; i++) assert(vgetc() == 'a');
+    assert(!anyinput());
+    text[0]=(char)0xe9; text[1]=0;
+    stuffin(text); assert(vgetc() == 0xe9);
+    memset(text, 'a', 1023); text[1023]=0;
+    stuffin(text);
+    strcpy(vi_undo_buff, "rZ");
+    vi_uncurs_char=vi_file_mem+1;
+    normal('u');
+    assert(!strcmp(vi_undo_buff, "rZ") && vi_curs_char == vi_file_mem);
+    for(i=0; i<1023; i++) assert(vgetc() == 'a');
+    assert(!anyinput());
+}
 int main(int argc, char **argv) {
     vi_file_mem = calloc(FILELENG, 1); assert(vi_file_mem);
     vi_file_max = vi_file_mem + FILELENG;
@@ -330,6 +532,14 @@ int main(int argc, char **argv) {
     else if(!strcmp(argv[1], "read-errors")) check_read_errors();
     else if(!strcmp(argv[1], "word-eof")) check_word_eof();
     else if(!strcmp(argv[1], "bulk-insert")) check_bulk_insert();
+    else if(!strcmp(argv[1], "search-bounds")) check_search_bounds();
+    else if(!strcmp(argv[1], "command-limits")) check_command_limits();
+    else if(!strcmp(argv[1], "delete-limits")) check_delete_limits();
+    else if(!strcmp(argv[1], "insert-limits")) check_insert_limits();
+    else if(!strcmp(argv[1], "literal-limits")) check_literal_limits();
+    else if(!strcmp(argv[1], "replay-limits")) check_replay_limits();
+    else if(!strcmp(argv[1], "file-insert-limits")) check_file_insert_limits();
+    else if(!strcmp(argv[1], "long-messages")) check_long_messages();
     else assert(0);
     clearlastmess();
     free(vi_file_mem);
@@ -346,12 +556,25 @@ def main():
     misc = (ROOT / 'misccmds.c').read_text()
     primitives = 'static int canincrease(int n);\n'
     for signature in ('static int canincrease(int n)\n', 'void insstr(char *s)',
-                      'void delchar(void)', 'void delword(int deltrailing)'):
+                      'void inschar(int c)', 'void delchar(void)',
+                      'int deleol(void)', 'int delword(int deltrailing)',
+                      'void fileinfo(void)'):
         primitives += function(misc, signature) + '\n'
+    queue = source[source.index('static char getcbuff'): ]
+    edit = (ROOT / 'edit.c').read_text()
+    editor = ('static void donormal(int c);\nstatic void insertchar(int c);\n'
+              'static int gethexchar(void);\n'
+              'static int insertroom(int n, int reserve_eof);\n'
+              'static int insertbyte(int c, int reserve_eof);\n')
+    for signature in ('void edit(void)', 'static void donormal(int c)\n',
+                      'static int insertroom(int n, int reserve_eof)\n',
+                      'static int insertbyte(int c, int reserve_eof)\n',
+                      'static void insertchar(int c)\n', 'static int gethexchar(void) {'):
+        editor += function(edit, signature) + '\n'
     with tempfile.TemporaryDirectory(prefix='vi-editor-state-') as directory:
         work = Path(directory)
         harness = work / 'check.c'
-        harness.write_text(HARNESS + globals_ + primitives +
+        harness.write_text(HARNESS + globals_ + primitives + queue + editor +
                            '#define getc test_getc\n#define ferror test_ferror\n'
                            '#define fclose test_fclose\n' + readfile +
                            '\n#undef getc\n#undef ferror\n#undef fclose\n' + CHECKS)
@@ -364,7 +587,10 @@ def main():
         ], check=True)
         failed = []
         for case in ('save', 'read', 'replace', 'search', 'insert-read',
-                     'read-limits', 'read-errors', 'word-eof', 'bulk-insert'):
+                     'read-limits', 'read-errors', 'word-eof', 'bulk-insert',
+                     'search-bounds', 'command-limits', 'delete-limits',
+                     'insert-limits', 'literal-limits', 'replay-limits',
+                     'file-insert-limits', 'long-messages'):
             result = subprocess.run([str(binary), case], cwd=work)
             if result.returncode:
                 failed.append(case)

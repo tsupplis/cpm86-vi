@@ -50,7 +50,7 @@ int cntlines(char *pbegin, char *pend)
 void fileinfo(void) {
     char buff[128];
 
-    sprintf(buff, "\"%s\"%s line %d of %d", vi_file_name,
+    snprintf(buff, sizeof buff, "\"%s\"%s line %d of %d", vi_file_name,
             vi_changed ? " [Modified]" : "", cntlines(vi_file_mem, vi_curs_char),
             cntlines(vi_file_mem, vi_file_end) - 1);
     message(buff);
@@ -223,9 +223,8 @@ static void appchar(int c)
 
 static int canincrease(int n)
 {
-    if ((vi_file_end + n) >= vi_file_max) {
+    if (n >= vi_file_max - vi_file_end) {
         message("Can't add anything, file is too big!");
-        vi_state = NORMAL;
         return (0);
     }
     return (1);
@@ -253,17 +252,21 @@ void delchar(void) {
  * deleol - delete from Curschar to end of line (not including the newline).
  * Sets up vi_undo_buff/vi_uncurs_char so undo works.
  */
-void deleol(void) {
+int deleol(void) {
     char *scan, *p;
     int n;
 
-    resetundo();
-    vi_uncurs_char = vi_curs_char;
     /* Count characters to delete first so delchar() repositioning
      * doesn't confuse the loop. */
     n = 0;
-    for (scan = vi_curs_char; *scan != '\n' && scan < vi_file_end; scan++)
+    for (scan = vi_curs_char; scan < vi_file_end && *scan != '\n'; scan++)
         n++;
+    if (n > UNDO_LIMIT) {
+        message("Deletion too big for undo; command rejected!");
+        return 0;
+    }
+    resetundo();
+    vi_uncurs_char = vi_curs_char;
     /* Build undo string: i<deleted chars>\033 */
     p = vi_undo_buff;
     *p++ = 'i';
@@ -274,22 +277,23 @@ void deleol(void) {
     *p = '\0';
     /* Now do the actual deletions */
     n = 0;
-    for (scan = vi_curs_char; *scan != '\n' && scan < vi_file_end; scan++)
+    for (scan = vi_curs_char; scan < vi_file_end && *scan != '\n'; scan++)
         n++;
     while (n-- > 0)
         delchar();
     addtobuff(vi_redo_buff, 'D', 0, 0, 0, 0, 0);
+    return 1;
 }
 
-void delword(int deltrailing) /* 1 if trailing white space should be removed */
+int delword(int deltrailing) /* 1 if trailing white space should be removed */
 {
     char *scan = vi_curs_char, *start = vi_curs_char;
     char *p = vi_undo_buff;
     int n;
 
     if (scan >= vi_file_end) {
-        *p = '\0';
-        return;
+        resetundo();
+        return 1;
     }
     if (issepchar((unsigned char)*scan) && !isspace((unsigned char)*scan)) {
         while (scan < vi_file_end && issepchar((unsigned char)*scan) &&
@@ -303,16 +307,22 @@ void delword(int deltrailing) /* 1 if trailing white space should be removed */
         while (scan < vi_file_end && isspace((unsigned char)*scan) && *scan != '\n')
             scan++;
     n = scan - start;
+    if (n > UNDO_LIMIT) {
+        message("Deletion too big for undo; command rejected!");
+        return 0;
+    }
+    resetundo();
     *p++ = 'i';
     while (start < scan)
         *p++ = *start++;
     *p++ = '\033';
     *p = '\0';
     if (n == 0)
-        return;
+        return 1;
     memmove(vi_curs_char, scan, (unsigned)(vi_file_end - scan));
     vi_file_end -= n;
     CHANGED;
+    return 1;
 }
 
 void delline(int nlines) {
