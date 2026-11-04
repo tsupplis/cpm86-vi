@@ -48,10 +48,11 @@ void beginline(void) {
         vi_curs_char--;
 }
 void inschar(int c);
-static int canincrease(int n);
+static int canincrease(unsigned n);
 '''
+    harness += function(lines, 'unsigned vi_byte_span(const char *first, const char *last)')
     harness += function(lines, 'char *prevline(char *curr)')
-    for sig in ('static int canincrease(int n)\n', 'void inschar(int c)',
+    for sig in ('static int canincrease(unsigned n)\n', 'void inschar(int c)',
                 'int yankline(int n)', 'void putline(int k)',
                 'void delline(int nlines)'):
         harness += '\n' + function(source, sig)

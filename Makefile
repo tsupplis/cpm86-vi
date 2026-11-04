@@ -306,6 +306,10 @@ test-editor-state:
 test-buffer-runtime:
 	python3 test/test_buffer_runtime.py
 
+.PHONY: test-capacity-runtime
+test-capacity-runtime:
+	python3 -B test/test_capacity_runtime.py
+
 .PHONY: test-yank-runtime test-yank-pce
 test-yank-runtime:
 	python3 test/test_yank_runtime.py

@@ -63,7 +63,6 @@ int oneright(void) { assert(0); return 0; }
 int oneleft(void) { assert(0); return 0; }
 int oneup(int n) { assert(0); return 0; }
 int onedown(int n) { assert(0); return 0; }
-void opencmd(void) { assert(0); }
 int issepchar(int c) { return strchr(WORDSEP, c) != NULL; }
 int cntlines(char *a, char *b) {
     int n = 1;
@@ -685,6 +684,27 @@ static void check_full_buffer(void) {
     assert(vi_file_end == vi_file_max && !vi_changed);
     for(i=0; i<FILELENG-1; i++) assert(vi_file_mem[i] == 'a');
 }
+static void check_capacity(void) {
+    static unsigned sizes[] = {32767U, 32768U, 40000U};
+    char *original = vi_file_mem;
+    unsigned i;
+    vi_file_mem = calloc(40001U, 1); assert(vi_file_mem);
+    for(i=0; i<sizeof sizes/sizeof sizes[0]; i++) {
+        vi_file_max = vi_file_mem + sizes[i];
+        load("abc\n");
+        run_edit("oZ\033"); expect("abc\nZ\n");
+        load("abc\n");
+        run_edit("OZ\033"); expect("Z\nabc\n");
+        load("");
+        run_edit("i\t\033"); expect("    \n");
+        load("keep\n"); assert(yankline(1));
+        load(""); putline(1); expect("keep\n");
+    }
+    free(vi_file_mem);
+    vi_file_mem = original;
+    vi_file_max = vi_file_mem + FILELENG;
+    load("");
+}
 int main(int argc, char **argv) {
     assert(vi_yank_init());
     vi_file_mem = calloc(FILELENG, 1); assert(vi_file_mem);
@@ -715,6 +735,7 @@ int main(int argc, char **argv) {
     else if(!strcmp(argv[1], "put-failures")) check_put_failures();
     else if(!strcmp(argv[1], "large-binary-put")) check_large_binary_put();
     else if(!strcmp(argv[1], "full-buffer")) check_full_buffer();
+    else if(!strcmp(argv[1], "capacity")) check_capacity();
     else assert(0);
     clearlastmess();
     vi_yank_close();
@@ -730,16 +751,18 @@ def main():
     globals_ = source[source.index('int vi_rows;'):source.index('int main(')]
     readfile = function(source, 'int readfile(char *fname, char *fromp,')
     misc = (ROOT / 'misccmds.c').read_text()
-    primitives = ('static int canincrease(int n);\n'
+    primitives = ('static int canincrease(unsigned n);\n'
+                  'static void appchar(int c);\n'
                   'static int savednum, savedcount, savedlast;\n')
     primitives += '#define vi_yank_store test_yank_store\n'
     primitives += '#define vi_yank_load test_yank_load\n'
     primitives += function(misc, 'int yankline(int n)') + '\n'
-    for signature in ('static int canincrease(int n)\n', 'void insstr(char *s)',
+    for signature in ('static int canincrease(unsigned n)\n', 'void insstr(char *s)',
                       'void inschar(int c)', 'void delchar(void)',
                       'int deleol(void)', 'int delword(int deltrailing)',
                       'void fileinfo(void)', 'void putline(int k)',
-                      'void delline(int nlines)'):
+                      'void delline(int nlines)', 'static void appchar(int c)\n',
+                      'void opencmd(void)'):
         primitives += function(misc, signature) + '\n'
     queue = source[source.index('static char getcbuff'): ]
     edit = (ROOT / 'edit.c').read_text()
@@ -780,7 +803,7 @@ def main():
                          'insert-limits', 'literal-limits', 'replay-limits',
                          'file-insert-limits', 'long-messages', 'yank-failures',
                          'yank-success', 'yank-message-failure',
-                         'put-failures', 'large-binary-put', 'full-buffer'):
+                         'put-failures', 'large-binary-put', 'full-buffer', 'capacity'):
                 try:
                     result = subprocess.run([str(binary), case], cwd=work, timeout=10)
                 except subprocess.TimeoutExpired:

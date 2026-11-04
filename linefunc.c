@@ -12,6 +12,12 @@ static char *ssearch(int dir, char *str);
 static char *fwdsearch(char *str);
 static char *bcksearch(char *str);
 
+/* Ordered endpoints in one near segment; subtract addresses, not signed ptrdiffs. */
+unsigned vi_byte_span(const char *first, const char *last)
+{
+    return (unsigned)((unsigned long)last - (unsigned long)first);
+}
+
 /*
  * nextline(curr)
  *

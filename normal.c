@@ -166,7 +166,7 @@ void normal(int c)
         startinsert("I");
         break;
     case 'o':
-        if (vi_file_max - vi_file_end <= 1) {
+        if (vi_byte_span(vi_file_end, vi_file_max) <= 1U) {
             message("Can't add anything, file is too big!");
             break;
         }
@@ -178,7 +178,7 @@ void normal(int c)
         break;
     case 'O':
         /* Open a new line above the current line, enter insert mode. */
-        if (vi_file_max - vi_file_end <= 1) {
+        if (vi_byte_span(vi_file_end, vi_file_max) <= 1U) {
             message("Can't add anything, file is too big!");
             break;
         }

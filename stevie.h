@@ -70,6 +70,7 @@ void clearlastmess(void);
 void filemess(char *s);
 
 /* linefunc.c */
+unsigned vi_byte_span(const char *first, const char *last);
 char *nextline(char *curr);
 char *prevline(char *curr);
 char *coladvance(char *p, int col);

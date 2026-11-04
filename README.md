@@ -171,6 +171,14 @@ save-runtime tests.
 clearing/diffing, and 500 frame/Botchar comparisons against the previous renderer
 under host sanitizers.
 
+`make test-capacity-runtime` checks unsigned byte spans, capacity rejection,
+EOF reservation and large tail copies at 32,000, 32,767, 32,768 and 40,000 bytes
+under host sanitizers and all three native runtimes. Capacity checks now
+subtract converted near addresses rather than signed 16-bit pointer differences.
+This is the first arithmetic-hardening batch only: production editing limits
+remain unchanged, and read/rollback counts, yank lengths and search/navigation
+arithmetic still need their own audits before larger files are supported.
+
 Searches wrap within the file only, handle overlapping matches, and start
 after/before the cursor in the selected direction before wrapping.
 

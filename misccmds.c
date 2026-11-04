@@ -10,7 +10,7 @@
 #include "yankmem.h"
 
 static void appchar(int c);
-static int canincrease(int n);
+static int canincrease(unsigned n);
 
 /*
  * opencmd
@@ -154,12 +154,12 @@ void putline(int k)
     suffix = insertp < vi_file_end && savedlast != '\n';
     total = savednum + prefix + suffix;
     /* Bulk paste needs no spare byte for subsequent character insertion. */
-    if (total > vi_file_max - vi_file_end) {
+    if ((unsigned)total > vi_byte_span(vi_file_end, vi_file_max)) {
         message("Can't add anything, file is too big!");
         return;
     }
     message("Inserting saved stuff...");
-    tail = (unsigned)(vi_file_end - insertp);
+    tail = vi_byte_span(insertp, vi_file_end);
     memmove(insertp + total, insertp, tail);
     first = insertp + prefix;
     if (!vi_yank_load(0, first, (unsigned)savednum)) {
@@ -209,7 +209,7 @@ void insstr(char *s)
         return;
 
     memmove(vi_curs_char + n, vi_curs_char,
-            (unsigned)(vi_file_end - vi_curs_char));
+            vi_byte_span(vi_curs_char, vi_file_end));
     for (k = 0; k < n; k++)
         *vi_curs_char++ = *s++;
     vi_file_end += n;
@@ -234,9 +234,9 @@ static void appchar(int c)
     CHANGED;
 }
 
-static int canincrease(int n)
+static int canincrease(unsigned n)
 {
-    if (n >= vi_file_max - vi_file_end) {
+    if (n >= vi_byte_span(vi_file_end, vi_file_max)) {
         message("Can't add anything, file is too big!");
         return (0);
     }
@@ -332,7 +332,7 @@ int delword(int deltrailing) /* 1 if trailing white space should be removed */
     *p = '\0';
     if (n == 0)
         return 1;
-    memmove(vi_curs_char, scan, (unsigned)(vi_file_end - scan));
+    memmove(vi_curs_char, scan, vi_byte_span(scan, vi_file_end));
     vi_file_end -= n;
     CHANGED;
     return 1;

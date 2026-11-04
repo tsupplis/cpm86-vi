@@ -368,7 +368,7 @@ void edit(void) {
                 case 0x09: /* Tab — expand to spaces unless preceded by ^V */
                     if (!insertroom(4, !vstuffed()))
                         break;
-                    if (vi_file_max - vi_file_end <= 5) {
+                    if (vi_byte_span(vi_file_end, vi_file_max) <= 5U) {
                         message("Can't add anything, file is too big!");
                         break;
                     }
@@ -490,7 +490,7 @@ static int insertbyte(int c, int reserve_eof)
 {
     if (!insertroom(1, reserve_eof))
         return 0;
-    if (vi_file_max - vi_file_end <= (reserve_eof ? 2 : 1)) {
+    if (vi_byte_span(vi_file_end, vi_file_max) <= (reserve_eof ? 2U : 1U)) {
         message("Can't add anything, file is too big!");
         return 0;
     }
@@ -513,7 +513,7 @@ static void insertchar(int c)
         p = vi_ins_ptr;
         for (;;) {
             if (insertroom(1, 0)) {
-                if (vi_file_max - vi_file_end > n + 1) {
+                if (vi_byte_span(vi_file_end, vi_file_max) > (unsigned)n + 1U) {
                     *vi_ins_ptr++ = c;
                     vi_ninsert++;
                     n++;
