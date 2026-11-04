@@ -2,6 +2,7 @@ CC     = aztec42_cc
 STRIP  = aztec42_sqz
 AS     = aztec42_as
 LD     = aztec42_link
+CMDMOD = pcdev_cmdmod
 CPM86_LDFLAGS = -lc86
 DOS11_LDFLAGS = -ld11
 DOS20_LDFLAGS = -lc
@@ -21,7 +22,9 @@ SHARED_OBJS = \
 	linefunc.o \
 	main.o     \
 	misccmds.o \
-	normal.o
+	normal.o   \
+	yankmem.o  \
+	yankcopy.o
 
 # --------------------------------------------------------------------
 # Top-level targets
@@ -33,31 +36,34 @@ all: vicp52.cmd vicp100.cmd vicpbios.cmd \
 # --------------------------------------------------------------------
 # Link targets
 # --------------------------------------------------------------------
-vicp52.cmd: $(SHARED_OBJS) cmdline.o savecp.o edtcp52.o wincp52.o keycp.o keyos.o os.o
+vicp52.cmd: $(SHARED_OBJS) yankcp.o cmdline.o savecp.o edtcp52.o wincp52.o keycp.o keyos.o os.o
 	printf '%s\n' '-o $@ $(filter %.o,$^)' > $(basename $@).lnk
 	$(LD) -f $(basename $@).lnk $(CPM86_LDFLAGS)
+	$(CMDMOD) -t EXTRA -n 8000 -m 8000 $@ 2
 	$(RM) $(basename $@).lnk
 
-vicp100.cmd: $(SHARED_OBJS) cmdline.o savecp.o edtcp100.o wincp100.o keycp.o keyos.o os.o
+vicp100.cmd: $(SHARED_OBJS) yankcp.o cmdline.o savecp.o edtcp100.o wincp100.o keycp.o keyos.o os.o
 	printf '%s\n' '-o $@ $(filter %.o,$^)' > $(basename $@).lnk
 	$(LD) -f $(basename $@).lnk $(CPM86_LDFLAGS)
+	$(CMDMOD) -t EXTRA -n 8000 -m 8000 $@ 2
 	$(RM) $(basename $@).lnk
 
-vid1bios.com: $(SHARED_OBJS) cmddos.o savedos.o edtd1bio.o wind1bio.o keydos.o
+vid1bios.com: $(SHARED_OBJS) yankd11.o cmddos.o savedos.o edtd1bio.o wind1bio.o keydos.o
 	printf '%s\n' '-o $@ $^' > $(basename $@).lnk
 	$(LD) -f $(basename $@).lnk $(DOS11_LDFLAGS)
 	$(RM) $(basename $@).lnk
 
-vid2bios.com: $(SHARED_OBJS) cmddos.o savedos.o edtd2bio.o wind2bio.o keydos.o
+vid2bios.com: $(SHARED_OBJS) yankd20.o cmddos.o savedos.o edtd2bio.o wind2bio.o keydos.o
 	printf '%s\n' '-o $@ $^' > $(basename $@).lnk
 	$(LD) -f $(basename $@).lnk $(DOS20_LDFLAGS)
 	$(RM) $(basename $@).lnk
 
 # CP/M-86 binary using the PC BIOS window/keyboard implementation (no VT
 # escape codes, no BDOS console I/O) instead of the DOS API.
-vicpbios.cmd: $(SHARED_OBJS) cmdline.o savecp.o edtcpbio.o wincpbio.o keycp.o keyos.o os.o
+vicpbios.cmd: $(SHARED_OBJS) yankcp.o cmdline.o savecp.o edtcpbio.o wincpbio.o keycp.o keyos.o os.o
 	printf '%s\n' '-o $@ $(filter %.o,$^)' > $(basename $@).lnk
 	$(LD) -f $(basename $@).lnk $(CPM86_LDFLAGS)
+	$(CMDMOD) -t EXTRA -n 8000 -m 8000 $@ 2
 	$(RM) $(basename $@).lnk
 
 # --------------------------------------------------------------------
@@ -245,6 +251,16 @@ os.o: os.asm
 	$(AS) $<
 	$(STRIP) $@
 
+yankmem.o: yankmem.c yankmem.h
+	$(CC) $(CFLAGS) -o $@ yankmem.c
+	$(STRIP) $@
+
+yankcopy.o yankcp.o yankd11.o yankd20.o: %.o: %.asm
+	$(AS) $<
+	$(STRIP) $@
+
+main.o misccmds.o: yankmem.h
+
 .PHONY: test-keys
 test-keys:
 	python3 testkeys.py
@@ -277,3 +293,9 @@ main.o: save.h
 .PHONY: test-editor-state
 test-editor-state:
 	python3 test/test_editor_state.py
+
+.PHONY: test-yank-runtime test-yank-pce
+test-yank-runtime:
+	python3 test/test_yank_runtime.py
+test-yank-pce:
+	python3 test/test_yank_pce.py

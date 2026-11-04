@@ -31,6 +31,7 @@ def main():
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include "yankmem.h"
 #define NORMAL 0
 #define CHANGED vi_changed=1
 static char memory[512];
@@ -38,8 +39,7 @@ char *vi_file_mem=memory, *vi_file_end, *vi_file_max=memory+sizeof memory;
 char *vi_curs_char, *vi_uncurs_char;
 int vi_renum, vi_changed, vi_state;
 char vi_undo_buff[1024], vi_redo_buff[1024];
-static char *savedline;
-static int savednum, savedcount;
+static int savednum, savedcount, savedlast;
 void message(char *s) {(void)s;}
 void updatescreen(void) {}
 void resetundo(void) {}
@@ -92,6 +92,7 @@ void roundtrip(const char *disk, int offset, int count, const char *deleted,
     expect(original);
 }
 int main(void) {
+    assert(vi_yank_init());
     roundtrip("first line\r\nsecond line\032",11,1,"first line\n",
               "first line\nsecond line");
     roundtrip("first line\nsecond line",11,1,"first line\n",
@@ -109,7 +110,7 @@ int main(void) {
     putline(0); expect("a\nlast\nlast");
     load("a\nlast"); vi_curs_char=memory+2; yankline(99);
     assert(savedcount==1);
-    free(savedline);
+    vi_yank_close();
     puts("PASS: 11 EOF line deletion/undo/paste checks");
     return 0;
 }
@@ -119,7 +120,8 @@ int main(void) {
         exe = Path(tmp) / 'check'
         cfile.write_text(harness)
         subprocess.run([os.environ.get('CC', 'cc'), '-g', '-fsanitize=address,undefined',
-                        str(cfile), '-o', str(exe)], check=True)
+                        '-I', str(ROOT), str(cfile), str(ROOT / 'yankmem.c'),
+                        str(ROOT / 'test/yankmock.c'), '-o', str(exe)], check=True)
         subprocess.run([str(exe)], check=True)
 
 

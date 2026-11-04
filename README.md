@@ -56,6 +56,7 @@ emulator, no ANSI.SYS required.
 Requires the Aztec C 86 cross-development toolchain
 (`aztec42_cc`, `aztec42_link`, `aztec42_sqz`) on the PATH, available from
 [tsupplis/cpm86-crossdev](https://github.com/tsupplis/cpm86-crossdev),
+plus `pcdev_cmdmod` for the CP/M EXTRA-group reservation,
 and **cpmtools** (`cpmcp`, `cpmrm`, `cpmls`) for CP/M-86 disk image
 management (DOS 1.1 images use `mtools`' `mcopy`/`mdir` instead).
 
@@ -109,10 +110,30 @@ messages truncate long filenames safely. Hex-byte entry (`Ctrl-X` in insert
 mode) prompts for two digits without temporarily modifying the file.
 Undo/repeat replays the recorded bytes without adding another EOF newline.
 
-The yank buffer is allocated dynamically for the selected text plus one byte.
-If allocation fails, `yy`, `dd` and `cc` cancel without changing the text,
-cursor, undo/repeat state or previous yank. Growing the buffer can temporarily
-require both old and new allocations; it is still limited by available heap.
+Yanked/deleted lines use a separate fixed 32 KiB memory segment, not the
+near C heap. The editing buffer remains 24,000 bytes; a full-buffer yank
+therefore no longer needs a second near-heap allocation. All builds remain
+small model. Segment reservation is platform-specific:
+
+- CP/M-86: `pcdev_cmdmod` adds a zero-image EXTRA group after linking,
+  reserving 32 KiB at load time without adding 32 KiB to the executable.
+- DOS 1.x: use process-owned memory above the entire 64 KiB near data
+  segment, after checking the PSP's memory ceiling; no DOS 2 calls.
+- DOS 2.x: allocate 2,048 paragraphs with INT 21h/AH=48h and release
+  them with AH=49h on exit.
+
+Startup fails explicitly if the yank segment is unavailable; there is no
+disk or near-heap fallback. Failed yank/paste operations preserve text,
+cursor and undo/repeat state; a failed yank also preserves the previous
+yank. Paste preflights editing-buffer capacity and copies bytes in bulk,
+including embedded NULs and an unterminated final line.
+
+`make test-yank-runtime` tests the real 8086 adapters under `emu2`, including
+all 32 KiB and rejection of missing/undersized CP/M EXTRA groups.
+`make test-yank-pce` additionally boots private image copies for DOS 1.1,
+DOS Plus (both CMD and DOS EXE), Concurrent CP/M and Concurrent DOS.
+It requires PCE, mtools/cpmtools and the same local kernel fixtures as the
+save-runtime tests.
 
 Searches wrap within the file only, handle overlapping matches, and start
 after/before the cursor in the selected direction before wrapping.

@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "stevie.h"
+#include "yankmem.h"
 
 static void appchar(int c);
 static int canincrease(int n);
@@ -80,9 +81,9 @@ void gotoline(int n)
     updatescreen();
 }
 
-static char *savedline = NULL;
 static int savednum = 0;
 static int savedcount = 0;
+static int savedlast = 0;
 
 /*
  * yankline
@@ -91,7 +92,7 @@ static int savedcount = 0;
  */
 
 int yankline(int n) {
-    char *savep, *start, *p, *replacement;
+    char *savep, *start, *p;
     int leng, count = 0;
 
     savep = vi_curs_char;
@@ -110,16 +111,13 @@ int yankline(int n) {
         count++;
     leng = p - vi_curs_char;
     vi_curs_char = savep;
-    replacement = realloc(savedline, (unsigned)(leng + 1));
-    if (replacement == NULL) {
-        message("Unable to allocate yank buffer; command cancelled!");
+    if (!vi_yank_store(start, (unsigned)leng)) {
+        message("Unable to store yank buffer; command cancelled!");
         return 0;
     }
-    memcpy(replacement, start, (unsigned)leng);
-    replacement[leng] = '\0';
-    savedline = replacement;
     savednum = leng;
     savedcount = count;
+    savedlast = leng ? p[-1] : 0;
     return 1;
 }
 
@@ -132,10 +130,11 @@ int yankline(int n) {
 
 void putline(int k)
 {
-    char *p, *insertp, *first;
-    int n, prefix, suffix;
+    char *insertp, *first;
+    int total, prefix, suffix;
+    unsigned tail;
 
-    if (savedline == NULL || savednum == 0)
+    if (savednum == 0)
         return;
     insertp = vi_curs_char;
     prefix = 0;
@@ -147,24 +146,31 @@ void putline(int k)
         else if (insertp > vi_file_mem && insertp[-1] != '\n')
             prefix = 1;
     } else {
-        beginline();
-        insertp = vi_curs_char;
+        while (insertp > vi_file_mem && insertp[-1] != '\n')
+            insertp--;
     }
     /* Separate a nonterminated yank from existing following text. At EOF
      * preserve its missing newline, including when undo restores dd. */
-    suffix = insertp < vi_file_end && savedline[savednum - 1] != '\n';
-    if (!canincrease(savednum + prefix + suffix))
+    suffix = insertp < vi_file_end && savedlast != '\n';
+    total = savednum + prefix + suffix;
+    if (!canincrease(total))
         return;
     message("Inserting saved stuff...");
-    vi_curs_char = insertp;
+    tail = (unsigned)(vi_file_end - insertp);
+    memmove(insertp + total, insertp, tail);
+    first = insertp + prefix;
+    if (!vi_yank_load(0, first, (unsigned)savednum)) {
+        memmove(insertp, insertp + total, tail);
+        message("Unable to read yank buffer; command cancelled!");
+        return;
+    }
     if (prefix)
-        inschar('\n');
-    first = vi_curs_char;
-    for (p = savedline, n = 0; n < savednum; p++, n++)
-        inschar(*p);
+        *insertp = '\n';
     if (suffix)
-        inschar('\n');
+        first[savednum] = '\n';
+    vi_file_end += total;
     vi_curs_char = first;
+    CHANGED;
     resetundo();
     vi_uncurs_char = vi_curs_char;
     sprintf(vi_undo_buff, "%ddd", savedcount);

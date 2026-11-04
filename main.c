@@ -9,6 +9,7 @@
 #include "stevie.h"
 #include "save.h"
 #include "keyboard.h"
+#include "yankmem.h"
 
 static void filetonext(void);
 static void nexttoscreen(void);
@@ -112,6 +113,16 @@ int main(int argc, char **argv)
         windusage();
         vi_key_exit();
         exit(1);
+    }
+
+    if (!vi_yank_init()) {
+        fputs("Unable to reserve 32 KiB yank memory!\n", stderr);
+        return 1;
+    }
+    if (atexit(vi_yank_close) != 0) {
+        vi_yank_close();
+        fputs("Unable to register yank memory cleanup!\n", stderr);
+        return 1;
     }
 
 #if defined(__CPM86__)

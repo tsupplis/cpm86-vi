@@ -26,6 +26,7 @@ HARNESS = r'''
 #include <string.h>
 #include <setjmp.h>
 #include "stevie.h"
+#include "yankmem.h"
 
 static const char *input;
 static int quit_calls, reject_save;
@@ -94,11 +95,17 @@ static int test_fclose(FILE *f) {
     int result = fclose(f);
     return fail_close ? EOF : result;
 }
-static int fail_yank_alloc, fail_message_alloc;
-static size_t yank_request;
-static void *test_yank_realloc(void *ptr, size_t size) {
-    yank_request = size;
-    return fail_yank_alloc ? NULL : realloc(ptr, size);
+static int fail_yank_store, fail_yank_load, fail_message_alloc;
+extern unsigned char test_yank_memory[VI_YANK_CAPACITY];
+static int test_yank_store(const char *source, unsigned length) {
+    return fail_yank_store ? 0 : vi_yank_store(source, length);
+}
+static int test_yank_load(unsigned offset, char *destination, unsigned length) {
+    if(fail_yank_load) {
+        memset(destination, 'X', length);
+        return 0;
+    }
+    return vi_yank_load(offset, destination, length);
 }
 void *test_message_malloc(size_t size) {
     return fail_message_alloc ? NULL : malloc(size);
@@ -524,20 +531,18 @@ static void check_replay_limits(void) {
     assert(!anyinput());
 }
 static void check_yank_failures(void) {
-    char *old;
     int dirty, command_index;
     load("first\n");
-    fail_yank_alloc = 1;
+    fail_yank_store = 1;
     input="y"; normal('y');
-    fail_yank_alloc = 0;
+    fail_yank_store = 0;
     expect("first\n");
-    assert(savedline == NULL && !vi_changed && vi_state == NORMAL);
+    assert(savednum == 0 && !vi_changed && vi_state == NORMAL);
     for(dirty=0; dirty<=1; dirty++) {
         for(command_index=0; command_index<3; command_index++) {
             load("keep\n");
             yankline(1);
             assert(savednum == 5 && savedcount == 1);
-            old = savedline;
             load("first\nsecond line\n");
             vi_curs_char = vi_file_mem + 8;
             vi_top_char = vi_file_mem + 6;
@@ -545,18 +550,18 @@ static void check_yank_failures(void) {
             strcpy(vi_undo_buff, "rZ");
             strcpy(vi_redo_buff, "rX");
             vi_uncurs_char = vi_file_mem + 1;
-            fail_yank_alloc = 1;
+            fail_yank_store = 1;
             if(command_index == 0) { input="y"; normal('y'); }
             else if(command_index == 1) { input="d"; normal('d'); }
             else { input="c"; normal('c'); }
-            fail_yank_alloc = 0;
+            fail_yank_store = 0;
             expect("first\nsecond line\n");
             assert(vi_changed == dirty && vi_state == NORMAL);
             assert(vi_curs_char == vi_file_mem+8 && vi_top_char == vi_file_mem+6);
             assert(!strcmp(vi_undo_buff, "rZ") && !strcmp(vi_redo_buff, "rX"));
             assert(vi_uncurs_char == vi_file_mem+1);
-            assert(savedline == old && savednum == 5 && savedcount == 1);
-            assert(!memcmp(savedline, "keep\n", 6));
+            assert(savednum == 5 && savedcount == 1 && savedlast == '\n');
+            assert(!memcmp(test_yank_memory, "keep\n", 5));
             assert(strstr(last_output, "yank") && strstr(last_output, "cancelled"));
         }
     }
@@ -570,17 +575,16 @@ static void check_yank_success(void) {
     input="y"; normal('y');
     assert(vi_curs_char == vi_file_mem+8 && !vi_changed);
     assert(savednum == 12 && savedcount == 1);
-    assert(!memcmp(savedline, "second line\n", 13));
+    assert(!memcmp(test_yank_memory, "second line\n", 12));
     vi_renum=2; input="y"; normal('y');
     assert(savednum == 16 && savedcount == 2);
-    assert(!memcmp(savedline, "second line\nlast", 17));
+    assert(!memcmp(test_yank_memory, "second line\nlast", 16));
     load("");
     memset(vi_file_mem, 'a', FILELENG);
     vi_file_end=vi_file_max;
     input="y"; normal('y');
-    assert(yank_request == FILELENG+1);
-    assert(savednum == FILELENG && savedcount == 1 && savedline[FILELENG] == 0);
-    for(i=0; i<FILELENG; i++) assert(savedline[i] == 'a');
+    assert(savednum == FILELENG && savedcount == 1 && savedlast == 'a');
+    for(i=0; i<FILELENG; i++) assert(test_yank_memory[i] == 'a');
     load("abc\nlast");
     vi_curs_char=vi_file_mem+4;
     input="d"; normal('d'); expect("abc\n");
@@ -589,23 +593,65 @@ static void check_yank_success(void) {
     vi_curs_char=vi_file_mem+4;
     input="c"; normal('c'); expect("abc\n");
     assert(vi_state == INSERT && savednum == 4 && savedcount == 1);
-    assert(!memcmp(savedline, "last", 5));
+    assert(!memcmp(test_yank_memory, "last", 4));
     load(""); input="y"; normal('y');
-    assert(savednum == 0 && savedcount == 0 && savedline[0] == 0);
+    assert(savednum == 0 && savedcount == 0 && savedlast == 0);
 }
 static void check_yank_message_failure(void) {
     load("keep\n"); yankline(1);
     load("replacement\n");
-    fail_yank_alloc=fail_message_alloc=1;
+    fail_yank_store=fail_message_alloc=1;
     input="d"; normal('d');
     assert(strstr(last_output, "yank") && strstr(last_output, "cancelled"));
     expect("replacement\n");
     assert(!vi_changed && vi_state == NORMAL);
     clearlastmess();
-    fail_yank_alloc=fail_message_alloc=0;
+    fail_yank_store=fail_message_alloc=0;
     normal('P'); expect("keep\nreplacement\n");
 }
+static void check_put_failures(void) {
+    int dirty, above;
+    load("saved"); assert(yankline(1));
+    for(dirty=0; dirty<=1; dirty++) {
+        for(above=0; above<=1; above++) {
+            load("first\nlast");
+            vi_curs_char=vi_file_mem+8;
+            vi_top_char=vi_file_mem+6;
+            vi_changed=dirty;
+            strcpy(vi_undo_buff, "rZ"); strcpy(vi_redo_buff, "rX");
+            vi_uncurs_char=vi_file_mem+1;
+            fail_yank_load=1;
+            putline(above);
+            fail_yank_load=0;
+            expect("first\nlast");
+            assert(vi_changed==dirty && vi_curs_char==vi_file_mem+8);
+            assert(vi_top_char==vi_file_mem+6 && vi_uncurs_char==vi_file_mem+1);
+            assert(!strcmp(vi_undo_buff,"rZ") && !strcmp(vi_redo_buff,"rX"));
+            assert(strstr(last_output,"yank") && strstr(last_output,"cancelled"));
+        }
+    }
+    /* A rejected P must not move the cursor to the beginning of its line. */
+    load("first\nlast"); vi_curs_char=vi_file_mem+8;
+    vi_file_max=vi_file_end+5;
+    putline(1); expect("first\nlast");
+    assert(vi_curs_char==vi_file_mem+8 && !vi_changed);
+    vi_file_max=vi_file_mem+FILELENG;
+    putline(1); expect("first\nsaved\nlast");
+}
+static void check_large_binary_put(void) {
+    int i;
+    load("");
+    for(i=0; i<FILELENG-1; i++) vi_file_mem[i]=(char)(i%251);
+    vi_file_end=vi_file_mem+FILELENG-1;
+    assert(yankline(FILELENG));
+    load("");
+    putline(1);
+    assert(vi_file_end==vi_file_mem+FILELENG-1 && vi_changed);
+    for(i=0; i<FILELENG-1; i++) assert(vi_file_mem[i]==(char)(i%251));
+    assert(vi_curs_char==vi_file_mem);
+}
 int main(int argc, char **argv) {
+    assert(vi_yank_init());
     vi_file_mem = calloc(FILELENG, 1); assert(vi_file_mem);
     vi_file_max = vi_file_mem + FILELENG;
     vi_file_name = "TEST.TXT";
@@ -631,9 +677,11 @@ int main(int argc, char **argv) {
     else if(!strcmp(argv[1], "yank-failures")) check_yank_failures();
     else if(!strcmp(argv[1], "yank-success")) check_yank_success();
     else if(!strcmp(argv[1], "yank-message-failure")) check_yank_message_failure();
+    else if(!strcmp(argv[1], "put-failures")) check_put_failures();
+    else if(!strcmp(argv[1], "large-binary-put")) check_large_binary_put();
     else assert(0);
     clearlastmess();
-    free(savedline);
+    vi_yank_close();
     free(vi_file_mem);
     printf("PASS: %s\n", argv[1]);
     return 0;
@@ -647,10 +695,10 @@ def main():
     readfile = function(source, 'int readfile(char *fname, char *fromp,')
     misc = (ROOT / 'misccmds.c').read_text()
     primitives = ('static int canincrease(int n);\n'
-                  'static char *savedline;\nstatic int savednum, savedcount;\n')
-    primitives += '#define realloc test_yank_realloc\n'
+                  'static int savednum, savedcount, savedlast;\n')
+    primitives += '#define vi_yank_store test_yank_store\n'
+    primitives += '#define vi_yank_load test_yank_load\n'
     primitives += function(misc, 'int yankline(int n)') + '\n'
-    primitives += '#undef realloc\n'
     for signature in ('static int canincrease(int n)\n', 'void insstr(char *s)',
                       'void inschar(int c)', 'void delchar(void)',
                       'int deleol(void)', 'int delword(int deltrailing)',
@@ -685,7 +733,8 @@ def main():
             os.environ.get('CC_HOST', 'cc'), '-std=c99', '-g',
             '-fsanitize=address,undefined', '-I', str(ROOT), str(harness),
             str(command_source), str(ROOT / 'normal.c'),
-            str(ROOT / 'linefunc.c'), '-o', str(binary),
+            str(ROOT / 'linefunc.c'), str(ROOT / 'yankmem.c'),
+            str(ROOT / 'test/yankmock.c'), '-o', str(binary),
         ], check=True)
         failed = []
         for case in ('save', 'read', 'replace', 'search', 'insert-read',
@@ -693,7 +742,8 @@ def main():
                      'search-bounds', 'command-limits', 'delete-limits',
                      'insert-limits', 'literal-limits', 'replay-limits',
                      'file-insert-limits', 'long-messages', 'yank-failures',
-                     'yank-success', 'yank-message-failure'):
+                     'yank-success', 'yank-message-failure',
+                     'put-failures', 'large-binary-put'):
             try:
                 result = subprocess.run([str(binary), case], cwd=work, timeout=10)
             except subprocess.TimeoutExpired:
