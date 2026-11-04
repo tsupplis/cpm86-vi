@@ -687,6 +687,7 @@ static void check_full_buffer(void) {
 static void check_capacity(void) {
     static unsigned sizes[] = {32767U, 32768U, 40000U};
     char *original = vi_file_mem;
+    char expected[40];
     unsigned i;
     vi_file_mem = calloc(40001U, 1); assert(vi_file_mem);
     for(i=0; i<sizeof sizes/sizeof sizes[0]; i++) {
@@ -699,6 +700,12 @@ static void check_capacity(void) {
         run_edit("i\t\033"); expect("    \n");
         load("keep\n"); assert(yankline(1));
         load(""); putline(1); expect("keep\n");
+        memset(vi_file_mem, 'x', sizes[i]);
+        vi_file_end = vi_file_max;
+        vi_curs_char = vi_file_end - 1;
+        command(".=\n");
+        sprintf(expected, "character %u", sizes[i]);
+        assert(strstr(last_output, expected) != NULL);
     }
     free(vi_file_mem);
     vi_file_mem = original;
@@ -753,7 +760,8 @@ def main():
     misc = (ROOT / 'misccmds.c').read_text()
     primitives = ('static int canincrease(unsigned n);\n'
                   'static void appchar(int c);\n'
-                  'static int savednum, savedcount, savedlast;\n')
+                  'static unsigned savednum;\n'
+                  'static int savedcount, savedlast;\n')
     primitives += '#define vi_yank_store test_yank_store\n'
     primitives += '#define vi_yank_load test_yank_load\n'
     primitives += function(misc, 'int yankline(int n)') + '\n'

@@ -371,8 +371,8 @@ int readfile(char *fname, char *fromp, int nochangename) /* if 1, don't change t
     char buff[128];
     char *p, *insertp = fromp;
     const char *error = NULL;
-    int c, n;
-    int unprint = 0;
+    int c;
+    unsigned n, unprint = 0;
     long remaining;
 
     snprintf(buff, sizeof buff, "Reading %s...", fname);
@@ -396,12 +396,12 @@ int readfile(char *fname, char *fromp, int nochangename) /* if 1, don't change t
         if (!vi_binary && c == '\r') {
             continue;
         }
-        if (!(isprint(c) || isspace(c)))
-            unprint++;
         if (vi_file_end >= vi_file_max) {
             error = "File too long; read cancelled!";
             break;
         }
+        if (!(isprint(c) || isspace(c)))
+            unprint++;
         /* Insert the char at the current point by shifting the tail. */
         for (p = vi_file_end; p > fromp; p--)
             *p = *(p - 1);
@@ -414,7 +414,7 @@ int readfile(char *fname, char *fromp, int nochangename) /* if 1, don't change t
     if (fclose(f) == EOF)
         error = "Read/close failed; read cancelled!";
     if (error != NULL) {
-        memmove(insertp, insertp + n, (unsigned)(vi_file_end - insertp - n));
+        memmove(insertp, fromp, vi_byte_span(fromp, vi_file_end));
         vi_file_end -= n;
         message((char *)error);
         return -1;
@@ -422,15 +422,15 @@ int readfile(char *fname, char *fromp, int nochangename) /* if 1, don't change t
     if (!vi_binary && unprint > 0) {
         sprintf(
             buff,
-            "%d unprintable chars!  Perhaps binary mode (-b) should be used?",
+            "%u unprintable chars!  Perhaps binary mode (-b) should be used?",
             unprint);
         message(buff);
         /* sleep(2); */
     }
     if (unprint > 0)
-        p = "\"%s\" %d characters (%d un-printable)  (Press 'H' for help)";
+        p = "\"%s\" %u characters (%u un-printable)  (Press 'H' for help)";
     else
-        p = "\"%s\" %d characters  (Press 'H' for help)";
+        p = "\"%s\" %u characters  (Press 'H' for help)";
     snprintf(buff, sizeof buff, p, fname, n, unprint);
     message(buff);
     return (0);

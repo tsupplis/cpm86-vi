@@ -177,8 +177,8 @@ void readcmdline(int firstc) /* either ':', '/', or '?' */
     case '.':
         if (strcmp(cmd, ".=") == 0) {
             char messbuff[80];
-            sprintf(messbuff, "line %d   character %d", cntlines(vi_file_mem, vi_curs_char),
-                    1 + (int)(vi_curs_char - vi_file_mem));
+            sprintf(messbuff, "line %d   character %u", cntlines(vi_file_mem, vi_curs_char),
+                    1U + vi_byte_span(vi_file_mem, vi_curs_char));
             message(messbuff);
             return;
         }
@@ -316,7 +316,7 @@ static int writeit(char *fname)
         return 0;
     }
     snprintf(buff, sizeof buff, "\"%s\" %u characters", fname,
-             (unsigned)(vi_file_end-vi_file_mem));
+             vi_byte_span(vi_file_mem, vi_file_end));
     message(buff);
     UNCHANGED;
     return 1;

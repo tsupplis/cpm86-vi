@@ -81,7 +81,7 @@ void gotoline(int n)
     updatescreen();
 }
 
-static int savednum = 0;
+static unsigned savednum = 0;
 static int savedcount = 0;
 static int savedlast = 0;
 
@@ -93,7 +93,8 @@ static int savedlast = 0;
 
 int yankline(int n) {
     char *savep, *start, *p;
-    int leng, count = 0;
+    unsigned leng;
+    int count = 0;
 
     savep = vi_curs_char;
     /* go to the beginning of the current line. */
@@ -109,9 +110,9 @@ int yankline(int n) {
     }
     if (p > vi_curs_char && p[-1] != '\n')
         count++;
-    leng = p - vi_curs_char;
+    leng = vi_byte_span(vi_curs_char, p);
     vi_curs_char = savep;
-    if (!vi_yank_store(start, (unsigned)leng)) {
+    if (!vi_yank_store(start, leng)) {
         message("Unable to store yank buffer; command cancelled!");
         return 0;
     }
@@ -131,8 +132,8 @@ int yankline(int n) {
 void putline(int k)
 {
     char *insertp, *first;
-    int total, prefix, suffix;
-    unsigned tail;
+    int prefix, suffix;
+    unsigned total, tail, available, extra;
 
     if (savednum == 0)
         return;
@@ -152,17 +153,19 @@ void putline(int k)
     /* Separate a nonterminated yank from existing following text. At EOF
      * preserve its missing newline, including when undo restores dd. */
     suffix = insertp < vi_file_end && savedlast != '\n';
-    total = savednum + prefix + suffix;
     /* Bulk paste needs no spare byte for subsequent character insertion. */
-    if ((unsigned)total > vi_byte_span(vi_file_end, vi_file_max)) {
+    available = vi_byte_span(vi_file_end, vi_file_max);
+    extra = prefix + suffix;
+    if (savednum > available || extra > available - savednum) {
         message("Can't add anything, file is too big!");
         return;
     }
+    total = savednum + extra;
     message("Inserting saved stuff...");
     tail = vi_byte_span(insertp, vi_file_end);
     memmove(insertp + total, insertp, tail);
     first = insertp + prefix;
-    if (!vi_yank_load(0, first, (unsigned)savednum)) {
+    if (!vi_yank_load(0, first, savednum)) {
         memmove(insertp, insertp + total, tail);
         message("Unable to read yank buffer; command cancelled!");
         return;
@@ -201,7 +204,11 @@ void inschar(int c)
 
 void insstr(char *s)
 {
-    int k, n = strlen(s);
+    unsigned k, n;
+
+    /* The native runtime's strlen stops below 32 KiB. */
+    for (n = 0; s[n] != '\0'; n++)
+        ;
 
     /* Move everything in the file over to make */
     /* room for the new string. */
@@ -267,7 +274,7 @@ void delchar(void) {
  */
 int deleol(void) {
     char *scan, *p;
-    int n;
+    unsigned n;
 
     /* Count characters to delete first so delchar() repositioning
      * doesn't confuse the loop. */
@@ -284,16 +291,20 @@ int deleol(void) {
     p = vi_undo_buff;
     *p++ = 'i';
     scan = vi_curs_char;
-    while (n-- > 0)
+    while (n != 0) {
         *p++ = *scan++;
+        n--;
+    }
     *p++ = '\033';
     *p = '\0';
     /* Now do the actual deletions */
     n = 0;
     for (scan = vi_curs_char; scan < vi_file_end && *scan != '\n'; scan++)
         n++;
-    while (n-- > 0)
+    while (n != 0) {
         delchar();
+        n--;
+    }
     addtobuff(vi_redo_buff, 'D', 0, 0, 0, 0, 0);
     return 1;
 }
@@ -302,7 +313,7 @@ int delword(int deltrailing) /* 1 if trailing white space should be removed */
 {
     char *scan = vi_curs_char, *start = vi_curs_char;
     char *p = vi_undo_buff;
-    int n;
+    unsigned n;
 
     if (scan >= vi_file_end) {
         resetundo();
@@ -319,7 +330,7 @@ int delword(int deltrailing) /* 1 if trailing white space should be removed */
     if (deltrailing)
         while (scan < vi_file_end && isspace((unsigned char)*scan) && *scan != '\n')
             scan++;
-    n = scan - start;
+    n = vi_byte_span(start, scan);
     if (n > UNDO_LIMIT) {
         message("Deletion too big for undo; command rejected!");
         return 0;
@@ -339,7 +350,7 @@ int delword(int deltrailing) /* 1 if trailing white space should be removed */
 }
 
 void delline(int nlines) {
-    int nchars;
+    unsigned nchars;
     char *p, *q;
 
     /* If we're not at the beginning of the line, get there. */

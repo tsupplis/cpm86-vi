@@ -39,7 +39,8 @@ char *vi_file_mem=memory, *vi_file_end, *vi_file_max=memory+sizeof memory;
 char *vi_curs_char, *vi_uncurs_char;
 int vi_renum, vi_changed, vi_state;
 char vi_undo_buff[1024], vi_redo_buff[1024];
-static int savednum, savedcount, savedlast;
+static unsigned savednum;
+static int savedcount, savedlast;
 void message(char *s) {(void)s;}
 void updatescreen(void) {}
 void resetundo(void) {}

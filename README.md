@@ -175,9 +175,32 @@ under host sanitizers.
 EOF reservation and large tail copies at 32,000, 32,767, 32,768 and 40,000 bytes
 under host sanitizers and all three native runtimes. Capacity checks now
 subtract converted near addresses rather than signed 16-bit pointer differences.
-This is the first arithmetic-hardening batch only: production editing limits
-remain unchanged, and read/rollback counts, yank lengths and search/navigation
-arithmetic still need their own audits before larger files are supported.
+Read/nonprintable counts and byte-position/save reports also use unsigned
+byte accounting; failed imports restore the original tail using an unsigned
+span. The save backend already uses `long` for physical output sizes, including
+CRLF expansion.
+
+`make test-io-runtime` checks reads at 32,767, 32,768 and 40,000 bytes,
+read/close/overflow rollback, restoration of tails longer than 32 KiB,
+and 40,000-byte binary and 80,000-byte CRLF-expanded text saves under host
+sanitizers and all three native runtimes.
+
+Yank/paste and deletion byte lengths also use unsigned accounting. Paste
+checks available space before adding separator bytes, and oversized word/EOL
+deletions cannot wrap past the undo-size check. String insertion counts bytes
+directly because the native runtime's `strlen` stops below 32 KiB.
+
+`make test-yank-lengths` checks full-capacity binary yank/delete/paste roundtrips,
+separator/capacity rejection, failed-yank preservation, partial-load rollback
+over a large tail, and 40,000-byte insertion/deletion boundaries under host
+sanitizers and all three native runtimes. CP/M and DOS 2 additionally exercise
+40,000-byte yanks with test-only enlarged yank regions; DOS 1 retains its
+24,000-byte yank region.
+
+Production editing and yank limits remain unchanged. Command/line counts
+(including yank's line count) remain signed and bounded by the current command
+count interface. Search/navigation and command-count arithmetic still need
+their audit before larger files are supported.
 
 Searches wrap within the file only, handle overlapping matches, and start
 after/before the cursor in the selected direction before wrapping.

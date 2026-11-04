@@ -162,6 +162,9 @@ def editor_state():
     a=source.index('static int writeit(char *fname)\n{')
     b=source.index('\nvoid filemess',a)
     body=source[a:b]
+    lines=(ROOT/'linefunc.c').read_text()
+    a=lines.index('unsigned vi_byte_span(')
+    span=lines[a:lines.index('\n}',a)+2]
     harness=r'''#include <stdio.h>
 #include <assert.h>
 static char text[]="test";
@@ -172,7 +175,7 @@ void message(char *s) {(void)s;}
 const char *vi_save_file(const char *n,const char *a,const char *b,int binary) {
  assert(a==vi_file_mem && b==vi_file_end);return reject?"injected failure":0;
 }
-''' + body + r'''
+''' + span + '\n' + body + r'''
 int main(void) {
  reject=1;assert(!writeit("test") && vi_changed==1);
  reject=0;assert(writeit("test") && vi_changed==0);
@@ -186,4 +189,3 @@ int main(void) {
 if __name__=='__main__':
     main()
     editor_state()
-
