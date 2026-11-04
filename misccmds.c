@@ -90,33 +90,37 @@ static int savedcount = 0;
  * Save a copy of the current line(s) for later 'p'lacing.
  */
 
-void yankline(int n) {
-    char *savep, *p, *q;
-    int leng, k;
+int yankline(int n) {
+    char *savep, *start, *p, *replacement;
+    int leng, count = 0;
 
-    if (savedline != NULL)
-        free(savedline);
     savep = vi_curs_char;
     /* go to the beginning of the current line. */
     beginline();
+    start = vi_curs_char;
     /* The last line may end at logical EOF, without a newline. */
-    savedcount = 0;
     for (p = vi_curs_char; p < vi_file_end; ) {
         if (*p++ == '\n') {
-            savedcount++;
+            count++;
             if (--n <= 0)
                 break;
         }
     }
     if (p > vi_curs_char && p[-1] != '\n')
-        savedcount++;
+        count++;
     leng = p - vi_curs_char;
-    savedline = malloc((unsigned)(leng + 1));
-    for (p = vi_curs_char, q = savedline, k = 0; k < leng; k++)
-        *q++ = *p++;
-    *q = '\0';
     vi_curs_char = savep;
+    replacement = realloc(savedline, (unsigned)(leng + 1));
+    if (replacement == NULL) {
+        message("Unable to allocate yank buffer; command cancelled!");
+        return 0;
+    }
+    memcpy(replacement, start, (unsigned)leng);
+    replacement[leng] = '\0';
+    savedline = replacement;
     savednum = leng;
+    savedcount = count;
+    return 1;
 }
 
 /*

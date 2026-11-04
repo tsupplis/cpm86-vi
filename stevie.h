@@ -81,7 +81,7 @@ int issepchar(int c);
 int cntlines(char *pbegin, char *pend);
 void fileinfo(void);
 void gotoline(int n);
-void yankline(int n);
+int yankline(int n);
 void putline(int k);
 void inschar(int c);
 void insstr(char *s);

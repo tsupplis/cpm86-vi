@@ -109,6 +109,11 @@ messages truncate long filenames safely. Hex-byte entry (`Ctrl-X` in insert
 mode) prompts for two digits without temporarily modifying the file.
 Undo/repeat replays the recorded bytes without adding another EOF newline.
 
+The yank buffer is allocated dynamically for the selected text plus one byte.
+If allocation fails, `yy`, `dd` and `cc` cancel without changing the text,
+cursor, undo/repeat state or previous yank. Growing the buffer can temporarily
+require both old and new allocations; it is still limited by available heap.
+
 Searches wrap within the file only, handle overlapping matches, and start
 after/before the cursor in the selected direction before wrapping.
 

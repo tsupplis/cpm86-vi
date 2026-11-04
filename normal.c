@@ -196,12 +196,13 @@ void normal(int c)
         n = (vi_renum == 0 ? 1 : vi_renum);
         switch (nchar) {
         case 'd':
+            if (!yankline(n))
+                break;
             sprintf(vi_redo_buff, "%ddd", n);
             /* addtobuff(vi_redo_buff,'d','d',NULL); */
             beginline();
             resetundo();
             vi_uncurs_char = vi_curs_char;
-            yankline(n);
             delline(n);
             beginline();
             updatescreen();
@@ -230,12 +231,13 @@ void normal(int c)
         nchar = vgetc();
         switch (nchar) {
         case 'c':
+            if (!yankline(1))
+                break;
             resetundo();
             /* Go to the beginning of the line */
             beginline();
-            yankline(1);
             /* delete everything but the newline */
-            while (*vi_curs_char != '\n')
+            while (vi_curs_char < vi_file_end && *vi_curs_char != '\n')
                 delchar();
             startinsert("cc");
             updatescreen();

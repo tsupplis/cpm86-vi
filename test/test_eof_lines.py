@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Host regression of the editor's actual linewise yank/delete/paste functions.
 
-Run: python3 test_eof_lines.py
+Run: python3 test/test_eof_lines.py
 Uses the same dd/undo sequence as normal.c, with screen and undo bookkeeping
 stubbed out. Compiler sanitizers catch physical memory errors as well.
 """
@@ -10,7 +10,7 @@ import os
 import subprocess
 import tempfile
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def function(source, signature):
@@ -52,7 +52,7 @@ static int canincrease(int n);
 '''
     harness += function(lines, 'char *prevline(char *curr)')
     for sig in ('static int canincrease(int n)\n', 'void inschar(int c)',
-                'void yankline(int n)', 'void putline(int k)',
+                'int yankline(int n)', 'void putline(int k)',
                 'void delline(int nlines)'):
         harness += '\n' + function(source, sig)
     harness += r'''
@@ -81,7 +81,7 @@ void roundtrip(const char *disk, int offset, int count, const char *deleted,
     vi_curs_char=memory+offset;
     beginline(); before=vi_curs_char;
     vi_renum=count;
-    yankline(count);
+    assert(yankline(count));
     assert(savednum<=vi_file_end-before);
     delline(count);
     beginline();

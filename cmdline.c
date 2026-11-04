@@ -281,6 +281,7 @@ void message(char *s)
         if (strcmp(last_message, s) == 0)
             return;
         free(last_message);
+        last_message = NULL;
     }
     gotocmd(1, 1, 0);
     /* take off any trailing newline */
@@ -288,7 +289,10 @@ void message(char *s)
         *p = '\0';
     windstr(s);
     windcolorreset();
-    last_message = strsave(s);
+    /* Caching is optional: reporting an allocation failure must not recurse. */
+    p = malloc((unsigned)(strlen(s) + 1));
+    if (p != NULL)
+        last_message = strcpy(p, s);
 }
 
 /* Forget the last message shown, so the next message() call always
