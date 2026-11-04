@@ -30,7 +30,7 @@ SHARED_OBJS = \
 # Top-level targets
 # --------------------------------------------------------------------
 all: vicp52.cmd vicp100.cmd vicpbios.cmd \
- vid1bios.com vid2bios.com \
+ vid1bios.com vid2bios.exe \
  cpmtest.img 
 
 # --------------------------------------------------------------------
@@ -39,21 +39,23 @@ all: vicp52.cmd vicp100.cmd vicpbios.cmd \
 vicp52.cmd: $(SHARED_OBJS) yankcp.o cmdline.o savecp.o edtcp52.o wincp52.o keycp.o keyos.o os.o
 	printf '%s\n' '-o $@ $(filter %.o,$^)' > $(basename $@).lnk
 	$(LD) -f $(basename $@).lnk $(CPM86_LDFLAGS)
+	$(CMDMOD) -t DATA -n f000 -m 10000 $@ 1
 	$(CMDMOD) -t EXTRA -n 8000 -m 8000 $@ 2
 	$(RM) $(basename $@).lnk
 
 vicp100.cmd: $(SHARED_OBJS) yankcp.o cmdline.o savecp.o edtcp100.o wincp100.o keycp.o keyos.o os.o
 	printf '%s\n' '-o $@ $(filter %.o,$^)' > $(basename $@).lnk
 	$(LD) -f $(basename $@).lnk $(CPM86_LDFLAGS)
+	$(CMDMOD) -t DATA -n f000 -m 10000 $@ 1
 	$(CMDMOD) -t EXTRA -n 8000 -m 8000 $@ 2
 	$(RM) $(basename $@).lnk
 
-vid1bios.com: $(SHARED_OBJS) yankd11.o cmddos.o savedos.o edtd1bio.o wind1bio.o keydos.o
+vid1bios.com: $(filter-out main.o,$(SHARED_OBJS)) maind1.o yankd11.o cmddos.o savedos.o edtd1bio.o wind1bio.o keydos.o
 	printf '%s\n' '-o $@ $^' > $(basename $@).lnk
 	$(LD) -f $(basename $@).lnk $(DOS11_LDFLAGS)
 	$(RM) $(basename $@).lnk
 
-vid2bios.com: $(SHARED_OBJS) yankd20.o cmddos.o savedos.o edtd2bio.o wind2bio.o keydos.o
+vid2bios.exe: $(SHARED_OBJS) yankd20.o cmddos.o savedos.o edtd2bio.o wind2bio.o keydos.o
 	printf '%s\n' '-o $@ $^' > $(basename $@).lnk
 	$(LD) -f $(basename $@).lnk $(DOS20_LDFLAGS)
 	$(RM) $(basename $@).lnk
@@ -63,8 +65,11 @@ vid2bios.com: $(SHARED_OBJS) yankd20.o cmddos.o savedos.o edtd2bio.o wind2bio.o 
 vicpbios.cmd: $(SHARED_OBJS) yankcp.o cmdline.o savecp.o edtcpbio.o wincpbio.o keycp.o keyos.o os.o
 	printf '%s\n' '-o $@ $(filter %.o,$^)' > $(basename $@).lnk
 	$(LD) -f $(basename $@).lnk $(CPM86_LDFLAGS)
+	$(CMDMOD) -t DATA -n f000 -m 10000 $@ 1
 	$(CMDMOD) -t EXTRA -n 8000 -m 8000 $@ 2
 	$(RM) $(basename $@).lnk
+
+vicp52.cmd vicp100.cmd vicpbios.cmd: Makefile
 
 # --------------------------------------------------------------------
 # Scratch program: isolate windgoto/windputc from all of vi's own
@@ -167,6 +172,10 @@ main.o: main.c
 	$(CC) $(CFLAGS) -o $@ main.c
 	$(STRIP) $@
 
+maind1.o: main.c stevie.h keyboard.h yankmem.h save.h
+	$(CC) $(CFLAGS) -D__PCDOS__=11 -o $@ $<
+	$(STRIP) $@
+
 misccmds.o: misccmds.c
 	$(CC) $(CFLAGS) -o $@ misccmds.c
 	$(STRIP) $@
@@ -176,23 +185,22 @@ normal.o: normal.c
 	$(STRIP) $@
 
 cpmtest.img: vicp52.cmd vicp100.cmd vicpbios.cmd cpmbase.img test.txt \
-    vid1bios.com vid2bios.com
+    vid2bios.exe
 	cp cpmbase.img cpmtest.img
 	cpmrm -f ibmpc-514ss cpmtest.img 0:*.cmd
 	cpmrm -f ibmpc-514ss cpmtest.img 0:test.txt
 	cpmcp -f ibmpc-514ss cpmtest.img vicp52.cmd 0:
 	cpmcp -f ibmpc-514ss cpmtest.img vicp100.cmd 0:
 	cpmcp -f ibmpc-514ss cpmtest.img vicpbios.cmd 0:
-	cpmcp -f ibmpc-514ss cpmtest.img vid1bios.com 0:
-	cpmcp -f ibmpc-514ss cpmtest.img vid2bios.com 0:
+	cpmcp -f ibmpc-514ss cpmtest.img vid2bios.exe 0:
 	cpmcp -f ibmpc-514ss cpmtest.img test.txt 0:
 	cpmls -F -f ibmpc-514ss cpmtest.img 0:*.*
 
-dostest.img: vid1bios.com vid2bios.com dosbase.img test.txt
+dostest.img: vid1bios.com vid2bios.exe dosbase.img test.txt
 	cp dosbase.img dostest.img
 	mcopy -i dostest.img vid1bios.com  ::VID1BIOS.COM
 	mcopy -i dostest.img vid1bios.com  ::VI.COM
-	mcopy -i dostest.img vid2bios.com  ::VID2BIOS.COM
+	mcopy -i dostest.img vid2bios.exe  ::VID2BIOS.EXE
 	mcopy -i dostest.img test.txt  ::TEST.TXT
 	mdir -i dostest.img ::
 
@@ -201,9 +209,9 @@ dostest.img: vid1bios.com vid2bios.com dosbase.img test.txt
 # --------------------------------------------------------------------
 dist: vi.zip
 
-vi.zip: vicp52.cmd vicp100.cmd vicpbios.cmd vid1bios.com vid2bios.com
+vi.zip: vicp52.cmd vicp100.cmd vicpbios.cmd vid1bios.com vid2bios.exe
 	rm -f vi.zip
-	zip vi.zip vicp52.cmd vicp100.cmd vicpbios.cmd vid1bios.com vid2bios.com
+	zip vi.zip vicp52.cmd vicp100.cmd vicpbios.cmd vid1bios.com vid2bios.exe
 
 # --------------------------------------------------------------------
 # Utility
@@ -211,7 +219,7 @@ vi.zip: vicp52.cmd vicp100.cmd vicpbios.cmd vid1bios.com vid2bios.com
 clean:
 	$(RM) cpmtest.img *.o gitver.h \
 	vicp52.cmd vicp100.cmd vicpbios.cmd \
-	vid1bios.com vid2bios.com \
+	vid1bios.com vid2bios.com vid2bios.exe \
 	vi.zip
 
 test: cpm86test
@@ -293,6 +301,10 @@ main.o: save.h
 .PHONY: test-editor-state
 test-editor-state:
 	python3 test/test_editor_state.py
+
+.PHONY: test-buffer-runtime
+test-buffer-runtime:
+	python3 test/test_buffer_runtime.py
 
 .PHONY: test-yank-runtime test-yank-pce
 test-yank-runtime:

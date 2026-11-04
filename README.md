@@ -47,7 +47,7 @@ emulator, no ANSI.SYS required.
 | `vicp100.cmd`   | ANSI / VT-100 escape sequences (CP/M-86) | `-D__CPM86__ -D__VTCMD__ -D__VT100__` |
 | `vicpbios.cmd`  | Direct PC BIOS, CP/M-86 `.cmd` binary    | `-D__CPM86__ -D__PCBIOS__` |
 | `vid1bios.com`  | Direct PC BIOS, PC-DOS 1.1 `.com` binary | `-D__PCDOS__=11 -D__PCBIOS__` |
-| `vid2bios.com`  | Direct PC BIOS, PC-DOS 2.0 `.com` binary | `-D__PCDOS__=20 -D__PCBIOS__` |
+| `vid2bios.exe`  | Direct PC BIOS, PC-DOS 2.0 `.exe` binary | `-D__PCDOS__=20 -D__PCBIOS__` |
 
 ---
 
@@ -61,11 +61,11 @@ and **cpmtools** (`cpmcp`, `cpmrm`, `cpmls`) for CP/M-86 disk image
 management (DOS 1.1 images use `mtools`' `mcopy`/`mdir` instead).
 
 ```sh
-# Build all four variants
+# Build all five variants
 make
 
 # Build and package as a zip for distribution
-make dist          # produces vi-bin.zip
+make dist          # produces vi.zip
 
 # Copy CP/M-86 binaries to a CP/M-86 test disk image
 make cpmtest.img
@@ -77,6 +77,10 @@ make dostest.img
 make cpm86test
 ```
 
+The CP/M test disk includes the three `.CMD` builds and the DOS 2 `.EXE`
+for DOS Plus. The DOS test disk includes both DOS builds; DOS 1 is also
+installed there as `VI.COM`.
+
 Each build embeds the current `git describe` output (or `unknown` outside a
 git checkout) as the version shown by the `:v` command; see `gitver.h`
 (generated, not checked in) and `viversion()` in `window.c`.
@@ -85,6 +89,9 @@ git checkout) as the version shown by the `:v` command; see `gitver.h`
 
 Run `make test-editor-state` with a host C compiler (`cc`, or `CC_HOST`)
 supporting AddressSanitizer and UndefinedBehaviorSanitizer. These tests cover
+both the 32,000-byte and DOS 1 24,000-byte buffer configurations, including
+exact-limit reads, oversized-read rollback, and full-buffer delete/undo.
+They also cover
 failed saves retaining the modified flag, failed `:r` leaving the buffer
 unchanged, single-character replacements marking it modified, and repeat
 searches retaining a valid pattern. They do not require an emulator.
@@ -111,12 +118,16 @@ mode) prompts for two digits without temporarily modifying the file.
 Undo/repeat replays the recorded bytes without adding another EOF newline.
 
 Yanked/deleted lines use a separate fixed 32 KiB memory segment, not the
-near C heap. The editing buffer remains 24,000 bytes; a full-buffer yank
-therefore no longer needs a second near-heap allocation. All builds remain
-small model. Segment reservation is platform-specific:
+near C heap. The editing buffer holds 32,000 bytes on CP/M-86 and DOS 2,
+and 24,000 bytes on DOS 1. A full-buffer yank therefore no longer needs a
+second near-heap allocation. All builds remain small model. DOS 1 retains
+its `.COM` layout; DOS 2 uses `.EXE` with separate code and data segments
+to make room for the larger buffer. Segment reservation is platform-specific:
 
 - CP/M-86: `pcdev_cmdmod` adds a zero-image EXTRA group after linking,
   reserving 32 KiB at load time without adding 32 KiB to the executable.
+  The DATA group requests a minimum of 60 KiB (61,440 bytes), up to 65,536 bytes,
+  for near data, heap and stack; the editing buffer remains 32,000 bytes.
 - DOS 1.x: use process-owned memory above the entire 64 KiB near data
   segment, after checking the PSP's memory ceiling; no DOS 2 calls.
 - DOS 2.x: allocate 2,048 paragraphs with INT 21h/AH=48h and release
@@ -127,6 +138,17 @@ disk or near-heap fallback. Failed yank/paste operations preserve text,
 cursor and undo/repeat state; a failed yank also preserves the previous
 yank. Paste preflights editing-buffer capacity and copies bytes in bulk,
 including embedded NULs and an unterminated final line.
+Bulk paste can fill the editing buffer exactly, including when undo
+restores a full-file deletion. Character insertion still reserves a byte.
+
+`make test-buffer-runtime` builds the four 32,000-byte variants with a test
+entry point and runs them under `emu2`, without scripted keyboard input. It checks
+full-buffer loading, yank/delete/undo, rejected growth, and byte-exact saving,
+while holding an additional 8 KiB heap allocation. DOS 1 retains its
+24,000-byte limit and is covered by the host tests; the instrumented native
+entry point would itself consume too much of its shared `.COM` segment.
+The CP/M checks also verify the DATA header limits and repeat with allocation
+capped at the 60 KiB minimum, holding an additional 2 KiB heap allocation.
 
 `make test-yank-runtime` tests the real 8086 adapters under `emu2`, including
 all 32 KiB and rejection of missing/undersized CP/M EXTRA groups.
@@ -331,7 +353,7 @@ so the two builds share the same escape-parsing code in `edit.c`.
 | `vicp52.cmd`               | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | ✅(1) |
 | `vicp100.cmd`              | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | ✅(1) |
 | `vid1bios.com`             | — | — | ✅ | ✅ | ✅ | ✅ | ✅| ✅(2)|
-| `vid2bios.com`             | — | — | — | ✅  | ✅ | — | ✅ | ✅(2) |
+| `vid2bios.exe`             | — | — | — | ✅  | ✅ | — | ✅ | ✅(2) |
 
 1. keyboard navigation keys need to be configured
 2. 25 lines terminal needed

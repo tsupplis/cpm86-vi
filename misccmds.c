@@ -153,8 +153,11 @@ void putline(int k)
      * preserve its missing newline, including when undo restores dd. */
     suffix = insertp < vi_file_end && savedlast != '\n';
     total = savednum + prefix + suffix;
-    if (!canincrease(total))
+    /* Bulk paste needs no spare byte for subsequent character insertion. */
+    if (total > vi_file_max - vi_file_end) {
+        message("Can't add anything, file is too big!");
         return;
+    }
     message("Inserting saved stuff...");
     tail = (unsigned)(vi_file_end - insertp);
     memmove(insertp + total, insertp, tail);

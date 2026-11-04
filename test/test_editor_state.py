@@ -260,6 +260,13 @@ static void check_read_limits(void) {
     assert(readfile("insert.txt", vi_file_mem, 1) != 0);
     assert(vi_file_end == vi_file_max);
     for(i=0; i<FILELENG; i++) assert(vi_file_mem[i] == 'x');
+    f = fopen("insert.txt", "wb"); assert(f);
+    for(i=0; i<=FILELENG; i++) assert(putc('x', f) != EOF);
+    assert(!fclose(f));
+    load("");
+    assert(readfile("insert.txt", vi_file_mem, 1) == -1);
+    expect("");
+    assert(!vi_changed && strstr(last_output, "File too long") != NULL);
     load("");
     seed("");
     command("r insert.txt\n"); expect("");
@@ -650,6 +657,34 @@ static void check_large_binary_put(void) {
     for(i=0; i<FILELENG-1; i++) assert(vi_file_mem[i]==(char)(i%251));
     assert(vi_curs_char==vi_file_mem);
 }
+static void check_full_buffer(void) {
+    int i;
+#if defined(__PCDOS__) && __PCDOS__ == 11
+    assert(FILELENG == 24000);
+#else
+    assert(FILELENG == 32000);
+#endif
+    load("");
+    memset(vi_file_mem, 'a', FILELENG);
+    vi_file_mem[FILELENG-1] = '\n';
+    vi_file_end = vi_file_max;
+    vi_renum = FILELENG; input = "y"; normal('y');
+    assert(savednum == FILELENG && !vi_changed);
+    vi_renum = FILELENG; input = "d"; normal('d');
+    assert(vi_file_end == vi_file_mem && vi_changed);
+    run_edit("u");
+    assert(vi_file_end == vi_file_max);
+    for(i=0; i<FILELENG-1; i++) assert(vi_file_mem[i] == 'a');
+    assert(vi_file_mem[FILELENG-1] == '\n');
+    vi_changed = 0;
+    vi_curs_char = vi_file_mem;
+    inschar('X');
+    assert(vi_file_end == vi_file_max && !vi_changed);
+    assert(vi_curs_char == vi_file_mem && vi_file_mem[0] == 'a');
+    normal('P');
+    assert(vi_file_end == vi_file_max && !vi_changed);
+    for(i=0; i<FILELENG-1; i++) assert(vi_file_mem[i] == 'a');
+}
 int main(int argc, char **argv) {
     assert(vi_yank_init());
     vi_file_mem = calloc(FILELENG, 1); assert(vi_file_mem);
@@ -679,6 +714,7 @@ int main(int argc, char **argv) {
     else if(!strcmp(argv[1], "yank-message-failure")) check_yank_message_failure();
     else if(!strcmp(argv[1], "put-failures")) check_put_failures();
     else if(!strcmp(argv[1], "large-binary-put")) check_large_binary_put();
+    else if(!strcmp(argv[1], "full-buffer")) check_full_buffer();
     else assert(0);
     clearlastmess();
     vi_yank_close();
@@ -729,28 +765,30 @@ def main():
                            '#define fclose test_fclose\n' + readfile +
                            '\n#undef getc\n#undef ferror\n#undef fclose\n' + CHECKS)
         binary = work / 'check'
-        subprocess.run([
-            os.environ.get('CC_HOST', 'cc'), '-std=c99', '-g',
-            '-fsanitize=address,undefined', '-I', str(ROOT), str(harness),
-            str(command_source), str(ROOT / 'normal.c'),
-            str(ROOT / 'linefunc.c'), str(ROOT / 'yankmem.c'),
-            str(ROOT / 'test/yankmock.c'), '-o', str(binary),
-        ], check=True)
         failed = []
-        for case in ('save', 'read', 'replace', 'search', 'insert-read',
-                     'read-limits', 'read-errors', 'word-eof', 'bulk-insert',
-                     'search-bounds', 'command-limits', 'delete-limits',
-                     'insert-limits', 'literal-limits', 'replay-limits',
-                     'file-insert-limits', 'long-messages', 'yank-failures',
-                     'yank-success', 'yank-message-failure',
-                     'put-failures', 'large-binary-put'):
-            try:
-                result = subprocess.run([str(binary), case], cwd=work, timeout=10)
-            except subprocess.TimeoutExpired:
-                failed.append(case + ' (timed out)')
-                continue
-            if result.returncode:
-                failed.append(case)
+        for profile, flags in (('32000', []), ('DOS1-24000', ['-D__PCDOS__=11'])):
+            subprocess.run([
+                os.environ.get('CC_HOST', 'cc'), '-std=c99', '-g',
+                '-fsanitize=address,undefined', *flags, '-I', str(ROOT), str(harness),
+                str(command_source), str(ROOT / 'normal.c'),
+                str(ROOT / 'linefunc.c'), str(ROOT / 'yankmem.c'),
+                str(ROOT / 'test/yankmock.c'), '-o', str(binary),
+            ], check=True)
+            for case in ('save', 'read', 'replace', 'search', 'insert-read',
+                         'read-limits', 'read-errors', 'word-eof', 'bulk-insert',
+                         'search-bounds', 'command-limits', 'delete-limits',
+                         'insert-limits', 'literal-limits', 'replay-limits',
+                         'file-insert-limits', 'long-messages', 'yank-failures',
+                         'yank-success', 'yank-message-failure',
+                         'put-failures', 'large-binary-put', 'full-buffer'):
+                try:
+                    result = subprocess.run([str(binary), case], cwd=work, timeout=10)
+                except subprocess.TimeoutExpired:
+                    failed.append(profile + ': ' + case + ' (timed out)')
+                    continue
+                if result.returncode:
+                    failed.append(profile + ': ' + case)
+            print('EDITOR STATE PROFILE:', profile, flush=True)
         if failed:
             raise SystemExit('Failed: ' + ', '.join(failed))
 

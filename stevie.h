@@ -10,7 +10,11 @@
 /*#define UNIXPC	1	/* The AT&T UNIX PC (console) */
 #define TCAP 1 /* For termcap-based terminals */
 
+#if defined(__PCDOS__) && __PCDOS__ == 11
 #define FILELENG 24000
+#else
+#define FILELENG 32000
+#endif
 #define CMDSIZE 1024
 #define UNDO_LIMIT (CMDSIZE - 3)
 #define NORMAL 0
