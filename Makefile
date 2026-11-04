@@ -272,3 +272,7 @@ test-save-runtime:
 test-save-pce:
 	python3 test/test_save_pce.py
 main.o: save.h
+
+.PHONY: test-editor-state
+test-editor-state:
+	python3 test/test_editor_state.py

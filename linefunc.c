@@ -118,14 +118,16 @@ static int lastdir;
 
 static char *ssearch(int dir, char *str) /* dir: FORWARD or BACKWARD */
 {
+    char *saved = strsave(str);
+
     if (laststr != NULL)
         free(laststr);
-    laststr = strsave(str);
+    laststr = saved;
     lastdir = dir;
     if (dir == BACKWARD)
-        return (bcksearch(str));
+        return (bcksearch(laststr));
     else
-        return (fwdsearch(str));
+        return (fwdsearch(laststr));
 }
 
 void dosearch(int dir, char *str)

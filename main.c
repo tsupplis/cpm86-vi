@@ -357,7 +357,8 @@ int readfile(char *fname, char *fromp, int nochangename) /* if 1, don't change t
 
     remaining=vi_binary ? vi_file_length(fname) : -1L;
     if ((f = fopen(fname, "r")) == NULL) {
-        vi_file_end = vi_file_mem;
+        if (nochangename)
+            message("Unable to open file for reading!");
         return (1);
     }
 

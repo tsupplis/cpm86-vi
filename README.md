@@ -80,6 +80,13 @@ Each build embeds the current `git describe` output (or `unknown` outside a
 git checkout) as the version shown by the `:v` command; see `gitver.h`
 (generated, not checked in) and `viversion()` in `window.c`.
 
+### Host regression tests
+
+Run `make test-editor-state` with a host C compiler (`cc`, or `CC_HOST`)
+supporting AddressSanitizer and UndefinedBehaviorSanitizer. These tests cover
+failed saves retaining the modified flag, failed `:r` leaving the buffer
+unchanged, single-character replacements marking it modified, and repeat
+searches retaining a valid pattern. They do not require an emulator.
 
 ## Command Reference
 

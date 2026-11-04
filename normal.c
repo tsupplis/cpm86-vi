@@ -329,6 +329,7 @@ void normal(int c)
         }
         /* Save stuff necessary to redo it */
         addtobuff(vi_redo_buff, 'r', nchar, 0, 0, 0, 0);
+        CHANGED;
         updatescreen();
         break;
     case 'p':

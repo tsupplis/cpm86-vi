@@ -118,7 +118,6 @@ void readcmdline(int firstc) /* either ':', '/', or '?' */
         if (strcmp(cmd, "w") == 0) {
             if (arg == NULL) {
                 writeit(vi_file_name);
-                UNCHANGED;
             } else
                 writeit(arg);
             return;
@@ -223,7 +222,8 @@ void readcmdline(int firstc) /* either ':', '/', or '?' */
         /* find the beginning of the next line and */
         /* read file in there */
         pp = nextline(vi_curs_char);
-        readfile(arg, pp, 1);
+        if (readfile(arg, pp, 1))
+            return;
         updatescreen();
         CHANGED;
         return;
