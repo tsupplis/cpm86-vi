@@ -17,34 +17,53 @@ PROBE = r'''
 #define REQUIRE(x) if (!(x)) { \
     fprintf(stderr, "VI BUFFER FAIL: line %d\n", __LINE__); return 1; }
 
-static int expected(int i) {
+extern void vi_test_donormal(int c);
+static int pattern_mode;
+
+static int expected(unsigned i) {
+    if (pattern_mode == 1)
+        return '\n';
+    if (pattern_mode == 2)
+        return i % 251U;
     return i % 64 == 63 ? '\n' : 'a' + i % 23;
 }
 
 static int contents(void) {
-    int i;
+    unsigned i;
     if (vi_file_end != vi_file_max)
         return 0;
     for (i = 0; i < FILELENG; i++)
-        if (vi_file_mem[i] != expected(i))
+        if ((unsigned char)vi_file_mem[i] != expected(i))
             return 0;
     return 1;
 }
 
 int main(int argc, char **argv) {
     char *spare;
+    char expected_undo[16];
     FILE *report;
-    int i, spare_size;
+    unsigned i;
+    int spare_size, minimum = 0;
 
-    REQUIRE(argc == 1 || (argc == 2 && !strcmp(argv[1], "MINIMUM")));
-    spare_size = argc == 1 ? 8192 : 2048;
+    for (i = 1; i < (unsigned)argc; i++) {
+        if (!strcmp(argv[i], "MINIMUM"))
+            minimum = 1;
+        else if (!strcmp(argv[i], "LINES"))
+            pattern_mode = 1;
+        else if (!strcmp(argv[i], "BINARY"))
+            pattern_mode = 2;
+        else
+            REQUIRE(0);
+    }
+    spare_size = minimum ? 2048 : 8192;
 #if defined(__PCDOS__) && __PCDOS__ == 11
     spare_size = 1024;
     REQUIRE(FILELENG == 24000);
 #else
-    REQUIRE(FILELENG == 32000);
+    REQUIRE(FILELENG == 40064U);
 #endif
     REQUIRE(vi_yank_init());
+    REQUIRE(vi_yank_capacity() == FILELENG);
     windinit();
     hexchars();
     vi_file_name = strsave("INPUT.TXT");
@@ -75,14 +94,29 @@ int main(int argc, char **argv) {
     REQUIRE(!strcmp(vi_redo_buff, "65535dd"));
     normal('u');
     while (anyinput())
-        normal(vgetc());
+        vi_test_donormal(vgetc());
     REQUIRE(contents());
-    vi_curs_char = vi_file_mem;
-    normal('~');
-    REQUIRE(vi_file_mem[0] == 'A' && !strcmp(vi_redo_buff, "65535~"));
-    vi_curs_char = vi_file_mem;
-    normal('~');
-    REQUIRE(contents());
+    if (pattern_mode == 1) {
+        sprintf(expected_undo, "%udd", FILELENG);
+        REQUIRE(!strcmp(vi_undo_buff, expected_undo));
+        normal('u');
+        while (anyinput())
+            vi_test_donormal(vgetc());
+        REQUIRE(vi_file_end == vi_file_mem);
+        normal('u');
+        while (anyinput())
+            vi_test_donormal(vgetc());
+        REQUIRE(contents());
+    }
+    if (pattern_mode == 0) {
+        vi_renum = VI_COUNT_MAX;
+        vi_curs_char = vi_file_mem;
+        normal('~');
+        REQUIRE(vi_file_mem[0] == 'A' && !strcmp(vi_redo_buff, "65535~"));
+        vi_curs_char = vi_file_mem;
+        normal('~');
+        REQUIRE(contents());
+    }
     vi_changed = 0;
     vi_curs_char = vi_file_mem;
     inschar('X');
@@ -92,6 +126,11 @@ int main(int argc, char **argv) {
     REQUIRE(readfile("INPUT.TXT", vi_file_mem, 1) == -1);
     REQUIRE(contents() && !vi_changed);
     REQUIRE(vi_save_file("OUTPUT.TXT", vi_file_mem, vi_file_end, 1) == NULL);
+    vi_file_end = vi_top_char = vi_curs_char = vi_file_mem;
+    REQUIRE(readfile("OVER.TXT", vi_file_mem, 1) == -1);
+    REQUIRE(vi_file_end == vi_file_mem && !vi_changed);
+    REQUIRE(readfile("OUTPUT.TXT", vi_file_mem, 1) == 0);
+    REQUIRE(contents());
     for (i = 0; i < spare_size; i++)
         REQUIRE(spare[i] == 'Z');
     free(spare);
@@ -100,7 +139,7 @@ int main(int argc, char **argv) {
     vi_yank_close();
     report = fopen("RESULT.TXT", "w");
     REQUIRE(report != NULL);
-    REQUIRE(fprintf(report, "VI BUFFER PASS: %d bytes; %d bytes spare heap\n",
+    REQUIRE(fprintf(report, "VI BUFFER PASS: %u bytes; %d bytes spare heap\n",
                     FILELENG, spare_size) >= 0);
     REQUIRE(fclose(report) == 0);
     return 0;
@@ -137,6 +176,9 @@ def main():
             end += 1
         (work / 'editor.c').write_text(source[:start] + source[end:])
         (work / 'main.c').write_text(PROBE)
+        edit = work / 'edit.c'
+        edit.write_text(edit.read_text() +
+                        '\nvoid vi_test_donormal(int c) { donormal(c); }\n')
         run(['make', *PROGRAMS], work)
         for program in PROGRAMS:
             allocations = [(None, 1024 if program == 'vid1bios.com' else 8192)]
@@ -152,23 +194,29 @@ def main():
                 if maximum is not None:
                     run(['pcdev_cmdmod', '-m', format(maximum, 'x'), program, '1'], work)
                     args.append('MINIMUM')
-                capacity = 24000 if program == 'vid1bios.com' else 32000
-                original = bytes(10 if i % 64 == 63 else 97 + i % 23
-                                 for i in range(capacity))
-                (work / 'INPUT.TXT').write_bytes(original)
-                result = run(args, work)
-                report = work / 'RESULT.TXT'
-                assert report.exists(), (program, maximum, result.stdout[-4000:])
-                expected = (f'VI BUFFER PASS: {capacity} bytes; '
-                            f'{spare} bytes spare heap').encode()
-                assert report.read_bytes().split(b'\x1a', 1)[0].strip() == expected, program
-                assert (work / 'OUTPUT.TXT').read_bytes() == original, program
-                report.unlink()
-                (work / 'OUTPUT.TXT').unlink()
-                allocation = f', DATA {maximum} bytes' if maximum is not None else ''
-                print('VI BUFFER RUNTIME PASS:', program,
-                      f'({capacity} bytes, {spare} bytes spare heap{allocation})',
-                      flush=True)
+                capacity = 24000 if program == 'vid1bios.com' else 40064
+                fixtures = (
+                    ([], bytes(10 if i % 64 == 63 else 97 + i % 23
+                               for i in range(capacity))),
+                    (['LINES'], b'\n' * capacity),
+                    (['BINARY'], bytes(i % 251 for i in range(capacity))),
+                )
+                (work / 'OVER.TXT').write_bytes(b'x' * (capacity + 1))
+                for flags, original in fixtures:
+                    (work / 'INPUT.TXT').write_bytes(original)
+                    result = run(args + flags, work)
+                    report = work / 'RESULT.TXT'
+                    assert report.exists(), (program, maximum, flags, result.stdout[-4000:])
+                    expected = (f'VI BUFFER PASS: {capacity} bytes; '
+                                f'{spare} bytes spare heap').encode()
+                    assert report.read_bytes().split(b'\x1a', 1)[0].strip() == expected, program
+                    assert (work / 'OUTPUT.TXT').read_bytes() == original, program
+                    report.unlink()
+                    (work / 'OUTPUT.TXT').unlink()
+                    allocation = f', DATA {maximum} bytes' if maximum is not None else ''
+                    print('VI BUFFER RUNTIME PASS:', program,
+                          f'({capacity} bytes, {spare} bytes spare heap{allocation}, '
+                          f'{flags[0] if flags else "TEXT"})', flush=True)
 
 
 if __name__ == '__main__':

@@ -89,7 +89,7 @@ git checkout) as the version shown by the `:v` command; see `gitver.h`
 
 Run `make test-editor-state` with a host C compiler (`cc`, or `CC_HOST`)
 supporting AddressSanitizer and UndefinedBehaviorSanitizer. These tests cover
-both the 32,000-byte and DOS 1 24,000-byte buffer configurations, including
+both the 40,064-byte and DOS 1 24,000-byte buffer configurations, including
 exact-limit reads, oversized-read rollback, and full-buffer delete/undo.
 They also cover
 failed saves retaining the modified flag, failed `:r` leaving the buffer
@@ -118,7 +118,7 @@ mode) prompts for two digits without temporarily modifying the file.
 Undo/repeat replays the recorded bytes without adding another EOF newline.
 
 Yanked/deleted lines and both screen images share an external memory segment,
-not the near C heap. The editing buffer holds 32,000 bytes on CP/M-86 and DOS 2,
+not the near C heap. The editing buffer holds 40,064 bytes on CP/M-86 and DOS 2,
 and 24,000 bytes on DOS 1. A full-buffer yank therefore no longer needs a
 second near-heap allocation. All builds remain small model. DOS 1 retains
 its `.COM` layout; DOS 2 uses `.EXE` with separate code and data segments
@@ -127,14 +127,14 @@ to make room for the larger buffer. Segment reservation is platform-specific:
 - CP/M-86: `pcdev_cmdmod` adds a zero-image EXTRA group after linking,
   reserving 64 KiB at load time without adding 64 KiB to the executable.
   The DATA group requests a minimum of 60 KiB (61,440 bytes), up to 65,536 bytes,
-  for near data, heap and stack; the editing buffer remains 32,000 bytes.
+  for near data, heap and stack; the editing buffer uses 40,064 bytes.
 - DOS 1.x: use process-owned memory above the entire 64 KiB near data
   segment, after checking the PSP's memory ceiling; no DOS 2 calls. The
   external reservation remains 32 KiB.
 - DOS 2.x: allocate 4,096 paragraphs (64 KiB) with INT 21h/AH=48h and release
   them with AH=49h on exit.
 
-The yank region is 32 KiB on CP/M-86 and DOS 2, and 24,000 bytes on DOS 1,
+The yank region is 40,064 bytes on CP/M-86 and DOS 2, and 24,000 bytes on DOS 1,
 where it still holds the entire editing buffer. Two 2,000-byte screen slots
 follow it. Rendering uses two 80-byte near row buffers instead of allocating
 two full screens on the near heap. This removes 3,840 bytes of screen heap
@@ -143,6 +143,12 @@ small bookkeeping, and additional code. Screens are limited to 80 columns
 and 25 rows; unsupported dimensions fail explicitly.
 DOS 1 also pays for the added code inside its shared `.COM` window, so its
 net near-memory gain is approximately 3 KiB rather than the full 4,000 bytes.
+
+The 40,064-byte limit is the first 128-byte CP/M record boundary above 40,000.
+This alignment lets a full binary buffer be saved and reopened without
+record padding exceeding the editing limit. Line deletion scans the selected
+range once and shifts the remaining tail once, including for files with
+tens of thousands of blank lines.
 
 Startup fails explicitly if the external segment is unavailable; there is no
 disk or near-heap fallback. Failed yank/paste operations preserve text,
@@ -154,7 +160,8 @@ restores a full-file deletion. Character insertion still reserves a byte.
 
 `make test-buffer-runtime` builds all five variants with a test
 entry point and runs them under `emu2`, without scripted keyboard input. It checks
-full-buffer loading, yank/delete/undo, rejected growth, and byte-exact saving,
+full-buffer loading, yank/delete/undo (including numeric replay), rejected
+growth, and byte-exact saving/reopening for text, all-newline and binary files,
 while holding an additional 8 KiB heap allocation (1 KiB on DOS 1).
 The CP/M checks also verify the DATA header limits and repeat with allocation
 capped at the 60 KiB minimum, holding an additional 2 KiB heap allocation.
@@ -172,7 +179,8 @@ clearing/diffing, and 500 frame/Botchar comparisons against the previous rendere
 under host sanitizers.
 
 `make test-capacity-runtime` checks unsigned byte spans, capacity rejection,
-EOF reservation and large tail copies at 32,000, 32,767, 32,768 and 40,000 bytes
+EOF reservation and large tail copies at 32,000, 32,767, 32,768, 40,000 and
+40,064 bytes
 under host sanitizers and all three native runtimes. Capacity checks now
 subtract converted near addresses rather than signed 16-bit pointer differences.
 Read/nonprintable counts and byte-position/save reports also use unsigned
@@ -193,9 +201,8 @@ directly because the native runtime's `strlen` stops below 32 KiB.
 `make test-yank-lengths` checks full-capacity binary yank/delete/paste roundtrips,
 separator/capacity rejection, failed-yank preservation, partial-load rollback
 over a large tail, and 40,000-byte insertion/deletion boundaries under host
-sanitizers and all three native runtimes. CP/M and DOS 2 additionally exercise
-40,000-byte yanks with test-only enlarged yank regions; DOS 1 retains its
-24,000-byte yank region.
+sanitizers and all three native runtimes. These tests use the production
+40,064-byte CP/M/DOS 2 yank regions and 24,000-byte DOS 1 yank region.
 
 Search bounds use unsigned byte spans. Command counts, linewise operations
 and their replay strings support counts through 65,535; larger numeric prefixes
@@ -205,14 +212,15 @@ Vertical movement uses the renderer's displayed widths, including expanded
 binary characters. `G` also reaches an unterminated final line.
 
 `make test-navigation-runtime` checks search wrapping/overlap, 32,767/32,768/
-40,000-byte and line boundaries, virtual columns above 65,535, and numeric
+40,000/40,064-byte and line boundaries, virtual columns above 65,535, and numeric
 prefix parsing on the host and all three native runtimes. Host editor tests
 add oversized-command cancellation, unsigned count replay and undo checks;
 the five production probes also verify count rejection and 65,535-count
 delete/toggle operations.
 
-Production editing and yank limits remain unchanged. These arithmetic tests
-use larger test-only buffers; they do not enable larger production files.
+Production editing and yank limits are 40,064 bytes on CP/M-86 and DOS 2,
+and 24,000 bytes on DOS 1. Standalone arithmetic tests also exercise larger
+test buffers on the DOS 1 runtime without increasing its production limit.
 
 Searches wrap within the file only, handle overlapping matches, and start
 after/before the cursor in the selected direction before wrapping.

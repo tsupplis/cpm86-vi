@@ -349,7 +349,7 @@ int delword(int deltrailing) /* 1 if trailing white space should be removed */
 
 void delline(unsigned nlines) {
     unsigned nchars;
-    char *p, *q;
+    char *p;
 
     /* If we're not at the beginning of the line, get there. */
     if (*vi_curs_char != '\n') {
@@ -364,19 +364,17 @@ void delline(unsigned nlines) {
         }
     }
     message("Deleting...");
-    while (nlines > 0) {
-        nlines--;
-        /* Count the characters in the line */
-        for (nchars = 0, p = vi_curs_char; p < vi_file_end && *p != '\n'; p++, nchars++)
-            ;
-        if (p < vi_file_end)
-            nchars++; /* Include a newline only when one actually exists. */
-        /* Delete the characters of the line */
-        /* by moving everything else in the file down. */
-        q = vi_curs_char;
-        p = vi_curs_char + nchars;
-        while (p < vi_file_end)
-            *q++ = *p++;
+    if (nlines > 0) {
+        p = vi_curs_char;
+        while (nlines > 0 && p < vi_file_end) {
+            while (p < vi_file_end && *p != '\n')
+                p++;
+            if (p < vi_file_end)
+                p++;
+            nlines--;
+        }
+        nchars = vi_byte_span(vi_curs_char, p);
+        memmove(vi_curs_char, p, vi_byte_span(p, vi_file_end));
         vi_file_end -= nchars;
         CHANGED;
 
@@ -384,8 +382,6 @@ void delline(unsigned nlines) {
         if (vi_curs_char >= vi_file_end) {
             if ((vi_curs_char = prevline(vi_curs_char)) == NULL)
                 vi_curs_char = vi_file_mem;
-            /* and don't try to delete any more lines */
-            break;
         }
     }
     message("");

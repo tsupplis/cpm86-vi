@@ -68,7 +68,7 @@ since been renamed (outside this pass) to `vi_`-prefixed
 in the `extern` block near the top of `stevie.h`.
 
 - **File buffer**: `vi_file_mem`/`vi_file_max`/`vi_file_end` — a single
-  fixed-size heap block (`FILELENG` = 32000 bytes, or 24000 on DOS 1) holding
+  fixed-size heap block (`FILELENG` = 40064 bytes, or 24000 on DOS 1) holding
   the whole file as raw bytes; `vi_file_end` is the current logical end,
   `vi_file_max` the allocated end. `vi_curs_char` points at the cursor's
   byte. There is no gap buffer — insert/delete shift the tail of the
@@ -77,7 +77,7 @@ in the `extern` block near the top of `stevie.h`.
   desired screen images follow the yank region. `nexttoscreen()` in
   `main.c` loads and compares rows through two 80-byte near buffers, so
   only changed cells are redrawn. CP/M-86 and DOS 2 reserve a 64 KiB
-  external segment with a 32 KiB yank region; DOS 1 retains a 32 KiB
+  external segment with a 40,064-byte yank region; DOS 1 retains a 32 KiB
   segment with a 24,000-byte yank region. No screen-image heap allocation
   remains. Maximum dimensions are 25 rows by 80 columns.
   `vi_top_char`/`vi_bot_char` bound the visible slice of the file buffer.
@@ -274,7 +274,7 @@ a gap buffer or index rebuild — significant redesign risk).
   in the function (a bare `#asm`-only body with no params/locals is
   treated as a leaf function with no frame) — already handled via a
   defensive `int dummy;` local in the 3 affected `window.c` functions.
-- **Fixed-size buffers**: `FILELENG` (32000 bytes, or 24000 on DOS 1) for the whole file,
+- **Fixed-size buffers**: `FILELENG` (40064 bytes, or 24000 on DOS 1) for the whole file,
   and 1024-byte `vi_undo_buff`/`vi_redo_buff`/`vi_ins_buff`/
   `vi_repl_buf` — all compile-time constants, not configurable, a
   direct consequence of the target's limited RAM.
