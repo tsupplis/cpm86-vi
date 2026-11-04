@@ -55,7 +55,7 @@ int main(int argc, char **argv) {
         else
             REQUIRE(0);
     }
-    spare_size = minimum ? 2048 : 8192;
+    spare_size = minimum ? 2048 : 4096;
 #if defined(__PCDOS__) && __PCDOS__ == 11
     spare_size = 1024;
     REQUIRE(FILELENG == 24000);
@@ -97,7 +97,7 @@ int main(int argc, char **argv) {
         vi_test_donormal(vgetc());
     REQUIRE(contents());
     if (pattern_mode == 1) {
-        sprintf(expected_undo, "%udd", FILELENG);
+        sprintf(expected_undo, "%udd", (unsigned)FILELENG);
         REQUIRE(!strcmp(vi_undo_buff, expected_undo));
         normal('u');
         while (anyinput())
@@ -140,7 +140,7 @@ int main(int argc, char **argv) {
     report = fopen("RESULT.TXT", "w");
     REQUIRE(report != NULL);
     REQUIRE(fprintf(report, "VI BUFFER PASS: %u bytes; %d bytes spare heap\n",
-                    FILELENG, spare_size) >= 0);
+                    (unsigned)FILELENG, spare_size) >= 0);
     REQUIRE(fclose(report) == 0);
     return 0;
 }
@@ -181,7 +181,7 @@ def main():
                         '\nvoid vi_test_donormal(int c) { donormal(c); }\n')
         run(['make', *PROGRAMS], work)
         for program in PROGRAMS:
-            allocations = [(None, 1024 if program == 'vid1bios.com' else 8192)]
+            allocations = [(None, 1024 if program == 'vid1bios.com' else 4096)]
             if program.endswith('.cmd'):
                 data = struct.unpack_from('<BHHHH', (work / program).read_bytes(), 9)
                 assert (data[0], data[3] * 16, data[4] * 16) == (2, 61440, 65536), program
@@ -209,7 +209,8 @@ def main():
                     assert report.exists(), (program, maximum, flags, result.stdout[-4000:])
                     expected = (f'VI BUFFER PASS: {capacity} bytes; '
                                 f'{spare} bytes spare heap').encode()
-                    assert report.read_bytes().split(b'\x1a', 1)[0].strip() == expected, program
+                    actual = report.read_bytes().split(b'\x1a', 1)[0].strip()
+                    assert actual == expected, (program, flags, actual, expected)
                     assert (work / 'OUTPUT.TXT').read_bytes() == original, program
                     report.unlink()
                     (work / 'OUTPUT.TXT').unlink()

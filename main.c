@@ -347,7 +347,7 @@ void screenclear(void) {
 static void filealloc(void) {
     if ((vi_file_mem = malloc((unsigned)FILELENG)) == NULL) {
         fprintf(stderr, "Unable to allocate %u bytes for file memory!\n",
-                FILELENG);
+                (unsigned)FILELENG);
         vi_key_exit();
         exit(1);
     }

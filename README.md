@@ -162,7 +162,7 @@ restores a full-file deletion. Character insertion still reserves a byte.
 entry point and runs them under `emu2`, without scripted keyboard input. It checks
 full-buffer loading, yank/delete/undo (including numeric replay), rejected
 growth, and byte-exact saving/reopening for text, all-newline and binary files,
-while holding an additional 8 KiB heap allocation (1 KiB on DOS 1).
+while holding an additional 4 KiB heap allocation (1 KiB on DOS 1).
 The CP/M checks also verify the DATA header limits and repeat with allocation
 capped at the 60 KiB minimum, holding an additional 2 KiB heap allocation.
 
