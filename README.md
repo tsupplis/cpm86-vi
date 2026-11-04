@@ -117,23 +117,34 @@ messages truncate long filenames safely. Hex-byte entry (`Ctrl-X` in insert
 mode) prompts for two digits without temporarily modifying the file.
 Undo/repeat replays the recorded bytes without adding another EOF newline.
 
-Yanked/deleted lines use a separate fixed 32 KiB memory segment, not the
-near C heap. The editing buffer holds 32,000 bytes on CP/M-86 and DOS 2,
+Yanked/deleted lines and both screen images share an external memory segment,
+not the near C heap. The editing buffer holds 32,000 bytes on CP/M-86 and DOS 2,
 and 24,000 bytes on DOS 1. A full-buffer yank therefore no longer needs a
 second near-heap allocation. All builds remain small model. DOS 1 retains
 its `.COM` layout; DOS 2 uses `.EXE` with separate code and data segments
 to make room for the larger buffer. Segment reservation is platform-specific:
 
 - CP/M-86: `pcdev_cmdmod` adds a zero-image EXTRA group after linking,
-  reserving 32 KiB at load time without adding 32 KiB to the executable.
+  reserving 64 KiB at load time without adding 64 KiB to the executable.
   The DATA group requests a minimum of 60 KiB (61,440 bytes), up to 65,536 bytes,
   for near data, heap and stack; the editing buffer remains 32,000 bytes.
 - DOS 1.x: use process-owned memory above the entire 64 KiB near data
-  segment, after checking the PSP's memory ceiling; no DOS 2 calls.
-- DOS 2.x: allocate 2,048 paragraphs with INT 21h/AH=48h and release
+  segment, after checking the PSP's memory ceiling; no DOS 2 calls. The
+  external reservation remains 32 KiB.
+- DOS 2.x: allocate 4,096 paragraphs (64 KiB) with INT 21h/AH=48h and release
   them with AH=49h on exit.
 
-Startup fails explicitly if the yank segment is unavailable; there is no
+The yank region is 32 KiB on CP/M-86 and DOS 2, and 24,000 bytes on DOS 1,
+where it still holds the entire editing buffer. Two 2,000-byte screen slots
+follow it. Rendering uses two 80-byte near row buffers instead of allocating
+two full screens on the near heap. This removes 3,840 bytes of screen heap
+allocations on CP/M-86 and 4,000 bytes on DOS, at the cost of the row buffers,
+small bookkeeping, and additional code. Screens are limited to 80 columns
+and 25 rows; unsupported dimensions fail explicitly.
+DOS 1 also pays for the added code inside its shared `.COM` window, so its
+net near-memory gain is approximately 3 KiB rather than the full 4,000 bytes.
+
+Startup fails explicitly if the external segment is unavailable; there is no
 disk or near-heap fallback. Failed yank/paste operations preserve text,
 cursor and undo/repeat state; a failed yank also preserves the previous
 yank. Paste preflights editing-buffer capacity and copies bytes in bulk,
@@ -141,21 +152,24 @@ including embedded NULs and an unterminated final line.
 Bulk paste can fill the editing buffer exactly, including when undo
 restores a full-file deletion. Character insertion still reserves a byte.
 
-`make test-buffer-runtime` builds the four 32,000-byte variants with a test
+`make test-buffer-runtime` builds all five variants with a test
 entry point and runs them under `emu2`, without scripted keyboard input. It checks
 full-buffer loading, yank/delete/undo, rejected growth, and byte-exact saving,
-while holding an additional 8 KiB heap allocation. DOS 1 retains its
-24,000-byte limit and is covered by the host tests; the instrumented native
-entry point would itself consume too much of its shared `.COM` segment.
+while holding an additional 8 KiB heap allocation (1 KiB on DOS 1).
 The CP/M checks also verify the DATA header limits and repeat with allocation
 capped at the 60 KiB minimum, holding an additional 2 KiB heap allocation.
 
 `make test-yank-runtime` tests the real 8086 adapters under `emu2`, including
-all 32 KiB and rejection of missing/undersized CP/M EXTRA groups.
+the full platform-specific yank capacity, both screen regions, their bounds
+and independence, and rejection of missing/undersized CP/M EXTRA groups.
 `make test-yank-pce` additionally boots private image copies for DOS 1.1,
 DOS Plus (both CMD and DOS EXE), Concurrent CP/M and Concurrent DOS.
 It requires PCE, mtools/cpmtools and the same local kernel fixtures as the
 save-runtime tests.
+
+`make test-scroll` checks scrolling, paging, status-row protection, screen
+clearing/diffing, and 500 frame/Botchar comparisons against the previous renderer
+under host sanitizers.
 
 Searches wrap within the file only, handle overlapping matches, and start
 after/before the cursor in the selected direction before wrapping.

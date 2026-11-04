@@ -15,13 +15,13 @@ static void filetonext(void);
 static void nexttoscreen(void);
 static void filealloc(void);
 static void screenalloc(void);
+static void screenerror(void);
 
 int vi_rows;    /* Number of Rows and Columns */
 int vi_columns; /* in the current window. */
 
-char *vi_real_scr; /* What's currently on the screen, a single */
-                  /* array of size Rows*Columns. */
-char *vi_next_scr; /* What's to be put on the screen. */
+static char screen_line[VI_SCREEN_MAX_COLUMNS];
+static char screen_previous[VI_SCREEN_MAX_COLUMNS];
 
 char *vi_file_name = NULL; /* Current file name */
 
@@ -116,12 +116,12 @@ int main(int argc, char **argv)
     }
 
     if (!vi_yank_init()) {
-        fputs("Unable to reserve 32 KiB yank memory!\n", stderr);
+        fputs("Unable to reserve external yank/screen memory!\n", stderr);
         return 1;
     }
     if (atexit(vi_yank_close) != 0) {
         vi_yank_close();
-        fputs("Unable to register yank memory cleanup!\n", stderr);
+        fputs("Unable to register external memory cleanup!\n", stderr);
         return 1;
     }
 
@@ -195,11 +195,9 @@ int main(int argc, char **argv)
 
 static void filetonext(void) {
     int row, col;
-    char *screenp = vi_next_scr;
+    unsigned position = 0, endscreen;
     char *memp = vi_top_char;
     char *lastmemp = vi_top_char;
-    char *endscreen;
-    char *nextrow;
     char extra[16];
     int nextra = 0;
     int c;
@@ -207,10 +205,10 @@ static void filetonext(void) {
 
     /* The number of rows shown is Rows-1. */
     /* The last line is the status/command line. */
-    endscreen = &screenp[(vi_rows - 1) * vi_columns];
+    endscreen = (vi_rows - 1) * vi_columns;
 
     row = col = 0;
-    while (screenp < endscreen && (memp < vi_file_end || nextra > 0)) {
+    while (position < endscreen && (memp < vi_file_end || nextra > 0)) {
 
         /* Get the next character to put on the screen. */
 
@@ -239,12 +237,13 @@ static void filetonext(void) {
         }
 
         if (c == '\n') {
+            if (col < vi_columns) {
+                memset(screen_line + col, ' ', (unsigned)(vi_columns - col));
+                if (!vi_screen_store(VI_SCREEN_NEXT, row, screen_line))
+                    screenerror();
+            }
             row++;
-            /* get pointer to start of next row */
-            nextrow = &vi_next_scr[row * vi_columns];
-            /* blank out the rest of this row */
-            while (screenp != nextrow)
-                *screenp++ = ' ';
+            position = row * vi_columns;
             col = 0;
             continue;
         }
@@ -253,26 +252,38 @@ static void filetonext(void) {
             row++;
             col = 0;
         }
-        *screenp++ = c;
+        screen_line[col] = c;
+        position++;
         col++;
+        if (col == vi_columns &&
+            !vi_screen_store(VI_SCREEN_NEXT, row, screen_line))
+            screenerror();
     }
     /* If we stopped before finishing the current file character,
      * Botchar is where that character began, else memp. */
-    if (screenp >= endscreen && nextra > 0)
+    if (position >= endscreen && nextra > 0)
         vi_bot_char = lastmemp;
     else
         vi_bot_char = memp;
 
-    /* make sure the rest of the screen is blank */
-    while (screenp < endscreen)
-        *screenp++ = ' ';
-    /* put '~'s on rows that aren't part of the file. */
-    if (col != 0)
+    if (col != 0) {
+        if (col < vi_columns) {
+            memset(screen_line + col, ' ', (unsigned)(vi_columns - col));
+            if (!vi_screen_store(VI_SCREEN_NEXT, row, screen_line))
+                screenerror();
+        }
         row++;
-    else if (vi_file_end == vi_file_mem && vi_state == INSERT)
+    } else if (vi_file_end == vi_file_mem && vi_state == INSERT) {
+        memset(screen_line, ' ', (unsigned)vi_columns);
+        if (!vi_screen_store(VI_SCREEN_NEXT, 0, screen_line))
+            screenerror();
         row = 1;
+    }
+    memset(screen_line, ' ', (unsigned)vi_columns);
+    screen_line[0] = '~';
     while (row < vi_rows - 1) {
-        vi_next_scr[row * vi_columns] = '~';
+        if (!vi_screen_store(VI_SCREEN_NEXT, row, screen_line))
+            screenerror();
         row++;
     }
 }
@@ -285,37 +296,32 @@ static void filetonext(void) {
  */
 
 static void nexttoscreen(void) {
-    char *np = vi_next_scr;
-    char *rp = vi_real_scr;
-    char *endscreen;
     char nc;
-    int row = 0, col = 0;
+    int row, col, changed;
     int gorow = -1, gocol = -1;
 
-    endscreen = &np[(vi_rows - 1) * vi_columns];
-
-    for (; np < endscreen; np++, rp++) {
-        /* If desired screen (contents of Nextscreen) does not */
-        /* match what's really there, put it there. */
-        if ((nc = (*np)) != (*rp)) {
-            *rp = nc;
-            /* if we are positioned at the right place, */
-            /* we don't have to use windgoto(). */
-            if (!(gorow == row && gocol == col))
-                windgoto(gorow = row, gocol = col);
-            if (nc == '~' && col == 0) {
-                windcolor(2);
-                windputc(nc);
-                windcolorreset();
-            } else {
-                windputc(nc);
+    for (row = 0; row < vi_rows - 1; row++) {
+        if (!vi_screen_load(VI_SCREEN_NEXT, row, screen_line) ||
+            !vi_screen_load(VI_SCREEN_REAL, row, screen_previous))
+            screenerror();
+        changed = 0;
+        for (col = 0; col < vi_columns; col++) {
+            if ((nc = screen_line[col]) != screen_previous[col]) {
+                changed = 1;
+                if (!(gorow == row && gocol == col))
+                    windgoto(gorow = row, gocol = col);
+                if (nc == '~' && col == 0) {
+                    windcolor(2);
+                    windputc(nc);
+                    windcolorreset();
+                } else {
+                    windputc(nc);
+                }
+                gocol++;
             }
-            gocol++;
         }
-        if (++col >= vi_columns) {
-            col = 0;
-            row++;
-        }
+        if (changed && !vi_screen_store(VI_SCREEN_REAL, row, screen_line))
+            screenerror();
     }
     windrefresh();
 }
@@ -326,13 +332,14 @@ void updatescreen(void) {
 }
 
 void screenclear(void) {
-    int n;
+    int row;
 
     windclear();
-    /* blank out the stored screens */
-    for (n = vi_rows * vi_columns - 1; n >= 0; n--) {
-        vi_real_scr[n] = ' ';
-        vi_next_scr[n] = ' ';
+    memset(screen_line, ' ', (unsigned)vi_columns);
+    for (row = 0; row < vi_rows; row++) {
+        if (!vi_screen_store(VI_SCREEN_REAL, row, screen_line) ||
+            !vi_screen_store(VI_SCREEN_NEXT, row, screen_line))
+            screenerror();
     }
 }
 
@@ -347,8 +354,14 @@ static void filealloc(void) {
 }
 
 static void screenalloc(void) {
-    vi_real_scr = malloc((unsigned)(vi_rows * vi_columns));
-    vi_next_scr = malloc((unsigned)(vi_rows * vi_columns));
+    if (!vi_screen_configure((unsigned)vi_rows, (unsigned)vi_columns))
+        screenerror();
+}
+
+static void screenerror(void) {
+    fputs("Unable to access external screen memory!\n", stderr);
+    vi_key_exit();
+    exit(1);
 }
 
 /* Return 1 for an open failure, -1 for a rolled-back read, or 0 on success. */

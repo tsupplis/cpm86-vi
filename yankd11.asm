@@ -31,6 +31,12 @@ yd1_done:
     ret
 vi_yseg_init_ endp
 
+    public vi_yseg_capacity_
+vi_yseg_capacity_ proc near
+    mov ax,24000
+    ret
+vi_yseg_capacity_ endp
+
     public vi_yseg_free_
 vi_yseg_free_ proc near
     ; DOS 1 owns the whole process block; the near heap ends below this area.

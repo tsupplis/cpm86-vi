@@ -96,7 +96,7 @@ static int test_fclose(FILE *f) {
     return fail_close ? EOF : result;
 }
 static int fail_yank_store, fail_yank_load, fail_message_alloc;
-extern unsigned char test_yank_memory[VI_YANK_CAPACITY];
+extern unsigned char test_yank_memory[];
 static int test_yank_store(const char *source, unsigned length) {
     return fail_yank_store ? 0 : vi_yank_store(source, length);
 }

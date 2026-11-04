@@ -42,8 +42,6 @@ extern struct charinfo chars[];
 extern int vi_state;
 extern int vi_rows;
 extern int vi_columns;
-extern char *vi_real_scr;
-extern char *vi_next_scr;
 extern char *vi_file_name;
 extern char *vi_file_mem;
 extern char *vi_file_max;

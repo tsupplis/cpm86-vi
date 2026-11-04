@@ -40,14 +40,14 @@ vicp52.cmd: $(SHARED_OBJS) yankcp.o cmdline.o savecp.o edtcp52.o wincp52.o keycp
 	printf '%s\n' '-o $@ $(filter %.o,$^)' > $(basename $@).lnk
 	$(LD) -f $(basename $@).lnk $(CPM86_LDFLAGS)
 	$(CMDMOD) -t DATA -n f000 -m 10000 $@ 1
-	$(CMDMOD) -t EXTRA -n 8000 -m 8000 $@ 2
+	$(CMDMOD) -t EXTRA -n 10000 -m 10000 $@ 2
 	$(RM) $(basename $@).lnk
 
 vicp100.cmd: $(SHARED_OBJS) yankcp.o cmdline.o savecp.o edtcp100.o wincp100.o keycp.o keyos.o os.o
 	printf '%s\n' '-o $@ $(filter %.o,$^)' > $(basename $@).lnk
 	$(LD) -f $(basename $@).lnk $(CPM86_LDFLAGS)
 	$(CMDMOD) -t DATA -n f000 -m 10000 $@ 1
-	$(CMDMOD) -t EXTRA -n 8000 -m 8000 $@ 2
+	$(CMDMOD) -t EXTRA -n 10000 -m 10000 $@ 2
 	$(RM) $(basename $@).lnk
 
 vid1bios.com: $(filter-out main.o,$(SHARED_OBJS)) maind1.o yankd11.o cmddos.o savedos.o edtd1bio.o wind1bio.o keydos.o
@@ -66,7 +66,7 @@ vicpbios.cmd: $(SHARED_OBJS) yankcp.o cmdline.o savecp.o edtcpbio.o wincpbio.o k
 	printf '%s\n' '-o $@ $(filter %.o,$^)' > $(basename $@).lnk
 	$(LD) -f $(basename $@).lnk $(CPM86_LDFLAGS)
 	$(CMDMOD) -t DATA -n f000 -m 10000 $@ 1
-	$(CMDMOD) -t EXTRA -n 8000 -m 8000 $@ 2
+	$(CMDMOD) -t EXTRA -n 10000 -m 10000 $@ 2
 	$(RM) $(basename $@).lnk
 
 vicp52.cmd vicp100.cmd vicpbios.cmd: Makefile
@@ -275,7 +275,7 @@ test-keys:
 
 .PHONY: test-scroll
 test-scroll:
-	python3 testscroll.py
+	python3 test/test_scroll.py
 
 # Save policy must match the linked runtime; never share the CP/M command object.
 cmddos.o: cmdline.c save.h

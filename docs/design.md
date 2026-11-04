@@ -73,9 +73,13 @@ in the `extern` block near the top of `stevie.h`.
   `vi_file_max` the allocated end. `vi_curs_char` points at the cursor's
   byte. There is no gap buffer — insert/delete shift the tail of the
   buffer up/down a byte at a time (see Efficiency Findings Log).
-- **Screen buffers**: `vi_real_scr` (what's on-screen) and `vi_next_scr`
-  (what should be on-screen), each `vi_rows*vi_columns` bytes, diffed by
-  `nexttoscreen()` in `main.c` so only changed cells are redrawn.
+- **Screen buffers**: two external 2,000-byte slots for the current and
+  desired screen images follow the yank region. `nexttoscreen()` in
+  `main.c` loads and compares rows through two 80-byte near buffers, so
+  only changed cells are redrawn. CP/M-86 and DOS 2 reserve a 64 KiB
+  external segment with a 32 KiB yank region; DOS 1 retains a 32 KiB
+  segment with a 24,000-byte yank region. No screen-image heap allocation
+  remains. Maximum dimensions are 25 rows by 80 columns.
   `vi_top_char`/`vi_bot_char` bound the visible slice of the file buffer.
 - **Editor state**: `vi_state` (one of `NORMAL`/`INSERT`/`APPEND`/
   `REPLACE`/... from `stevie.h`), `vi_renum` (pending numeric count

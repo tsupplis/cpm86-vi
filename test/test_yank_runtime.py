@@ -47,8 +47,14 @@ def main():
                     assert 'VI YANK INIT REJECTED' in rejected.stdout
                     run(['pcdev_cmdmod', '-t', 'EXTRA', '-n', '8000',
                          '-m', '8000', output, '2'], work)
+                    rejected = run(['emu2', output, 'REJECT'], work)
+                    assert 'VI YANK INIT REJECTED' in rejected.stdout
+                    run(['pcdev_cmdmod', '-t', 'EXTRA', '-n', '10000',
+                         '-m', '10000', output, '2'], work)
                 result = run(['emu2', output], work)
                 assert 'VI YANK PASS: 0 failures' in result.stdout, result.stdout
+                capacity = 24000 if library == 'd11' else 32768
+                assert f'VI YANK CAPACITY: {capacity}' in result.stdout, result.stdout
                 print('VI YANK RUNTIME PASS:', library)
                 if os.environ.get('YANK_TEST_OUTPUT'):
                     destination = Path(os.environ['YANK_TEST_OUTPUT'])

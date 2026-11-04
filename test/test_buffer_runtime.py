@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Exercise the larger editor buffer and heap budget in native builds."""
+"""Exercise external screens, full editor buffers and heap budget in native builds."""
 from pathlib import Path
 import os
 import shutil
@@ -9,7 +9,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 PROGRAMS = ('vicp52.cmd', 'vicp100.cmd', 'vicpbios.cmd',
-            'vid2bios.exe')
+            'vid1bios.com', 'vid2bios.exe')
 
 PROBE = r'''
 #include "editor.c"
@@ -38,13 +38,17 @@ int main(int argc, char **argv) {
 
     REQUIRE(argc == 1 || (argc == 2 && !strcmp(argv[1], "MINIMUM")));
     spare_size = argc == 1 ? 8192 : 2048;
+#if defined(__PCDOS__) && __PCDOS__ == 11
+    spare_size = 1024;
+    REQUIRE(FILELENG == 24000);
+#else
     REQUIRE(FILELENG == 32000);
+#endif
     REQUIRE(vi_yank_init());
     windinit();
     hexchars();
     vi_file_name = strsave("INPUT.TXT");
     screenalloc();
-    REQUIRE(vi_real_scr != NULL && vi_next_scr != NULL);
     filealloc();
     spare = malloc((unsigned)spare_size);
     REQUIRE(spare != NULL);
@@ -120,17 +124,20 @@ def main():
         (work / 'main.c').write_text(PROBE)
         run(['make', *PROGRAMS], work)
         for program in PROGRAMS:
-            allocations = [(None, 8192)]
+            allocations = [(None, 1024 if program == 'vid1bios.com' else 8192)]
             if program.endswith('.cmd'):
                 data = struct.unpack_from('<BHHHH', (work / program).read_bytes(), 9)
                 assert (data[0], data[3] * 16, data[4] * 16) == (2, 61440, 65536), program
+                extra = struct.unpack_from('<BHHHH', (work / program).read_bytes(), 18)
+                assert (extra[0], extra[1], extra[3] * 16, extra[4] * 16) == (
+                    3, 0, 65536, 65536), program
                 allocations.append((61440, 2048))
             for maximum, spare in allocations:
                 args = [os.environ.get('EMU2', 'emu2'), program]
                 if maximum is not None:
                     run(['pcdev_cmdmod', '-m', format(maximum, 'x'), program, '1'], work)
                     args.append('MINIMUM')
-                capacity = 32000
+                capacity = 24000 if program == 'vid1bios.com' else 32000
                 original = bytes(10 if i % 64 == 63 else 97 + i % 23
                                  for i in range(capacity))
                 (work / 'INPUT.TXT').write_bytes(original)

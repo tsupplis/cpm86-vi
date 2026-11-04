@@ -5,7 +5,7 @@ import os
 import re
 import subprocess
 import tempfile
-root=Path(__file__).resolve().parent
+root=Path(__file__).resolve().parents[1]
 
 def function(filename, signature):
     text=(root/filename).read_text(); start=re.search(re.escape(signature)+r'\s*\{',text).start()
@@ -19,25 +19,112 @@ source=r'''
 #include <stdlib.h>
 #include <string.h>
 #include "stevie.h"
+#include "yankmem.h"
 struct charinfo chars[256];
 int vi_state=NORMAL, vi_rows=6, vi_columns=10;
 int vi_curs_row, vi_curs_col, vi_curs_vcol;
 char *vi_file_mem, *vi_file_end, *vi_top_char, *vi_bot_char, *vi_curs_char;
-char *vi_next_scr;
-static char file[4096], screen[256];
+static char screen_line[VI_SCREEN_MAX_COLUMNS], screen_previous[VI_SCREEN_MAX_COLUMNS];
+static char file[4096], screen[VI_SCREEN_IMAGE_SIZE], reference_screen[VI_SCREEN_IMAGE_SIZE];
+static char displayed[VI_SCREEN_IMAGE_SIZE];
 static char displays[256][17];
-static int renders;
+static int renders, terminal_position, writes;
 static void check(int ok, char *why) { if (!ok) { fprintf(stderr,"FAIL: %s\n",why); exit(1); } }
+static void screenerror(void) { check(0,"external screen storage"); }
+void windgoto(int r, int c) {
+    check(r>=0 && r<vi_rows-1 && c>=0 && c<vi_columns,"terminal cursor bounds");
+    terminal_position=r*vi_columns+c;
+}
+void windputc(int c) {
+    check(terminal_position<(vi_rows-1)*vi_columns,"no terminal writes in status row");
+    displayed[terminal_position++]=(char)c;
+    writes++;
+}
+void windclear(void) { memset(displayed,' ',sizeof displayed); }
+void windcolor(int color) { check(color==2,"tilde color"); }
+void windcolorreset(void) {}
+void windrefresh(void) {}
+static void readscreen(unsigned image, char *destination) {
+    int row;
+    for(row=0; row<vi_rows; row++)
+        check(vi_screen_load(image,row,destination+row*vi_columns),"read screen image");
+}
+static void reset_display(void) {
+    int row;
+    check(vi_screen_configure(vi_rows,vi_columns),"configure screen");
+    memset(screen_line,'Z',sizeof screen_line);
+    for(row=0; row<vi_rows; row++) {
+        check(vi_screen_store(VI_SCREEN_REAL,row,screen_line),"seed real screen");
+        check(vi_screen_store(VI_SCREEN_NEXT,row,screen_line),"seed next screen");
+    }
+    memset(displayed,'Z',sizeof displayed);
+    writes=0;
+}
 static void guard(void) {
     int i;
+    readscreen(VI_SCREEN_NEXT,screen);
     check(vi_curs_row>=0 && vi_curs_row<vi_rows-1,"cursor stays in document viewport");
     check(vi_curs_col>=0 && vi_curs_col<vi_columns,"cursor column in range");
     for(i=(vi_rows-1)*vi_columns;i<vi_rows*vi_columns;i++)
         check(screen[i]=='Z',"renderer leaves status row untouched");
 }
+/* Frozen pre-segmentation renderer, used as the behavioral reference. */
+static void reference(char *image, char **bottom) {
+    int row=0, col=0, nextra=0, c, n;
+    char *screenp=image, *memp=vi_top_char, *lastmemp=memp;
+    char *endscreen=image+(vi_rows-1)*vi_columns, *nextrow, extra[16], *p;
+    while(screenp<endscreen && (memp<vi_file_end || nextra>0)) {
+        if(nextra>0) c=extra[--nextra];
+        else {
+            lastmemp=memp;
+            c=(unsigned char)*memp++;
+            if((n=chars[c].ch_size)>1) {
+                p=chars[c].ch_str;
+                while(n>1) extra[nextra++]=p[--n];
+                c=p[0];
+            }
+        }
+        if(c=='\n') {
+            row++;
+            nextrow=image+row*vi_columns;
+            while(screenp!=nextrow) *screenp++=' ';
+            col=0;
+            continue;
+        }
+        if(col>=vi_columns) { row++; col=0; }
+        *screenp++=c;
+        col++;
+    }
+    *bottom=screenp>=endscreen && nextra>0 ? lastmemp : memp;
+    while(screenp<endscreen) *screenp++=' ';
+    if(col!=0) row++;
+    else if(vi_file_end==vi_file_mem && vi_state==INSERT) row=1;
+    while(row<vi_rows-1) image[row++*vi_columns]='~';
+}
 '''
 source+=function('main.c','static void filetonext(void)')
-source+='void updatescreen(void) { renders++; filetonext(); }\n'
+source+=function('main.c','static void nexttoscreen(void)')
+source+=function('main.c','void screenclear(void)')
+source+=r'''
+void updatescreen(void) {
+    char *bottom;
+    int previous_writes, size=vi_rows*vi_columns;
+    renders++;
+    readscreen(VI_SCREEN_NEXT,reference_screen);
+    reference(reference_screen,&bottom);
+    filetonext();
+    readscreen(VI_SCREEN_NEXT,screen);
+    check(!memcmp(screen,reference_screen,size),"renderer matches original frame");
+    check(vi_bot_char==bottom,"renderer matches original Botchar");
+    nexttoscreen();
+    check(!memcmp(displayed,screen,size),"terminal matches desired frame");
+    readscreen(VI_SCREEN_REAL,reference_screen);
+    check(!memcmp(screen,reference_screen,size),"real image tracks terminal");
+    previous_writes=writes;
+    nexttoscreen();
+    check(writes==previous_writes,"unchanged screen emits no characters");
+}
+'''
 for signature in ['static void cursor_position(void)','static char *next_screen_row(char *p)','void cursupdate(void)']:
     source+=function('edit.c',signature)
 for signature in ['char *nextline(char *curr)','char *prevline(char *curr)','char *coladvance(char *p, int col)']:
@@ -46,13 +133,15 @@ source+=function('edit.c','int oneup(int n)')+function('edit.c','int onedown(int
 source+=r'''
 static void load(char *text) {
     strcpy(file,text); vi_file_mem=file; vi_file_end=file+strlen(file);
-    vi_top_char=vi_curs_char=file; vi_next_scr=screen;
-    memset(screen,'Z',sizeof(screen)); renders=0;
+    vi_top_char=vi_curs_char=file;
+    reset_display(); renders=0;
     cursupdate(); updatescreen(); guard();
 }
 int main(void) {
     int i, j;
     char lines[1024];
+    unsigned random=17;
+    check(vi_yank_init(),"reserve external segment");
     for(i=0;i<256;i++) {
         displays[i][0]=(char)i; displays[i][1]=0;
         chars[i].ch_size=1; chars[i].ch_str=displays[i];
@@ -91,12 +180,42 @@ int main(void) {
     vi_state=INSERT;
     load(""); guard();
     load("1234567890\nx\n"); vi_curs_char=vi_file_end; cursupdate(); updatescreen(); guard();
-    puts("PASS: symmetric scrolling, paging, wrapped/blank/long lines, EOF and status-row guards");
+    for(i=0;i<500;i++) {
+        int length, top, k;
+        random=random*1664525U+1013904223U;
+        vi_columns=1+random%80;
+        random=random*1664525U+1013904223U;
+        vi_rows=3+random%23;
+        random=random*1664525U+1013904223U;
+        length=random%sizeof(file);
+        for(j=0;j<length;j++) {
+            random=random*1664525U+1013904223U;
+            k=random%20;
+            file[j]=k==0?'\n':k==1?'\t':k==2?1:'a'+k;
+        }
+        top=length?random%length:0;
+        vi_file_mem=file; vi_file_end=file+length;
+        vi_top_char=vi_curs_char=file+top;
+        vi_state=i%2?INSERT:NORMAL;
+        vi_curs_row=vi_curs_col=0;
+        reset_display();
+        updatescreen(); guard();
+    }
+    check(vi_yank_store("keep",4),"seed yank");
+    screenclear();
+    readscreen(VI_SCREEN_NEXT,screen);
+    readscreen(VI_SCREEN_REAL,reference_screen);
+    for(i=0;i<vi_rows*vi_columns;i++)
+        check(screen[i]==' ' && reference_screen[i]==' ' && displayed[i]==' ',"clear both screens");
+    check(vi_yank_load(0,screen_line,4) && !memcmp(screen_line,"keep",4),"clear preserves yank");
+    vi_yank_close();
+    puts("PASS: scrolling, paging, 500 renderer parity cases, screen diff/clear and status-row guards");
     return 0;
 }
 '''
 with tempfile.TemporaryDirectory(prefix='vi-scroll-') as folder:
     work=Path(folder); (work/'scroll.c').write_text(source)
     subprocess.run([os.environ.get('CC_HOST','cc'),'-std=gnu89','-Wno-comment','-fsanitize=address,undefined',
-                    '-I'+str(root),str(work/'scroll.c'),'-o',str(work/'scroll')],check=True)
+                    '-I'+str(root),str(work/'scroll.c'),str(root/'yankmem.c'),
+                    str(root/'test/yankmock.c'),'-o',str(work/'scroll')],check=True)
     subprocess.run([str(work/'scroll')],check=True)
