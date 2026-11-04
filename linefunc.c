@@ -18,6 +18,13 @@ unsigned vi_byte_span(const char *first, const char *last)
     return (unsigned)((unsigned long)last - (unsigned long)first);
 }
 
+unsigned long vi_count_digit(unsigned long count, unsigned digit)
+{
+    if (count > (VI_COUNT_MAX - digit) / 10U)
+        return VI_COUNT_MAX + 1UL;
+    return count * 10UL + digit;
+}
+
 /*
  * nextline(curr)
  *
@@ -77,29 +84,20 @@ char *prevline(char *curr)
  * Try to advance to the specified column, starting at p.
  */
 
-char *coladvance(char *p, int col)
+char *coladvance(char *p, unsigned long col)
 {
-    int c, inc;
+    char *start = p;
+    unsigned width;
 
-    /* If we're on a blank ('\n' only) line, we can't do anything */
-    if (*p == '\n')
-        return (p);
-    /* try to advance to the specified column */
-    for (c = 0; col-- > 0; c++) {
-        /* Count a tab for what it's worth */
-        if (*p == '\t') {
-            inc = (7 - c % 8);
-            col -= inc;
-            c += inc;
-        }
-        p++;
-        /* Don't go past the end of */
-        /* the file or the line. */
-        if (p == vi_file_end || *p == '\n') {
-            p--;
+    while (p < vi_file_end && *p != '\n' && col > 0) {
+        width = chars[(unsigned char)*p].ch_size;
+        if (col < width)
             break;
-        }
+        col -= width;
+        p++;
     }
+    if (p > start && (p == vi_file_end || *p == '\n'))
+        p--;
     return (p);
 }
 
@@ -169,10 +167,10 @@ void repsearch(void) {
 
 static char *fwdsearch(char *str)
 {
-    int leng = strlen(str);
+    unsigned leng = strlen(str);
     char *p, *last;
 
-    if (leng == 0 || leng > vi_file_end - vi_file_mem)
+    if (leng == 0 || leng > vi_byte_span(vi_file_mem, vi_file_end))
         return NULL;
     last = vi_file_end - leng;
     p = vi_curs_char < vi_file_end ? vi_curs_char + 1 : vi_file_end;
@@ -187,10 +185,10 @@ static char *fwdsearch(char *str)
 
 static char *bcksearch(char *str)
 {
-    int leng = strlen(str);
+    unsigned leng = strlen(str);
     char *p, *last;
 
-    if (leng == 0 || leng > vi_file_end - vi_file_mem)
+    if (leng == 0 || leng > vi_byte_span(vi_file_mem, vi_file_end))
         return NULL;
     last = vi_file_end - leng;
     p = vi_curs_char > last ? last + 1 : vi_curs_char;

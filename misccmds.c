@@ -36,9 +36,9 @@ int issepchar(int c)
     return (0);
 }
 
-int cntlines(char *pbegin, char *pend)
+unsigned long cntlines(char *pbegin, char *pend)
 {
-    int lnum = 1;
+    unsigned long lnum = 1;
     char *p;
 
     for (p = pbegin; p < pend;) {
@@ -51,23 +51,19 @@ int cntlines(char *pbegin, char *pend)
 void fileinfo(void) {
     char buff[128];
 
-    snprintf(buff, sizeof buff, "\"%s\"%s line %d of %d", vi_file_name,
+    snprintf(buff, sizeof buff, "\"%s\"%s line %lu of %lu", vi_file_name,
             vi_changed ? " [Modified]" : "", cntlines(vi_file_mem, vi_curs_char),
             cntlines(vi_file_mem, vi_file_end) - 1);
     message(buff);
 }
 
-void gotoline(int n)
+void gotoline(unsigned n)
 {
     char *p;
 
-    /* n==0 means "last line": use the same descent logic as the
-     * numbered case, with the actual line count as the target. */
-    if (n == 0)
-        n = cntlines(vi_file_mem, vi_file_end) - 1;
-    /* Start at the top of the file and go down 'n'-1 lines */
+    /* Zero descends to EOF, including an unterminated final line. */
     vi_curs_char = vi_file_mem;
-    while (--n > 0) {
+    while (n == 0 || --n > 0) {
         if ((p = nextline(vi_curs_char)) == NULL)
             break;
         vi_curs_char = p;
@@ -82,7 +78,7 @@ void gotoline(int n)
 }
 
 static unsigned savednum = 0;
-static int savedcount = 0;
+static unsigned savedcount = 0;
 static int savedlast = 0;
 
 /*
@@ -91,11 +87,13 @@ static int savedlast = 0;
  * Save a copy of the current line(s) for later 'p'lacing.
  */
 
-int yankline(int n) {
+int yankline(unsigned n) {
     char *savep, *start, *p;
     unsigned leng;
-    int count = 0;
+    unsigned count = 0;
 
+    if (n == 0)
+        n = 1;
     savep = vi_curs_char;
     /* go to the beginning of the current line. */
     beginline();
@@ -104,7 +102,7 @@ int yankline(int n) {
     for (p = vi_curs_char; p < vi_file_end; ) {
         if (*p++ == '\n') {
             count++;
-            if (--n <= 0)
+            if (--n == 0)
                 break;
         }
     }
@@ -179,7 +177,7 @@ void putline(int k)
     CHANGED;
     resetundo();
     vi_uncurs_char = vi_curs_char;
-    sprintf(vi_undo_buff, "%ddd", savedcount);
+    sprintf(vi_undo_buff, "%udd", savedcount);
     sprintf(vi_redo_buff, "%s", k == 0 ? "p" : "P");
     message("");
     updatescreen();
@@ -349,7 +347,7 @@ int delword(int deltrailing) /* 1 if trailing white space should be removed */
     return 1;
 }
 
-void delline(int nlines) {
+void delline(unsigned nlines) {
     unsigned nchars;
     char *p, *q;
 
@@ -366,7 +364,8 @@ void delline(int nlines) {
         }
     }
     message("Deleting...");
-    while (nlines-- > 0) {
+    while (nlines > 0) {
+        nlines--;
         /* Count the characters in the line */
         for (nchars = 0, p = vi_curs_char; p < vi_file_end && *p != '\n'; p++, nchars++)
             ;

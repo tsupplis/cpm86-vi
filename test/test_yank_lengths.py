@@ -21,8 +21,8 @@ HARNESS = r'''
 char *vi_file_mem, *vi_file_end, *vi_file_max, *vi_curs_char, *vi_uncurs_char;
 char vi_undo_buff[CMDSIZE], vi_redo_buff[CMDSIZE];
 int vi_changed, vi_undo_changed, vi_undel_chars;
-static unsigned savednum;
-static int savedcount, savedlast;
+static unsigned savednum, savedcount;
+static int savedlast;
 static int failures, messages, screens, fail_load;
 void message(char *s) { (void)s; messages++; }
 void updatescreen(void) { screens++; }
@@ -48,7 +48,7 @@ int vi_yank_load(unsigned offset, char *destination, unsigned length) {
 
 CHECKS = r'''
 static void state(unsigned length) {
-    vi_file_max = vi_file_mem + 40010U;
+    vi_file_max = vi_file_mem + VI_YANK_CAPACITY + 10U;
     vi_file_end = vi_file_mem + length;
     vi_curs_char = vi_file_mem;
     vi_uncurs_char = vi_file_mem + 1;
@@ -199,12 +199,10 @@ static void large_copies(void) {
 static void line_counts(void) {
     unsigned size = vi_yank_capacity();
     char expected[16];
-    if (size > 32767U)
-        size = 32767U;
     memset(vi_file_mem, '\n', size);
     state(size);
-    CHECK(yankline(32767));
-    CHECK(savednum == size && savedcount == (int)size);
+    CHECK(yankline(VI_COUNT_MAX));
+    CHECK(savednum == size && savedcount == size);
     state(0);
     putline(1);
     sprintf(expected, "%udd", size);
@@ -212,9 +210,9 @@ static void line_counts(void) {
     CHECK(!strcmp(vi_undo_buff, expected));
 }
 int main(void) {
-    static unsigned sizes[] = {24000U, 32767U, 32768U, 40000U};
+    static unsigned sizes[] = {24000U, 32767U, 32768U, 40000U, VI_YANK_CAPACITY};
     unsigned j;
-    vi_file_mem = malloc(40011U);
+    vi_file_mem = malloc(VI_YANK_CAPACITY + 11U);
     if (!vi_file_mem || !vi_yank_init()) {
         puts("VI YANK LENGTH ALLOCATION FAILED");
         return 1;
@@ -261,9 +259,7 @@ def main():
                      'yankcp.asm', 'yankd11.asm', 'yankd20.asm'):
             shutil.copyfile(ROOT / name, work / name)
         (work / 'length.c').write_text(source + CHECKS)
-        mock = (ROOT / 'test/yankmock.c').read_text()
-        (work / 'mock.c').write_text(mock.replace('return VI_YANK_CAPACITY;',
-                                                 'return 40000U;'))
+        shutil.copyfile(ROOT / 'test/yankmock.c', work / 'mock.c')
         run([os.environ.get('CC_HOST', 'cc'), '-std=c99', '-g',
              '-fsanitize=address,undefined', '-I.', 'length.c', 'mock.c',
              '-o', 'length-host'], work)
@@ -275,27 +271,20 @@ def main():
         for library, adapter, extension in (
                 ('c86', 'yankcp', 'cmd'), ('d11', 'yankd11', 'com'),
                 ('c', 'yankd20', 'exe')):
-            for expanded in (False, True) if library != 'd11' else (False,):
-                assembly = (ROOT / (adapter + '.asm')).read_text()
-                if expanded:
-                    # Only CP/M/DOS 2 have 64 KiB reserved in production.
-                    assert assembly.count('mov ax,8000h') == 1
-                    assembly = assembly.replace('mov ax,8000h', 'mov ax,40000')
-                (work / (adapter + '.asm')).write_text(assembly)
-                run(['aztec42_as', adapter + '.asm'], work)
-                program = 'length.' + extension
-                run(['aztec42_link', '-o', program, 'length.o', 'yankcopy.o',
-                     adapter + '.o', '-l' + library], work)
-                if extension == 'cmd':
-                    run(['pcdev_cmdmod', '-t', 'EXTRA', '-n', '10000',
-                         '-m', '10000', program, '2'], work)
-                result = run([os.environ.get('EMU2', 'emu2'), program], work)
-                assert 'VI YANK LENGTH PASS: 0 failures' in result.stdout, result.stdout
-                capacity = 40000 if expanded else 24000 if library == 'd11' else 32768
-                assert f'YANK CAPACITY: {capacity}' in result.stdout, result.stdout
-                assert f'YANK ROUNDTRIP: {capacity}' in result.stdout, result.stdout
-                print('YANK LENGTH PASS:', library, f'({capacity}-byte yank)',
-                      flush=True)
+            run(['aztec42_as', adapter + '.asm'], work)
+            program = 'length.' + extension
+            run(['aztec42_link', '-o', program, 'length.o', 'yankcopy.o',
+                 adapter + '.o', '-l' + library], work)
+            if extension == 'cmd':
+                run(['pcdev_cmdmod', '-t', 'EXTRA', '-n', '10000',
+                     '-m', '10000', program, '2'], work)
+            result = run([os.environ.get('EMU2', 'emu2'), program], work)
+            assert 'VI YANK LENGTH PASS: 0 failures' in result.stdout, result.stdout
+            capacity = 24000 if library == 'd11' else 40064
+            assert f'YANK CAPACITY: {capacity}' in result.stdout, result.stdout
+            assert f'YANK ROUNDTRIP: {capacity}' in result.stdout, result.stdout
+            print('YANK LENGTH PASS:', library, f'({capacity}-byte yank)',
+                  flush=True)
 
 
 if __name__ == '__main__':

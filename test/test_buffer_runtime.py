@@ -60,13 +60,28 @@ int main(int argc, char **argv) {
     REQUIRE(contents());
 
     REQUIRE(yankline(FILELENG));
-    vi_renum = FILELENG;
+    vi_changed = 0;
+    strcpy(vi_undo_buff, "rZ");
+    strcpy(vi_redo_buff, "rX");
+    vi_renum = VI_COUNT_MAX + 1UL;
+    REQUIRE(stuffin("d"));
+    normal('d');
+    REQUIRE(contents() && !vi_changed && !anyinput());
+    REQUIRE(!strcmp(vi_undo_buff, "rZ") && !strcmp(vi_redo_buff, "rX"));
+    vi_renum = VI_COUNT_MAX;
     REQUIRE(stuffin("d"));
     normal('d');
     REQUIRE(vi_file_end == vi_file_mem);
+    REQUIRE(!strcmp(vi_redo_buff, "65535dd"));
     normal('u');
     while (anyinput())
         normal(vgetc());
+    REQUIRE(contents());
+    vi_curs_char = vi_file_mem;
+    normal('~');
+    REQUIRE(vi_file_mem[0] == 'A' && !strcmp(vi_redo_buff, "65535~"));
+    vi_curs_char = vi_file_mem;
+    normal('~');
     REQUIRE(contents());
     vi_changed = 0;
     vi_curs_char = vi_file_mem;

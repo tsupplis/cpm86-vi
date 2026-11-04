@@ -43,9 +43,10 @@ char *vi_bot_char; /* Pointer to the byte in Filemem which is */
 char *vi_curs_char; /* Pointer to byte in Filemem at which the */
                 /* cursor is currently placed. */
 
-int vi_curs_row, vi_curs_col; /* Current position of cursor */
+unsigned long vi_curs_row;
+int vi_curs_col; /* Current position of cursor */
 
-int vi_curs_vcol; /* Current virtual column, the column number of */
+unsigned long vi_curs_vcol; /* Current virtual column, the column number of */
               /* the file's actual line, as opposed to the */
               /* column number we're at on the screen.  This */
               /* makes a difference on lines that span more */
@@ -54,7 +55,7 @@ int vi_curs_vcol; /* Current virtual column, the column number of */
 int vi_state = NORMAL; /* This is the current state of the command */
                     /* interpreter. */
 
-int vi_renum = 0; /* The (optional) number before a command. */
+unsigned long vi_renum = 0; /* VI_COUNT_MAX + 1 marks an overflowing prefix. */
 
 char *vi_ins_start; /* This is where the latest insert/append */
                 /* mode started. */
@@ -345,7 +346,7 @@ void screenclear(void) {
 
 static void filealloc(void) {
     if ((vi_file_mem = malloc((unsigned)FILELENG)) == NULL) {
-        fprintf(stderr, "Unable to allocate %d bytes for file memory!\n",
+        fprintf(stderr, "Unable to allocate %u bytes for file memory!\n",
                 FILELENG);
         vi_key_exit();
         exit(1);

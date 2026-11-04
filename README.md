@@ -197,10 +197,22 @@ sanitizers and all three native runtimes. CP/M and DOS 2 additionally exercise
 40,000-byte yanks with test-only enlarged yank regions; DOS 1 retains its
 24,000-byte yank region.
 
-Production editing and yank limits remain unchanged. Command/line counts
-(including yank's line count) remain signed and bounded by the current command
-count interface. Search/navigation and command-count arithmetic still need
-their audit before larger files are supported.
+Search bounds use unsigned byte spans. Command counts, linewise operations
+and their replay strings support counts through 65,535; larger numeric prefixes
+and `:N` addresses are rejected explicitly rather than wrapping. Line reports,
+temporary screen-row counts and virtual columns use wider arithmetic.
+Vertical movement uses the renderer's displayed widths, including expanded
+binary characters. `G` also reaches an unterminated final line.
+
+`make test-navigation-runtime` checks search wrapping/overlap, 32,767/32,768/
+40,000-byte and line boundaries, virtual columns above 65,535, and numeric
+prefix parsing on the host and all three native runtimes. Host editor tests
+add oversized-command cancellation, unsigned count replay and undo checks;
+the five production probes also verify count rejection and 65,535-count
+delete/toggle operations.
+
+Production editing and yank limits remain unchanged. These arithmetic tests
+use larger test-only buffers; they do not enable larger production files.
 
 Searches wrap within the file only, handle overlapping matches, and start
 after/before the cursor in the selected direction before wrapping.

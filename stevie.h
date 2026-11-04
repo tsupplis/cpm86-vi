@@ -11,12 +11,13 @@
 #define TCAP 1 /* For termcap-based terminals */
 
 #if defined(__PCDOS__) && __PCDOS__ == 11
-#define FILELENG 24000
+#define FILELENG 24000U
 #else
-#define FILELENG 32000
+#define FILELENG 40064U
 #endif
 #define CMDSIZE 1024
 #define UNDO_LIMIT (CMDSIZE - 3)
+#define VI_COUNT_MAX 65535U
 #define NORMAL 0
 #define CMDLINE 1
 #define INSERT 2
@@ -50,8 +51,9 @@ extern char *vi_top_char;
 extern char *vi_bot_char;
 extern char *vi_curs_char;
 extern char *vi_ins_start;
-extern int vi_curs_row, vi_curs_col, vi_curs_vcol;
-extern int vi_renum;
+extern int vi_curs_col;
+extern unsigned long vi_curs_row, vi_curs_vcol;
+extern unsigned long vi_renum;
 extern int vi_debug;
 extern int vi_changed;
 extern int vi_undo_changed;
@@ -71,9 +73,10 @@ void filemess(char *s);
 
 /* linefunc.c */
 unsigned vi_byte_span(const char *first, const char *last);
+unsigned long vi_count_digit(unsigned long count, unsigned digit);
 char *nextline(char *curr);
 char *prevline(char *curr);
-char *coladvance(char *p, int col);
+char *coladvance(char *p, unsigned long col);
 char *strsave(char *string);
 void dosearch(int dir, char *str);
 void repsearch(void);
@@ -81,17 +84,17 @@ void repsearch(void);
 /* misccmds.c */
 void opencmd(void);
 int issepchar(int c);
-int cntlines(char *pbegin, char *pend);
+unsigned long cntlines(char *pbegin, char *pend);
 void fileinfo(void);
-void gotoline(int n);
-int yankline(int n);
+void gotoline(unsigned n);
+int yankline(unsigned n);
 void putline(int k);
 void inschar(int c);
 void insstr(char *s);
 void delchar(void);
 int deleol(void);
 int delword(int deltrailing);
-void delline(int nlines);
+void delline(unsigned nlines);
 
 /* normal.c */
 void normal(int c);
@@ -122,8 +125,8 @@ void cursupdate(void);
 int oneright(void);
 int oneleft(void);
 void beginline(void);
-int oneup(int n);
-int onedown(int n);
+int oneup(unsigned n);
+int onedown(unsigned n);
 
 /* window.c */
 char *viversion(void);

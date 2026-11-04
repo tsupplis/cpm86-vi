@@ -28,6 +28,7 @@ HARNESS = r'''
 #include "stevie.h"
 #include "yankmem.h"
 
+struct charinfo chars[256];
 static const char *input;
 static int quit_calls, reject_save;
 static char last_output[256];
@@ -61,15 +62,17 @@ void beginline(void) {
 }
 int oneright(void) { assert(0); return 0; }
 int oneleft(void) { assert(0); return 0; }
-int oneup(int n) { assert(0); return 0; }
-int onedown(int n) { assert(0); return 0; }
+int oneup(unsigned n) { assert(0); return 0; }
+int onedown(unsigned n) { assert(0); return 0; }
 int issepchar(int c) { return strchr(WORDSEP, c) != NULL; }
-int cntlines(char *a, char *b) {
-    int n = 1;
+unsigned long cntlines(char *a, char *b) {
+    unsigned long n = 1;
     while(a < b) if(*a++ == '\n') n++;
     return n;
 }
-void gotoline(int n) {}
+static unsigned goto_count;
+static int goto_calls;
+void gotoline(unsigned n) { goto_count = n; goto_calls++; }
 void octchars(void) {}
 void hexchars(void) {}
 void decchars(void) {}
@@ -431,6 +434,49 @@ static void run_edit(const char *s) {
     if(!setjmp(input_done)) edit();
     editing=0;
 }
+static void check_count_limits(void) {
+    static const char *rejected[] = {
+        "65536dd", "65536cw", "65536yy", "65536>>", "65536<<",
+        "65536rZ", "65536~", "9999999999999999999999999999999999999999dd",
+        "65536:q!\n", "65536/abc\n", "65536?abc\n"
+    };
+    unsigned i;
+    int calls, quits = quit_calls;
+    for(i=0; i<sizeof rejected/sizeof rejected[0]; i++) {
+        load("abc\n");
+        strcpy(vi_undo_buff, "rZ"); strcpy(vi_redo_buff, "rX");
+        vi_uncurs_char=vi_file_mem;
+        run_edit(rejected[i]);
+        expect("abc\n");
+        assert(!vi_changed && vi_state==NORMAL && vi_renum==0);
+        assert(!strcmp(vi_undo_buff, "rZ") && !strcmp(vi_redo_buff, "rX"));
+        assert(strstr(last_output, "count too large") && quit_calls==quits);
+    }
+    load("abc\n"); run_edit("65536ddx"); expect("bc\n");
+    load("abc\n"); run_edit("65536/abc\nx"); expect("bc\n");
+    load("abc\n");
+    command("65535\n"); assert(goto_count==65535U);
+    command("00040000\n"); assert(goto_count==40000U);
+    calls=goto_calls;
+    command("65536\n"); assert(goto_calls==calls);
+    command("99999999999999999999999999999\n"); assert(goto_calls==calls);
+    assert(strstr(last_output, "count too large"));
+    run_edit("65535dd"); expect("");
+    assert(!strcmp(vi_redo_buff, "65535dd"));
+    run_edit("u"); expect("abc\n");
+    free(vi_file_mem);
+    vi_file_mem=malloc(40001U); assert(vi_file_mem);
+    memset(vi_file_mem, 'a', 40000U);
+    vi_file_end=vi_file_mem+40000U; vi_file_max=vi_file_end+1;
+    vi_top_char=vi_curs_char=vi_file_mem;
+    resetundo();
+    run_edit("40000~");
+    assert(!strcmp(vi_undo_buff, "40000~") && !strcmp(vi_redo_buff, "40000~"));
+    assert(vi_curs_char==vi_file_end-1);
+    for(i=0; i<40000U; i++) assert(vi_file_mem[i]=='A');
+    run_edit("u");
+    for(i=0; i<40000U; i++) assert(vi_file_mem[i]=='a');
+}
 static void check_insert_limits(void) {
     char script[1600];
     load("\n");
@@ -661,7 +707,7 @@ static void check_full_buffer(void) {
 #if defined(__PCDOS__) && __PCDOS__ == 11
     assert(FILELENG == 24000);
 #else
-    assert(FILELENG == 32000);
+    assert(FILELENG == 40064U);
 #endif
     load("");
     memset(vi_file_mem, 'a', FILELENG);
@@ -685,11 +731,11 @@ static void check_full_buffer(void) {
     for(i=0; i<FILELENG-1; i++) assert(vi_file_mem[i] == 'a');
 }
 static void check_capacity(void) {
-    static unsigned sizes[] = {32767U, 32768U, 40000U};
+    static unsigned sizes[] = {32767U, 32768U, 40000U, 40064U};
     char *original = vi_file_mem;
     char expected[40];
     unsigned i;
-    vi_file_mem = calloc(40001U, 1); assert(vi_file_mem);
+    vi_file_mem = calloc(40065U, 1); assert(vi_file_mem);
     for(i=0; i<sizeof sizes/sizeof sizes[0]; i++) {
         vi_file_max = vi_file_mem + sizes[i];
         load("abc\n");
@@ -730,6 +776,7 @@ int main(int argc, char **argv) {
     else if(!strcmp(argv[1], "bulk-insert")) check_bulk_insert();
     else if(!strcmp(argv[1], "search-bounds")) check_search_bounds();
     else if(!strcmp(argv[1], "command-limits")) check_command_limits();
+    else if(!strcmp(argv[1], "count-limits")) check_count_limits();
     else if(!strcmp(argv[1], "delete-limits")) check_delete_limits();
     else if(!strcmp(argv[1], "insert-limits")) check_insert_limits();
     else if(!strcmp(argv[1], "literal-limits")) check_literal_limits();
@@ -760,16 +807,16 @@ def main():
     misc = (ROOT / 'misccmds.c').read_text()
     primitives = ('static int canincrease(unsigned n);\n'
                   'static void appchar(int c);\n'
-                  'static unsigned savednum;\n'
-                  'static int savedcount, savedlast;\n')
+                  'static unsigned savednum, savedcount;\n'
+                  'static int savedlast;\n')
     primitives += '#define vi_yank_store test_yank_store\n'
     primitives += '#define vi_yank_load test_yank_load\n'
-    primitives += function(misc, 'int yankline(int n)') + '\n'
+    primitives += function(misc, 'int yankline(unsigned n)') + '\n'
     for signature in ('static int canincrease(unsigned n)\n', 'void insstr(char *s)',
                       'void inschar(int c)', 'void delchar(void)',
                       'int deleol(void)', 'int delword(int deltrailing)',
                       'void fileinfo(void)', 'void putline(int k)',
-                      'void delline(int nlines)', 'static void appchar(int c)\n',
+                      'void delline(unsigned nlines)', 'static void appchar(int c)\n',
                       'void opencmd(void)'):
         primitives += function(misc, signature) + '\n'
     queue = source[source.index('static char getcbuff'): ]
@@ -797,7 +844,7 @@ def main():
                            '\n#undef getc\n#undef ferror\n#undef fclose\n' + CHECKS)
         binary = work / 'check'
         failed = []
-        for profile, flags in (('32000', []), ('DOS1-24000', ['-D__PCDOS__=11'])):
+        for profile, flags in (('40064', []), ('DOS1-24000', ['-D__PCDOS__=11'])):
             subprocess.run([
                 os.environ.get('CC_HOST', 'cc'), '-std=c99', '-g',
                 '-fsanitize=address,undefined', *flags, '-I', str(ROOT), str(harness),
@@ -807,7 +854,7 @@ def main():
             ], check=True)
             for case in ('save', 'read', 'replace', 'search', 'insert-read',
                          'read-limits', 'read-errors', 'word-eof', 'bulk-insert',
-                         'search-bounds', 'command-limits', 'delete-limits',
+                         'search-bounds', 'command-limits', 'count-limits', 'delete-limits',
                          'insert-limits', 'literal-limits', 'replay-limits',
                          'file-insert-limits', 'long-messages', 'yank-failures',
                          'yank-success', 'yank-message-failure',

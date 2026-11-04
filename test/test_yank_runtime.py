@@ -53,7 +53,7 @@ def main():
                          '-m', '10000', output, '2'], work)
                 result = run(['emu2', output], work)
                 assert 'VI YANK PASS: 0 failures' in result.stdout, result.stdout
-                capacity = 24000 if library == 'd11' else 32768
+                capacity = 24000 if library == 'd11' else 40064
                 assert f'VI YANK CAPACITY: {capacity}' in result.stdout, result.stdout
                 print('VI YANK RUNTIME PASS:', library)
                 if os.environ.get('YANK_TEST_OUTPUT'):

@@ -27,8 +27,8 @@ static void check(int ok) { if (!ok) failures++; }
 CHECKS = r'''
 int main(void)
 {
-    static unsigned sizes[] = {32000U, 32767U, 32768U, 40000U};
-    char *memory = malloc(40001U);
+    static unsigned sizes[] = {32000U, 32767U, 32768U, 40000U, 40064U};
+    char *memory = malloc(40065U);
     unsigned size, i, j;
     int before;
     if (memory == NULL) {
@@ -135,7 +135,7 @@ def main():
             run(['aztec42_link', '-o', program, 'capacity.o', '-l' + library], work)
             result = run([os.environ.get('EMU2', 'emu2'), program], work)
             assert 'VI CAPACITY PASS: 0 failures' in result.stdout, result.stdout
-            print('CAPACITY PASS:', library, '(32000/32767/32768/40000 bytes)',
+            print('CAPACITY PASS:', library, '(32000/32767/32768/40000/40064 bytes)',
                   flush=True)
 
 

@@ -37,10 +37,11 @@ def main():
 static char memory[512];
 char *vi_file_mem=memory, *vi_file_end, *vi_file_max=memory+sizeof memory;
 char *vi_curs_char, *vi_uncurs_char;
-int vi_renum, vi_changed, vi_state;
+unsigned long vi_renum;
+int vi_changed, vi_state;
 char vi_undo_buff[1024], vi_redo_buff[1024];
-static unsigned savednum;
-static int savedcount, savedlast;
+static unsigned savednum, savedcount;
+static int savedlast;
 void message(char *s) {(void)s;}
 void updatescreen(void) {}
 void resetundo(void) {}
@@ -54,8 +55,8 @@ static int canincrease(unsigned n);
     harness += function(lines, 'unsigned vi_byte_span(const char *first, const char *last)')
     harness += function(lines, 'char *prevline(char *curr)')
     for sig in ('static int canincrease(unsigned n)\n', 'void inschar(int c)',
-                'int yankline(int n)', 'void putline(int k)',
-                'void delline(int nlines)'):
+                'int yankline(unsigned n)', 'void putline(int k)',
+                'void delline(unsigned nlines)'):
         harness += '\n' + function(source, sig)
     harness += r'''
 void load(const char *disk) {

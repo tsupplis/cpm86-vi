@@ -22,7 +22,8 @@ source=r'''
 #include "yankmem.h"
 struct charinfo chars[256];
 int vi_state=NORMAL, vi_rows=6, vi_columns=10;
-int vi_curs_row, vi_curs_col, vi_curs_vcol;
+int vi_curs_col;
+unsigned long vi_curs_row, vi_curs_vcol;
 char *vi_file_mem, *vi_file_end, *vi_top_char, *vi_bot_char, *vi_curs_char;
 static char screen_line[VI_SCREEN_MAX_COLUMNS], screen_previous[VI_SCREEN_MAX_COLUMNS];
 static char file[4096], screen[VI_SCREEN_IMAGE_SIZE], reference_screen[VI_SCREEN_IMAGE_SIZE];
@@ -127,9 +128,9 @@ void updatescreen(void) {
 '''
 for signature in ['static void cursor_position(void)','static char *next_screen_row(char *p)','void cursupdate(void)']:
     source+=function('edit.c',signature)
-for signature in ['char *nextline(char *curr)','char *prevline(char *curr)','char *coladvance(char *p, int col)']:
+for signature in ['char *nextline(char *curr)','char *prevline(char *curr)','char *coladvance(char *p, unsigned long col)']:
     source+=function('linefunc.c',signature)
-source+=function('edit.c','int oneup(int n)')+function('edit.c','int onedown(int n)')
+source+=function('edit.c','int oneup(unsigned n)')+function('edit.c','int onedown(unsigned n)')
 source+=r'''
 static void load(char *text) {
     strcpy(file,text); vi_file_mem=file; vi_file_end=file+strlen(file);

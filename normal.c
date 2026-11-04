@@ -6,7 +6,7 @@
 #include <ctype.h>
 #include <stdio.h>
 
-static void tabinout(int inout, int num);
+static void tabinout(int inout, unsigned num);
 static void startinsert(char *initstr);
 
 /*
@@ -18,7 +18,21 @@ static void startinsert(char *initstr);
 void normal(int c)
 {
     char *p, *q;
-    int nchar, n;
+    int nchar;
+    unsigned n;
+
+    if (vi_renum > VI_COUNT_MAX) {
+        /* Discard the rest of this command, not the next valid command. */
+        if (c == 'd' || c == 'c' || c == 'y' || c == '<' || c == '>' || c == 'r')
+            vgetc();
+        else if (c == ':' || c == '/' || c == '?') {
+            do {
+                nchar = vgetc();
+            } while (nchar != '\n' && nchar != '\r' && nchar != '\033' && nchar != EOF);
+        }
+        message("Command count too large; command cancelled!");
+        return;
+    }
 
     switch (c) {
     case '\014':
@@ -198,7 +212,7 @@ void normal(int c)
         case 'd':
             if (!yankline(n))
                 break;
-            sprintf(vi_redo_buff, "%ddd", n);
+            sprintf(vi_redo_buff, "%udd", n);
             /* addtobuff(vi_redo_buff,'d','d',NULL); */
             beginline();
             resetundo();
@@ -424,17 +438,19 @@ void normal(int c)
         if (*vi_curs_char != '\n') {
             resetundo();
             vi_uncurs_char = vi_curs_char;
-            sprintf(vi_redo_buff, "%d~", n);
-            sprintf(vi_undo_buff, "%d~", n);  /* ~~ is its own inverse */
-            while (n-- > 0 && vi_curs_char < vi_file_end && *vi_curs_char != '\n') {
+            sprintf(vi_redo_buff, "%u~", n);
+            sprintf(vi_undo_buff, "%u~", n);  /* ~~ is its own inverse */
+            while (n > 0 && vi_curs_char < vi_file_end && *vi_curs_char != '\n') {
+                n--;
                 if (islower(*vi_curs_char))
                     *vi_curs_char = toupper(*vi_curs_char);
                 else if (isupper(*vi_curs_char))
                     *vi_curs_char = tolower(*vi_curs_char);
                 vi_curs_char++;
             }
-            /* don't land on newline */
-            if (*vi_curs_char == '\n' && vi_curs_char > vi_uncurs_char)
+            /* Don't land on the newline or logical EOF. */
+            if (vi_curs_char > vi_uncurs_char &&
+                (vi_curs_char == vi_file_end || *vi_curs_char == '\n'))
                 vi_curs_char--;
             CHANGED;
             updatescreen();
@@ -458,13 +474,14 @@ void normal(int c)
  * If inout==1, delete a tab from the begining of the next num lines.
  */
 
-static void tabinout(int inout, int num) {
-    int ntodo = num;
+static void tabinout(int inout, unsigned num) {
+    unsigned ntodo = num;
     char *savecurs, *p;
 
     beginline();
     savecurs = vi_curs_char;
-    while (ntodo-- > 0) {
+    while (ntodo > 0) {
+        ntodo--;
         beginline();
         if (inout == 0)
             inschar('\t');
@@ -483,10 +500,10 @@ static void tabinout(int inout, int num) {
     vi_curs_char = savecurs;
     updatescreen();
     /* Construct re-do and un-do stuff */
-    sprintf(vi_redo_buff, "%d%s", num, inout == 0 ? ">>" : "<<");
+    sprintf(vi_redo_buff, "%u%s", num, inout == 0 ? ">>" : "<<");
     resetundo();
     vi_uncurs_char = savecurs;
-    sprintf(vi_undo_buff, "%d%s", num, inout == 0 ? "<<" : ">>");
+    sprintf(vi_undo_buff, "%u%s", num, inout == 0 ? "<<" : ">>");
 }
 
 static void startinsert(char *initstr)

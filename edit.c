@@ -462,7 +462,7 @@ void edit(void) {
 static void donormal(int c)
 {
     if ((vi_renum > 0 && isdigit(c)) || (isdigit(c) && c != '0')) {
-        vi_renum = vi_renum * 10 + (c - '0');
+        vi_renum = vi_count_digit(vi_renum, c - '0');
         return;
     }
     /* Forget the last message: a command that repeats the same warning
@@ -681,9 +681,10 @@ void beginline(void) {
         ;
 }
 
-int oneup(int n) {
+int oneup(unsigned n) {
     char *p, *np;
-    int savevcol, k;
+    unsigned long savevcol;
+    unsigned k;
 
     savevcol = vi_curs_vcol;
     p = vi_curs_char;
@@ -706,9 +707,9 @@ int oneup(int n) {
     return (1);
 }
 
-int onedown(int n) {
+int onedown(unsigned n) {
     char *p, *np;
-    int k;
+    unsigned k;
 
     p = vi_curs_char;
     for (k = 0; k < n; k++) {

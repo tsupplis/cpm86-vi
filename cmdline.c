@@ -177,7 +177,7 @@ void readcmdline(int firstc) /* either ':', '/', or '?' */
     case '.':
         if (strcmp(cmd, ".=") == 0) {
             char messbuff[80];
-            sprintf(messbuff, "line %d   character %u", cntlines(vi_file_mem, vi_curs_char),
+            sprintf(messbuff, "line %lu   character %u", cntlines(vi_file_mem, vi_curs_char),
                     1U + vi_byte_span(vi_file_mem, vi_curs_char));
             message(messbuff);
             return;
@@ -186,7 +186,7 @@ void readcmdline(int firstc) /* either ':', '/', or '?' */
     case '$':
         if (strcmp(cmd, "$=") == 0) {
             char messbuff[8];
-            sprintf(messbuff, "%d", cntlines(vi_file_mem, vi_file_end) - 1);
+            sprintf(messbuff, "%lu", cntlines(vi_file_mem, vi_file_end) - 1UL);
             message(messbuff);
             return;
         }
@@ -244,10 +244,16 @@ void readcmdline(int firstc) /* either ':', '/', or '?' */
     /* :N  — go to line N (or last line if N exceeds the file) */
     {
         char *pp = cmd;
-        while (isdigit(*pp))
+        unsigned long count = 0;
+        while (isdigit((unsigned char)*pp)) {
+            count = vi_count_digit(count, *pp - '0');
             pp++;
+        }
         if (pp != cmd && *pp == '\0') {
-            gotoline(atoi(cmd));
+            if (count > VI_COUNT_MAX)
+                message("Command count too large; command cancelled!");
+            else
+                gotoline((unsigned)count);
             return;
         }
     }
