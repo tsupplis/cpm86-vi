@@ -87,6 +87,9 @@ supporting AddressSanitizer and UndefinedBehaviorSanitizer. These tests cover
 failed saves retaining the modified flag, failed `:r` leaving the buffer
 unchanged, single-character replacements marking it modified, and repeat
 searches retaining a valid pattern. They do not require an emulator.
+They also check word deletion at EOF, bulk insertion, and `:r` insertion at
+the middle/end of a buffer. Oversized imports and read/close failures cancel
+the entire insertion and preserve the original buffer and modified state.
 
 ## Command Reference
 

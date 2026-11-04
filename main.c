@@ -165,7 +165,7 @@ int main(int argc, char **argv)
     screenclear();
 
     vi_file_end = vi_file_mem;
-    if (readfile(vi_file_name, vi_file_end, 0))
+    if (readfile(vi_file_name, vi_file_end, 0) == 1)
         filemess("[New File]");
     vi_top_char = vi_curs_char = vi_file_mem;
 
@@ -340,11 +340,13 @@ static void screenalloc(void) {
     vi_next_scr = malloc((unsigned)(vi_rows * vi_columns));
 }
 
+/* Return 1 for an open failure, -1 for a rolled-back read, or 0 on success. */
 int readfile(char *fname, char *fromp, int nochangename) /* if 1, don't change the Filename */
 {
     FILE *f;
     char buff[128];
-    char *p;
+    char *p, *insertp = fromp;
+    const char *error = NULL;
     int c, n;
     int unprint = 0;
     long remaining;
@@ -363,27 +365,35 @@ int readfile(char *fname, char *fromp, int nochangename) /* if 1, don't change t
     }
 
     /* Read file into buffer until EOF or CP/M SUB char */
-    for (n = 0; remaining != 0L && (c = getc(f)) != EOF && (vi_binary || c != 0x1A); n++) {
+    n = 0;
+    while (remaining != 0L && (c = getc(f)) != EOF && (vi_binary || c != 0x1A)) {
         if(remaining>0L) remaining--;
         /* Skip CR; lines are terminated by LF alone internally */
         if (!vi_binary && c == '\r') {
-            n--;
             continue;
         }
         if (!(isprint(c) || isspace(c)))
             unprint++;
-        if (fromp >= vi_file_max) {
-            fprintf(stderr, "File too long (limit is %d)!\n", FILELENG);
-            vi_key_exit();
-            exit(1);
+        if (vi_file_end >= vi_file_max) {
+            error = "File too long; read cancelled!";
+            break;
         }
-        /* Insert the char at the current point by shifting
-        /* everything down. */
+        /* Insert the char at the current point by shifting the tail. */
         for (p = vi_file_end; p > fromp; p--)
             *p = *(p - 1);
         *fromp++ = c;
-        if (vi_file_end < fromp)
-            vi_file_end = fromp;
+        vi_file_end++;
+        n++;
+    }
+    if (ferror(f))
+        error = "Read/close failed; read cancelled!";
+    if (fclose(f) == EOF)
+        error = "Read/close failed; read cancelled!";
+    if (error != NULL) {
+        memmove(insertp, insertp + n, (unsigned)(vi_file_end - insertp - n));
+        vi_file_end -= n;
+        message((char *)error);
+        return -1;
     }
     if (!vi_binary && unprint > 0) {
         sprintf(
@@ -399,7 +409,6 @@ int readfile(char *fname, char *fromp, int nochangename) /* if 1, don't change t
         p = "\"%s\" %d characters  (Press 'H' for help)";
     sprintf(buff, p, fname, n, unprint);
     message(buff);
-    fclose(f);
     return (0);
 }
 

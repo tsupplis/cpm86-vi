@@ -222,6 +222,8 @@ void readcmdline(int firstc) /* either ':', '/', or '?' */
         /* find the beginning of the next line and */
         /* read file in there */
         pp = nextline(vi_curs_char);
+        if (pp == NULL)
+            pp = vi_file_end;
         if (readfile(arg, pp, 1))
             return;
         updatescreen();

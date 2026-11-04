@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Host regression tests for save/read failures, replacement and repeat search."""
+"""Host regressions for editor state, EOF deletion and file/string insertion."""
 from pathlib import Path
 import os
 import subprocess
@@ -66,9 +66,7 @@ void gotoline(int n) {}
 void yankline(int n) { assert(0); }
 void putline(int n) { assert(0); }
 void inschar(int c) { assert(0); }
-void delchar(void) { assert(0); }
 void deleol(void) { assert(0); }
-void delword(int n) { assert(0); }
 void delline(int n) { assert(0); }
 void stuffin(char *s) { assert(0); }
 void octchars(void) {}
@@ -88,6 +86,17 @@ const char *vi_save_file(const char *n, const char *a, const char *b, int binary
     return reject_save ? "Injected save failure" : NULL;
 }
 long vi_file_length(const char *name) { return -1L; }
+static int fail_after = -1, read_failed, fail_close;
+static int test_getc(FILE *f) {
+    if(fail_after == 0) { read_failed = 1; return EOF; }
+    if(fail_after > 0) fail_after--;
+    return getc(f);
+}
+static int test_ferror(FILE *f) { return read_failed || ferror(f); }
+static int test_fclose(FILE *f) {
+    int result = fclose(f);
+    return fail_close ? EOF : result;
+}
 '''
 
 CHECKS = r'''
@@ -181,6 +190,131 @@ static void check_search(void) {
     assert(!strcmp(last_output, "Pattern not found"));
     assert(!vi_changed);
 }
+static void seed(const char *s) {
+    FILE *f = fopen("insert.txt", "wb");
+    assert(f && fputs(s, f) >= 0);
+    assert(!fclose(f));
+}
+static void expect(const char *s) {
+    assert(vi_file_end - vi_file_mem == (long)strlen(s));
+    assert(!memcmp(vi_file_mem, s, strlen(s)));
+}
+static void check_insert_read(void) {
+    FILE *f;
+    static char binary[] = {'A', 0, 'B', 26, '\r', '\n'};
+    seed("X\r\nY\032ignored");
+    load("first\ntail\n");
+    command("r insert.txt\n");
+    expect("first\nX\nYtail\n");
+    assert(vi_changed && vi_curs_char == vi_file_mem);
+    load("last\n"); command("r insert.txt\n"); expect("last\nX\nY");
+    load("last"); command("r insert.txt\n"); expect("lastX\nY");
+    load(""); command(".r insert.txt\n"); expect("X\nY");
+    load("head\ntail\n");
+    vi_binary = 1;
+    command("r insert.txt\n");
+    expect("head\nX\r\nY\032ignoredtail\n");
+    f = fopen("insert.txt", "wb"); assert(f);
+    assert(fwrite(binary, 1, sizeof binary, f) == sizeof binary);
+    assert(!fclose(f));
+    load("a\ntail");
+    vi_binary = 1;
+    command("r insert.txt\n");
+    assert(vi_file_end == vi_file_mem + 6 + sizeof binary);
+    assert(!memcmp(vi_file_mem, "a\n", 2));
+    assert(!memcmp(vi_file_mem + 2, binary, sizeof binary));
+    assert(!memcmp(vi_file_mem + 2 + sizeof binary, "tail", 4));
+}
+static void check_read_limits(void) {
+    FILE *f;
+    int i, dirty;
+    f = fopen("insert.txt", "wb"); assert(f);
+    for(i=0; i<FILELENG; i++) assert(putc('x', f) != EOF);
+    assert(!fclose(f));
+    for(dirty=0; dirty<=1; dirty++) {
+        load("a\ntail");
+        vi_changed = dirty;
+        command("r insert.txt\n");
+        expect("a\ntail");
+        assert(vi_changed == dirty && vi_curs_char == vi_file_mem);
+        assert(strstr(last_output, "File too long") != NULL);
+    }
+    load("");
+    assert(!readfile("insert.txt", vi_file_mem, 1));
+    assert(vi_file_end == vi_file_max);
+    seed("y");
+    assert(readfile("insert.txt", vi_file_mem, 1) != 0);
+    assert(vi_file_end == vi_file_max);
+    for(i=0; i<FILELENG; i++) assert(vi_file_mem[i] == 'x');
+    load("");
+    seed("");
+    command("r insert.txt\n"); expect("");
+}
+static void check_read_errors(void) {
+    int dirty;
+    seed("inserted");
+    for(dirty=0; dirty<=1; dirty++) {
+        load("a\ntail\n"); vi_changed = dirty;
+        fail_after = 3;
+        command("r insert.txt\n");
+        fail_after = -1; read_failed = 0;
+        expect("a\ntail\n"); assert(vi_changed == dirty);
+        assert(strstr(last_output, "Read/close failed") != NULL);
+        fail_close = 1;
+        command("r insert.txt\n");
+        fail_close = 0;
+        expect("a\ntail\n"); assert(vi_changed == dirty);
+        assert(strstr(last_output, "Read/close failed") != NULL);
+    }
+}
+static void word(const char *before, int offset, int trailing,
+                 const char *after, const char *undo) {
+    load(before);
+    vi_curs_char += offset;
+    delword(trailing);
+    expect(after);
+    assert(!strcmp(vi_undo_buff, undo));
+}
+static void check_word_eof(void) {
+    word("word", 0, 1, "", "iword\033");
+    word("head word", 5, 1, "head ", "iword\033");
+    word("word\nnext", 0, 1, "\nnext", "iword\033");
+    word("word  next", 0, 1, "next", "iword  \033");
+    word("word  next", 0, 0, "  next", "iword\033");
+    word("!!!", 0, 1, "", "i!!!\033");
+    word("!!! \t", 0, 1, "", "i!!! \t\033");
+    word(" \t", 0, 1, "", "i \t\033");
+    load(""); delword(1); expect(""); assert(!vi_changed);
+    load("word");
+    vi_curs_char = vi_file_end;
+    delword(1); expect("word"); assert(!vi_changed);
+    load("head word");
+    vi_curs_char += 5; input = "w";
+    normal('d'); expect("head ");
+    assert(vi_changed && vi_uncurs_char == vi_file_mem + 5);
+    load("head word");
+    vi_curs_char += 5; input = "w";
+    normal('c'); expect("head ");
+    assert(vi_changed && vi_state == INSERT && vi_ins_start == vi_file_mem + 5);
+}
+static void check_bulk_insert(void) {
+    int offset;
+    for(offset=0; offset<=4; offset++) {
+        load("abcd");
+        vi_curs_char += offset;
+        insstr("XYZ");
+        assert(vi_file_end == vi_file_mem + 7);
+        assert(!memcmp(vi_file_mem, "abcd", offset));
+        assert(!memcmp(vi_file_mem + offset, "XYZ", 3));
+        assert(!memcmp(vi_file_mem + offset + 3, "abcd" + offset, 4-offset));
+        assert(vi_curs_char == vi_file_mem + offset + 3 && vi_changed);
+    }
+    load(""); insstr("XYZ"); expect("XYZ");
+    load("abcd"); insstr(""); expect("abcd"); assert(!vi_changed);
+    load("abcd");
+    vi_file_max = vi_file_end + 2;
+    insstr("XYZ"); expect("abcd"); assert(!vi_changed);
+}
 int main(int argc, char **argv) {
     vi_file_mem = calloc(FILELENG, 1); assert(vi_file_mem);
     vi_file_max = vi_file_mem + FILELENG;
@@ -191,6 +325,11 @@ int main(int argc, char **argv) {
     else if(!strcmp(argv[1], "read")) check_read();
     else if(!strcmp(argv[1], "replace")) check_replace();
     else if(!strcmp(argv[1], "search")) check_search();
+    else if(!strcmp(argv[1], "insert-read")) check_insert_read();
+    else if(!strcmp(argv[1], "read-limits")) check_read_limits();
+    else if(!strcmp(argv[1], "read-errors")) check_read_errors();
+    else if(!strcmp(argv[1], "word-eof")) check_word_eof();
+    else if(!strcmp(argv[1], "bulk-insert")) check_bulk_insert();
     else assert(0);
     clearlastmess();
     free(vi_file_mem);
@@ -204,10 +343,18 @@ def main():
     source = (ROOT / 'main.c').read_text()
     globals_ = source[source.index('int vi_rows;'):source.index('int main(')]
     readfile = function(source, 'int readfile(char *fname, char *fromp,')
+    misc = (ROOT / 'misccmds.c').read_text()
+    primitives = 'static int canincrease(int n);\n'
+    for signature in ('static int canincrease(int n)\n', 'void insstr(char *s)',
+                      'void delchar(void)', 'void delword(int deltrailing)'):
+        primitives += function(misc, signature) + '\n'
     with tempfile.TemporaryDirectory(prefix='vi-editor-state-') as directory:
         work = Path(directory)
         harness = work / 'check.c'
-        harness.write_text(HARNESS + globals_ + readfile + CHECKS)
+        harness.write_text(HARNESS + globals_ + primitives +
+                           '#define getc test_getc\n#define ferror test_ferror\n'
+                           '#define fclose test_fclose\n' + readfile +
+                           '\n#undef getc\n#undef ferror\n#undef fclose\n' + CHECKS)
         binary = work / 'check'
         subprocess.run([
             os.environ.get('CC_HOST', 'cc'), '-std=c99', '-g',
@@ -216,7 +363,8 @@ def main():
             str(ROOT / 'linefunc.c'), '-o', str(binary),
         ], check=True)
         failed = []
-        for case in ('save', 'read', 'replace', 'search'):
+        for case in ('save', 'read', 'replace', 'search', 'insert-read',
+                     'read-limits', 'read-errors', 'word-eof', 'bulk-insert'):
             result = subprocess.run([str(binary), case], cwd=work)
             if result.returncode:
                 failed.append(case)

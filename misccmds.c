@@ -188,17 +188,15 @@ void inschar(int c)
 
 void insstr(char *s)
 {
-    register char *p;
     int k, n = strlen(s);
 
     /* Move everything in the file over to make */
     /* room for the new string. */
-    if (!canincrease(n))
+    if (n == 0 || !canincrease(n))
         return;
 
-    for (p = vi_file_end - 1 + n; p > vi_curs_char; p--) {
-        *p = *(p - n);
-    }
+    memmove(vi_curs_char + n, vi_curs_char,
+            (unsigned)(vi_file_end - vi_curs_char));
     for (k = 0; k < n; k++)
         *vi_curs_char++ = *s++;
     vi_file_end += n;
@@ -285,46 +283,36 @@ void deleol(void) {
 
 void delword(int deltrailing) /* 1 if trailing white space should be removed */
 {
-    int c = *vi_curs_char;
+    char *scan = vi_curs_char, *start = vi_curs_char;
     char *p = vi_undo_buff;
+    int n;
 
-    /* The Undo string is an 'i'nsert of the word we're deleting. */
+    if (scan >= vi_file_end) {
+        *p = '\0';
+        return;
+    }
+    if (issepchar((unsigned char)*scan) && !isspace((unsigned char)*scan)) {
+        while (scan < vi_file_end && issepchar((unsigned char)*scan) &&
+               !isspace((unsigned char)*scan))
+            scan++;
+    } else {
+        while (scan < vi_file_end && !issepchar((unsigned char)*scan))
+            scan++;
+    }
+    if (deltrailing)
+        while (scan < vi_file_end && isspace((unsigned char)*scan) && *scan != '\n')
+            scan++;
+    n = scan - start;
     *p++ = 'i';
-    /* If we're positioned on a word separator... */
-    if (issepchar(c) && !isspace(c)) {
-        /* If we're on a non-space separator, remove */
-        /* the separators and any following space. */
-        while (issepchar(c) && !isspace(c)) {
-            /* Add the deleted character to the vi_undo_buff */
-            *p++ = *vi_curs_char;
-            delchar();
-            c = *vi_curs_char;
-        }
-    } else { /* we're positioned in the middle of a word */
-        int endofline = 0;
-        while (!issepchar(*vi_curs_char) && *vi_curs_char != '\n') {
-            /* If the next char is a newline, we note */
-            /* that fact here, because delchar() won't */
-            /* position us there afterword. */
-            if (*(vi_curs_char + 1) == '\n')
-                endofline = 1;
-            /* Add the deleted character to the vi_undo_buff */
-            *p++ = *vi_curs_char;
-            delchar();
-            if (endofline)
-                break;
-        }
-    }
-    if (deltrailing) {
-        /* remove any trailing white space */
-        while (isspace(*vi_curs_char) && *vi_curs_char != '\n') {
-            /* Add the deleted character to the vi_undo_buff */
-            *p++ = *vi_curs_char;
-            delchar();
-        }
-    }
+    while (start < scan)
+        *p++ = *start++;
     *p++ = '\033';
     *p = '\0';
+    if (n == 0)
+        return;
+    memmove(vi_curs_char, scan, (unsigned)(vi_file_end - scan));
+    vi_file_end -= n;
+    CHANGED;
 }
 
 void delline(int nlines) {
