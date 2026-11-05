@@ -11,7 +11,8 @@ import tempfile
 from test_buffer_runtime import ROOT, build, run
 
 
-def run_probe(root, name, image, config, exitprog, program, video, ram=None, timing=True):
+def run_probe(root, name, image, config, exitprog, program, video, ram=None, timing=True,
+              inputs=(), timeout=180):
     work = root / name
     work.mkdir()
     shutil.copyfile(image, work / 'boot.img')
@@ -47,6 +48,9 @@ def run_probe(root, name, image, config, exitprog, program, video, ram=None, tim
     (work / 'AUTOEXEC.BAT').write_bytes(command + b'\r\nPCEEXIT\r\n')
     run(['mcopy', '-o', '-i', program_disk, str(root / program),
          '::DISPLAY' + Path(program).suffix.upper()], work)
+    for source, destination in inputs:
+        run(['mcopy', '-o', '-i', program_disk, str(source),
+             '::' + destination], work)
     cpm = config.stem == 'cdos41'
     if cpm:
         twist = str(ROOT.parent / 'ref/scripts/cpm86twist')
@@ -66,7 +70,7 @@ def run_probe(root, name, image, config, exitprog, program, video, ram=None, tim
     result = subprocess.run(
         [os.environ.get('PCE', 'pce-ibmpc'), '-c', 'pce.cfg', '-t', 'null',
          '-r', '-g', video, '-l', 'pce.log'],
-        cwd=work, timeout=180, capture_output=True, text=True)
+        cwd=work, timeout=timeout, capture_output=True, text=True)
     assert result.returncode in (0, 1), result.stderr
     if cpm:
         run([twist, 'untwist', 'boot.img', 'logical.img'], work)

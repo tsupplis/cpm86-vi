@@ -1,377 +1,299 @@
-# STevie/vi for CP/M-86 and PC-DOS — Design Notes
+# STevie/vi for CP/M-86 and PC-DOS - Design Notes
 
-This document describes the internal architecture of this port of STevie
-(a small vi clone by Tim Thompson) to CP/M-86 and PC-DOS 1.1/2.0, compiled
-with Aztec C86 v4.10d. It also tracks the ANSI-C modernization pass done
-on the codebase: what changed, what was deliberately left alone, and what
-remains as follow-up work.
+This describes the current implementation, built with Aztec C86 v4.10d.
+Open work and acceptance criteria live in [todo.md](../todo.md); supported
+kernel combinations and user commands are in [README.md](../README.md).
 
-## Overview
+## Architecture
 
-The editor is a single-buffer, single-file, full-screen vi clone. The
-whole file being edited lives in one contiguous heap block (`vi_file_mem`
-.. `vi_file_max`), and the screen is rendered by diffing a "next" frame
-against a "real" (currently displayed) frame buffer, only emitting the
-bytes that changed. There is no gap buffer, undo tree, or multi-file
-support. Undo is single-level, usually replaying the opposite edit through
-small fixed-size command buffers (`vi_undo_buff`, `vi_redo_buff`,
-`vi_ins_buff`, `vi_repl_buf`). Indentation and join use literal-byte undo
-records in the same fixed storage rather than replaying inverse commands.
+The editor is single-file and single-buffer. File bytes occupy one contiguous
+near-heap block, without a gap buffer or piece table. Navigation operates on
+pointers into that block. The renderer builds a desired frame, compares it with
+the last displayed frame and emits only changed cells. Yanked bytes and both
+screen images occupy a separate segment, accessed through checked copy APIs.
 
-Keyboard input and screen output are the only genuinely platform-specific
-parts of the program (`edit.c`'s `getch()`/`bioskey()`/`keyready()`, and
-all of `window.c`). Everything else (`cmdline.c`, `linefunc.c`,
-`misccmds.c`, `normal.c`, `hexchars.c`, `help.c`, `main.c`'s screen-diff
-logic) is portable C operating purely on the in-memory file buffer.
+Platform boundaries include console input/output, file saving and exact-length
+metadata, OS detection/restoration, and external-memory adapters. Editing,
+command parsing, navigation and screen diffing share the same C implementation.
 
-## Build Variants & Portability Matrix
+### Component model
 
-One source tree produces 5 binaries, selected entirely by preprocessor
-macros passed on the compiler command line (see `Makefile`). `edit.c` and
-`window.c` are compiled once per variant; every other `.c` file is
-compiled once and shared (`SHARED_OBJS` in the Makefile) across all six.
-`main.c` is also compiled separately with `VI_DOS1_COM` for the compact
-DOS 1 `.COM`; its private `FILELENG` definition selects the editing limit.
+Arrows show calls or access through an API; dotted links represent shared state.
+The mutually exclusive console and external-memory implementations are selected
+at build time.
 
-| Binary            | OS               | Screen/keyboard technique         | Macros |
-|-------------------|------------------|------------------------------------|--------|
-| `vicp52.cmd`      | CP/M-86          | VT-52 escape sequences             | `__CPM86__ __VTCMD__ __VT52__` |
-| `vicp100.cmd`     | CP/M-86          | VT-100/ANSI escape sequences       | `__CPM86__ __VTCMD__ __VT100__` |
-| `vicpbios.cmd`    | CP/M-86          | Direct PC BIOS (INT 10h/16h)       | `__CPM86__ __PCBIOS__` |
-| `vid1bios.com`    | PC-DOS 1.1       | Direct PC BIOS (INT 10h/16h)       | DOS 1 BIOS objects, `VI_DOS1_COM` for `main.c` |
-| `vid1bios.exe`    | PC-DOS 1.1       | Direct PC BIOS (INT 10h/16h)       | `__PCDOS__=11 __PCBIOS__` |
-| `vid2bios.exe`    | PC-DOS 2.0       | Direct PC BIOS (INT 10h/16h)       | `__PCDOS__=20 __PCBIOS__` |
+<!-- mermaid-checked: no \n, no em-dash/en-dash, no {} in labels, subgraphs are id["label"], arrows are -->|"label"|, all subgraphs closed by end, ids unique -->
+```mermaid
+flowchart LR
+    subgraph Core["Shared editor core"]
+        Main["main.c<br/>Startup, read, renderer, replay queue"]
+        Edit["edit.c<br/>Input/state parser and viewport"]
+        Normal["normal.c<br/>Commands and undo"]
+        Cmd["cmdline.c<br/>Colon/search commands and messages"]
+        Lines["linefunc.c<br/>Navigation, search, string ownership"]
+        Misc["misccmds.c<br/>Edit primitives and yank/paste"]
+        Chars["hexchars.c / help.c<br/>Byte representations and help"]
+        State["stevie.h / main.c globals<br/>Near file buffer and editor state"]
+    end
+    subgraph Boundaries["Platform and storage APIs"]
+        Window["window.c<br/>wind* output API"]
+        Keys["keyboard.c / keyos.c / os.asm<br/>Concurrent input, OS detection/restoration"]
+        Save["save.c<br/>Save and exact-length API"]
+        Yank["yankmem.c<br/>Checked external storage API"]
+    end
+    subgraph Backends["Selected backends"]
+        VT["VT52 / VT100 console<br/>Runtime write to BDOS"]
+        BIOS["PC BIOS<br/>Included video/input assembly"]
+        Files["CP/M or DOS runtime / BDOS<br/>Files and length metadata"]
+        Adapters["yankcopy.asm + platform adapter<br/>CP/M EXTRA / DOS1-owned / DOS2-allocated"]
+        External["External segment<br/>Yank bytes + REAL/NEXT screens"]
+    end
+    Main --> Edit
+    Edit --> Normal
+    Normal --> Cmd
+    Normal --> Misc
+    Normal --> Lines
+    Normal --> Chars
+    Cmd --> Lines
+    Cmd --> Main
+    Cmd --> Save
+    Edit --> Keys
+    Edit --> BIOS
+    Edit --> Main
+    Lines --> Main
+    Misc --> Main
+    Main --> Window
+    Edit --> Window
+    Cmd --> Window
+    Chars --> Window
+    Main --> Save
+    Main --> Yank
+    Misc --> Yank
+    Window --> VT
+    Window --> BIOS
+    Window --> Keys
+    Save --> Files
+    Main --> Files
+    Yank --> Adapters
+    Adapters --> External
+    Main -.-> State
+    Edit -.-> State
+    Normal -.-> State
+    Cmd -.-> State
+    Lines -.-> State
+    Misc -.-> State
+```
 
-Macro meanings:
-- `__CPM86__` — target OS is CP/M-86 (vs. PC-DOS). Affects console raw
-  mode setup (`ioctl(... TIOCSETP ...)`), screen row count (24 vs 25),
-  and the `":v"` version string / usage message wording.
-- `__PCDOS__` — set to `11` or `20` for PC-DOS 1.1 / 2.0. Only meaningful
-  together with `__PCBIOS__` (there's no VTCMD DOS build).
-- `__VTCMD__` — screen/keyboard driven by printing terminal escape codes
-  and reading via BDOS function 6, instead of touching the BIOS directly.
-- `__VT52__` / `__VT100__` — which escape-code dialect `__VTCMD__` emits.
-- `__PCBIOS__` — screen/keyboard driven directly via `INT 10h` (video)
-  and `INT 16h` (keyboard) through Aztec C86 inline `#asm`/`#endasm`
-  blocks (kept in separate `.asm` files, `#include`d into the function
-  body: `windgoto.asm`, `windcurs.asm`, `windclr.asm`, `windputc.asm` in
-  `window.c`; `bioskey.asm`, `keyready.asm` in `edit.c`).
+`Main --> Files` is the input stream in `readfile()`; saving and exact-length
+queries go through `save.c`. The `Edit --> BIOS` path is legacy keyboard input;
+concurrent CP/M input goes through `keyboard.c` instead.
 
-None of this is portable beyond 8086 real-mode CP/M-86/DOS — the `#asm`
-blocks are Aztec C86-specific syntax and assume near/tiny memory model
-(a `char *` and an `int` are both 16 bits and freely interchangeable,
-which is relied on implicitly in a few places — see Portability Notes).
+## Six build variants
 
-## Data Model & Global State
+| Binary | Console | Editing/yank capacity | Runtime |
+|---|---|---:|---|
+| `vicp52.cmd` | CP/M VT52 | 38,016 bytes | `c86` |
+| `vicp100.cmd` | CP/M VT100/ANSI | 38,016 bytes | `c86` |
+| `vicpbios.cmd` | CP/M PC BIOS | 38,016 bytes | `c86` |
+| `vid1bios.com` | DOS 1 PC BIOS | 20,480 bytes | `d11` |
+| `vid1bios.exe` | DOS 1 PC BIOS | 38,016 bytes | `d11` |
+| `vid2bios.exe` | DOS 2 PC BIOS | 38,016 bytes | `c` |
 
-All cross-file shared state is declared `extern` in `stevie.h` and
-defined (without `extern`) in `main.c`. These were originally PascalCase
-and deliberately left unrenamed by this modernization pass, but have
-since been renamed (outside this pass) to `vi_`-prefixed
-`lower_snake_case` throughout the codebase — see the current full list
-in the `extern` block near the top of `stevie.h`.
+`edit.c` and `window.c` have terminal/OS-specific objects; the DOS 1 formats
+share their BIOS objects. `cmdline.c`, `save.c` and `keyboard.c` have CP/M/DOS
+objects. Other C objects are shared except `main.c`, which has a separate
+`VI_DOS1_COM` object selecting its private `FILELENG`. The external adapter
+reports the matching yank capacity at runtime.
 
-- **File buffer**: `vi_file_mem`/`vi_file_max`/`vi_file_end` — a single
-  fixed-size heap block (`FILELENG` = 38016 bytes, or 20480 in the DOS 1 `.COM`) holding
-  the whole file as raw bytes; `vi_file_end` is the current logical end,
-  `vi_file_max` the allocated end. `vi_curs_char` points at the cursor's
-  byte. There is no gap buffer — insert/delete shift the tail of the
-  buffer up/down a byte at a time (see Efficiency Findings Log).
-- **Screen buffers**: two external 2,000-byte slots for the current and
-  desired screen images follow the yank region. `nexttoscreen()` in
-  `main.c` loads and compares rows through two 80-byte near buffers, so
-  only changed cells are redrawn. CP/M-86 and DOS 2 reserve a 64 KiB
-  external segment with a 38,016-byte yank region; DOS 1 `.EXE` uses the same
-  layout in process-owned memory above its 64 KiB near-data window. DOS 1
-  `.COM` reserves 32 KiB there, with a 20,480-byte yank region.
-  Both DOS 1 adapters share `yankd11.asm`; `yankd1c.asm` selects the compact
-  constants. No DOS 2 memory
-  allocation calls are needed on DOS 1. No screen-image heap allocation
-  remains. Maximum dimensions are 25 rows by 80 columns.
-  `vi_top_char`/`vi_bot_char` bound the visible slice of the file buffer.
-- **Editor state**: `vi_state` (one of `NORMAL`/`INSERT`/`APPEND`/
-  `REPLACE`/... from `stevie.h`), `vi_renum` (pending numeric count
-  prefix for a command), `vi_curs_row`/`vi_curs_col`/`vi_curs_vcol`
-  (screen vs. virtual cursor column, the latter differing on lines that
-  wrap or contain tabs).
-- **Undo/redo**: single-level, command-replay based. `vi_undo_buff`/
-  `vi_redo_buff`/`vi_ins_buff`/`vi_repl_buf` (1024-byte fixed buffers)
-  hold a tiny "mini-script" of characters that, if fed back through the
-  normal-mode or insert-mode interpreters, reproduce or reverse the last
-  change. `vi_uncurs_char` is the cursor position to restore before
-  replaying.
-  For indentation and join, private metadata selects literal tab/newline edits.
-  The existing undo buffer is a bitmap of changed lines (up to 8192 visited
-  lines), so mixed/no-op outdents do not invent tabs. Preflight rejects capacity
-  or bitmap overflow before mutation; undo can restore a completely full buffer.
-  Modified-state snapshots are captured before editing and swapped on undo.
-- **`struct charinfo { char ch_size; char *ch_str; }`** (`stevie.h`) —
-  one entry per byte value 0-255 (table in `hexchars.c`), giving the
-  on-screen width and (for non-printable bytes) the placeholder string
-  like `[041]`/`[x29]`/`[ 41]`, switchable at runtime between octal/hex/
-  decimal via `:set oct|hex|dec`.
+`__CPM86__` selects CP/M behavior; `__PCDOS__` identifies DOS 11/20.
+`__VTCMD__` selects escape-code output with `__VT52__` or `__VT100__`;
+`__PCBIOS__` selects BIOS output and legacy BIOS keyboard input.
+Concurrent CP/M keyboard handling overrides that legacy input choice.
 
-## Module Reference
+Use serial Aztec compilations (`make -j1`): compiler intermediates share
+`TMPDIR/AZTEC/TEMP`. Use a private `TMPDIR` when other builds may be active.
+Native probes build in private directories; never run two Aztec builds sharing
+the same temporary directory concurrently.
 
-Each entry: responsibility, ANSI conversion notes, and any file-specific
-naming/portability points. All 9 `.c` files + `stevie.h` are fully
-converted from K&R to ANSI C prototypes; see Progress details below for
-the exact rationale on visibility (`static`) decisions.
+## Memory layout
 
-### stevie.h
-Central shared header: mode/state constants, `struct charinfo`, the
-`extern` global declarations (originally PascalCase, since renamed to
-`vi_`-prefixed lower_snake_case outside this pass — see Data Model &
-Global State), and now a full set of ANSI prototypes for every
-cross-file function, grouped by the `.c` file that defines them
-(`/* cmdline.c */`, `/* linefunc.c */`, etc.). The old blanket K&R
-forward-declarations (`char *malloc(), *strchr(), *strsave(), *alloc(),
-*strcpy();`) were removed function-by-function as each file was
-converted; `strchr()` alone still uses the old empty-parens
-(unspecified-args) form — see Deferred/Future Work.
+All builds use small code/data compilation. DOS EXEs have separate code/data
+segments; DOS 1 COM shares a 64 KiB window for code, data, heap and stack.
+The reduced COM capacity deliberately leaves additional headroom.
 
-### cmdline.c
-Parses and dispatches `:` command-line input, `/`/`?` search prefixes,
-and status-line messages. `badcmd()`, `gotocmd()`, `writeit()` are
-file-private (`static`); `readcmdline()`, `message()`, `clearlastmess()`,
-`filemess()` are the public surface. The file-scope static originally
-named `lastmess` has since been renamed `last_message`. Efficiency: the
-`:` command dispatcher was a long sequential `strcmp()` chain, since
-rewritten as a `switch (cmd[0])` bucketed dispatch (see Efficiency
-Findings Log — rated Low, applied).
+| Platform | External memory | Source/reservation |
+|---|---:|---|
+| CP/M | 64 KiB | Zero-image EXTRA group; no 64 KiB payload in the CMD |
+| DOS 1 COM | 32 KiB | Process-owned memory above the near window |
+| DOS 1 EXE | 64 KiB | Process-owned memory above the near-data window |
+| DOS 2 EXE | 64 KiB | INT 21h/AH=48h, released with AH=49h |
 
-### linefunc.c
-Line/column navigation (`nextline`, `prevline`, `coladvance`) and
-search (`ssearch`/`fwdsearch`/`bcksearch`, file-private; `dosearch`/
-`repsearch` public), plus the allocator helpers `alloc()` (private) and
-`strsave()` (public). Allocation failure reports an error and returns NULL;
-callers retain their previous state. `vi_set_filename()` owns filename
-replacement, copying before freeing the previous name so aliases are safe.
-The current filename is NULL or owned heap storage. Repeat search reuses its
-saved pattern without allocating; a failed replacement retains pattern and
-direction. `fwdsearch`/`bcksearch` are a naive O(n·m)
-character-by-character scan (Efficiency Findings Log — Medium, deferred).
+DOS 1 adapters check the PSP memory ceiling and never use DOS 2 allocation
+services. CP/M DATA requests 61,440 bytes minimum, up to 65,536 bytes.
+Real DOS 1 tests use 128 KiB RAM for COM and 256 KiB for EXE.
 
-### misccmds.c
-Character/line insert-delete primitives (`inschar`, `insstr`, `appchar`
-(private), `delchar`, `deleol`, `delword`, `delline`), yank/put
-(`yankline`, `putline`), and small utilities (`issepchar`, `cntlines`,
-`fileinfo`, `gotoline`, `opencmd`). Also defines a **hand-rolled
-`strchr()`** — see Deferred/Future Work, this shadows (and, per
-empirical testing, actually conflicts with) Aztec's real `<string.h>`
-`strchr`. The yank buffer's file-scope globals were renamed
-`Savedline`/`Savednum`/`Savedcount` → `savedline`/`savednum`/
-`savedcount` and made `static` (they were previously accidentally
-external-linkage globals never declared in `stevie.h` — a latent
-visibility bug, now fixed; confirmed via grep that nothing outside this
-file ever referenced them). Efficiency: `inschar`/`appchar`/`delchar`
-are O(n) shifts of the whole rest-of-file per call, so multi-character
-operations (`insstr`, `putline`, `delline`) are O(n²) (High, deferred —
-true fix is a gap buffer, out of scope for this pass).
+The yank region occupies the beginning of the external segment, followed by two
+fixed 2,000-byte screen slots. Only configured rows/columns are transferred.
+Maximum dimensions are 25x80; CP/M uses 24 rows, DOS 25. The final logical row
+belongs to status/commands, not document rendering. Two 80-byte near buffers
+replace near-heap screen images.
 
-### normal.c
-The normal-mode command interpreter (`normal()`, public), `tabinout()`
-(indent/outdent), shared literal-byte undo helpers, and `startinsert()`.
-Helpers are file-private. `resetundo()` is public (called from `misccmds.c`
-too); it invalidates both replay and literal-byte records and stale Replace
-state. Opening another file resets undo after filename allocation succeeds.
-This file already used angle-bracket `<ctype.h>`/`<stdio.h>` before this
-pass — the sole exception noted in the initial survey.
+Core globals are defined in `main.c` and declared in `stevie.h`, using `vi_`
+names. `chars[]` lives in `hexchars.c`. Search history, yank metadata, console
+state and literal-undo metadata are private to their modules.
 
-### hexchars.c
-The 256-entry `chars[]` table (non-printable byte display), and
-`octchars()`/`hexchars()`/`decchars()`/`hextoint()`, all public, all
-already ANSI-shaped once given real prototypes (pure data + straight
-loops, no K&R quirks beyond the missing prototypes themselves).
+## Editing and ownership invariants
 
-### help.c
-`help()` (public, shows the built-in key reference screen) and
-`helpstr()` (private helper that writes a string via `windputc()`).
+- `vi_file_mem <= vi_file_end <= vi_file_max`; `vi_file_end` is one past the
+  logical bytes, not a string terminator. Binary data can contain any byte.
+  Cursor and viewport pointers refer to this allocation; empty-file cursor is
+  `vi_file_mem`. File replacement resets undo before reading another file.
+- Large lengths use unsigned byte counts. `vi_byte_span()` subtracts converted
+  near addresses rather than a signed 16-bit pointer difference. Counts use
+  `unsigned long`: `VI_COUNT_MAX + 1` is an overflow sentinel rejected before
+  narrowing or executing a command.
+- Aztec's native `strlen()` does not cover the whole unsigned 16-bit range.
+  Large insertion lengths are counted explicitly. Small command/filename
+  strings may use the runtime string functions.
+- Single-character insertion reserves one spare byte. Bulk paste can fill the
+  editing allocation exactly. Preflight capacity and undo/replay bounds before
+  changing text; do not turn rejected operations into partial edits.
+- `strsave()` diagnoses allocation failure and returns NULL. Callers must
+  retain their previous state on failure. Optional message caching must not
+  recurse into allocation-error reporting.
+- The current filename is NULL or owned heap storage. `vi_set_filename()`
+  copies before freeing, including interior aliases; an unchanged pointer needs
+  no allocation. Failed replacement preserves filename, buffer and undo.
+- A new search copies the pattern before releasing the old one; failed
+  allocation preserves both pattern and direction. Repeat search allocates
+  nothing.
 
-### main.c
-Program entry point (`int main(int argc, char **argv)`), global state
-definitions, the screen-diff renderer (`filetonext()`/`nexttoscreen()`,
-both private, driven through public `updatescreen()`), and low-level
-file I/O (`readfile()`, public) and command-replay plumbing (`stuffin()`,
-`addtobuff()`, `vgetc()`/`vpeekc()`/`anyinput()`, all public).
-**`addtobuff()` arg-count fix**: originally `char c1..c6` with callers
-passing 2-4 real chars plus a `NULL` terminator, relying on K&R's lack
-of argument-count checking — this cannot compile under a strict ANSI
-prototype. Fixed by widening the params to `int c1..c6` (matching the
-`ctype.h`-style convention already used for `issepchar`) and updating
-every call site (in `misccmds.c` and `normal.c`) to always pass exactly
-6 arguments, padding unused trailing slots with `0` — behaviorally
-identical (the function already stops at the first `'\0'`/`0`), now
-ANSI-legal. Efficiency: `readfile()` inserts each character by shifting
-the rest of the buffer down one byte at a time — O(n²) for loading a
-file of length n (High, deferred).
+### Undo and replay
 
-### edit.c
-The main keyboard-read/dispatch loop (`edit()`, public) and its
-platform-specific input layer: `getch()` has two independent bodies
-(`__PCBIOS__`: polls `INT 16h` via `bioskey()`/`keyready()`, both
-file-private, plus a 1-byte `pending` lookahead for synthesized escape
-sequences; `__VTCMD__`: reads via BDOS function 6 into a 64-byte ring
-buffer). `windgetc()` is the OS-independent public wrapper.
-`donormal()`, `insertchar()`, `gethexchar()`, `scrolldown()` are
-file-private helpers; `getout()`, `cursupdate()`, `oneright()`,
-`oneleft()`, `beginline()`, `oneup()`, `onedown()` are public (called
-from `normal.c`/`linefunc.c`). The `#if defined(__PCBIOS__)` block's
-`bioskey()`/`keyready()` bodies are raw `#include`d `.asm` files with no
-parameters, so converting them to `static int name(void)` carries no
-`[bp+N]` stack-frame risk. Efficiency: `cursupdate()` re-scans from
-`vi_top_char` to `vi_curs_char` on every keystroke to track the virtual
-column (Medium, deferred — see Efficiency Findings Log).
+Undo is single-level, usually replaying inverse commands through the real
+interpreter. The four fixed 1,024-byte buffers hold undo, repeat, insertion and
+replacement bytes. `stuffin()` checks pending-plus-new replay length before
+changing the queue. `addtobuff()` takes six integer character slots, padded or
+terminated with zero.
 
-### window.c
-All screen/keyboard I/O, in two independent implementations gated by
-`#if defined(__VTCMD__)` / `#if defined(__PCBIOS__)` (never both). Both
-define the same public surface: `windinit`, `windgoto`, `windexit`,
-`windcursor`, `windcolor`, `windcolorreset`, `windclear`, `windstr`,
-`windputc`, `windrefresh`, `beep`, plus `viversion()`/`windusage()`
-(shared, outside either `#if`) and, PCBIOS-only, `windrefreshcursor()`
-(re-asserts the cursor position between polls, fighting CP/M-86's
-background clock/status updates — see edit.c's `getch()`).
-`windclreol()` is defined in both blocks but has **no external
-callers anywhere in the codebase**; made `static` in both. The
-`__PCBIOS__` implementation's `windgoto(r,c)`, `windcursor(on)`, and
-`windputc(c)` use raw `#asm` blocks (`windgoto.asm`/`windcurs.asm`/
-`windputc.asm`) addressing their C parameters via `[bp+4]`/`[bp+6]` —
-each already had a defensive `int dummy;` local (pre-existing, not
-added by this pass) to force Aztec to establish a stack frame; the
-ANSI signature conversion changes only the declaration syntax, not the
-calling convention, so these offsets are unaffected (verified by reading
-each `.asm` file). `windclr.asm` and `windputc.asm` reference the
-file-scope statics `cur_row`/`cur_col`/`clearbottom` by Aztec's
-`name_`-suffix convention (e.g. `cur_row_`) — these are already
-`lower_snake_case`, so no naming-pass rename was needed (and none of
-these statics should ever be renamed without also updating the `.asm`
-files that hardcode the `_`-suffixed symbol name).
+`D`/`d$`, `dw`, `C`/`c$` and `cw` reject deletions exceeding 1,021 bytes.
+Insert sessions reserve replay terminators and a possible EOF newline, normally
+accepting at most 1,020 bytes (less for some command prefixes).
+Replay must not invent an additional EOF newline.
 
-## Efficiency Findings Log
+Indent/outdent and join use literal single-byte undo rather than inverse
+commands. The existing undo buffer becomes a bitmap selecting changed lines;
+at most 8,192 visited lines are representable. Preflight rejects larger changes
+or insufficient capacity before mutation. No-op outdents and EOF joins retain
+the previous undo record. Undo can restore an originally full buffer without
+the spare-byte restriction used by interactive insertion. These literal edits
+swap the modified-state snapshot on undo; no extra file snapshot is allocated.
+`resetundo()` invalidates replay/literal records and stale Replace metadata.
 
-Per the agreed process, these are **documented, not applied**, except
-where noted. Ratings: Low (safe, local, quick win) / Medium (real but
-non-trivial, still fairly contained) / High (structural, e.g. would need
-a gap buffer or index rebuild — significant redesign risk).
+## Data movement and file I/O
 
-| Location | Issue | Rating | Status |
-|---|---|---|---|
-| `cmdline.c` `readcmdline()` | Long sequential `strcmp()` chain to dispatch `:` commands | Low | **Applied** — rewritten as a `switch (cmd[0])` bucketed dispatch |
-| `linefunc.c` `fwdsearch()`/`bcksearch()` | Naive O(n·m) character-by-character search, no early-exit optimizations (e.g. Boyer-Moore) | Medium | Documented only |
-| `misccmds.c` `inschar`/`appchar`/`delchar` (and everything built on them: `insstr`, `putline`, `delline`) | O(n) shift of the rest of the file buffer per single-character edit; O(n²) for multi-char operations | High | Documented only — true fix is a gap buffer, a significant architecture change |
-| `main.c` `readfile()` | O(n²) file load — shifts the whole in-memory buffer down for every character read | High | Documented only |
-| `edit.c` `cursupdate()` | Re-scans from `vi_top_char` to `vi_curs_char` every keystroke to recompute the virtual column | Medium | Documented only |
-| `main.c` `nexttoscreen()` / `window.c` `windputrun()` | Per-character BIOS output repeated cursor positioning and teletype work | Medium | **Applied** — row-bounded changed runs use AH=0Ah, coalesce repeated characters, set the BIOS data-area cursor before each write and update the hardware cursor once per run. Existing cell attributes are preserved. |
-| `window.c` VT `windgoto()`/`windputrun()` | Per-character stdio overhead for runs and cursor escape sequences | Medium | **Applied** — one descriptor-level write per run/sequence, preceded by a stdio flush to preserve ordering. The same CP/M console driver handles the same bytes. |
-| `window.c` PCBIOS `windrefreshcursor()`/`windputc()` | Re-issues an `INT 10h` cursor-position call for single-character/UI output and idle cursor recovery | Low (intentional tradeoff) | Retained for these callers; bulk renderer output uses `windputrun()`. |
+`inschar()`/`appchar()`/`delchar()` shift the tail once per byte.
+`insstr()` moves the tail once per string; `delline()` once per deleted range.
+`putline()` moves the tail once, loads external yank bytes, and rolls the tail
+back if loading fails. Paste separates terminated/unterminated lines as needed.
 
-The run backend uses the standard page-zero cursor word at `0040:0050`.
-Runs must not cross a row or include C0 controls; these retain the legacy
-single-character path, including carriage returns in binary data. The renderer
-supplies bounded display cells, not NUL-terminated strings. BIOS handles the actual video writes,
-including CGA synchronization. VT52/VT100 runs bypass per-character stdio calls,
-not the console driver; control characters retain their old single-byte path.
-They do not use BDOS string output, so dollar signs and high-bit bytes need no
-special treatment. Flush failures and short/failed writes terminate with an
-explicit diagnostic and keyboard restoration. Native display probes compare against the frozen
-single-character renderer and check physical screen cells, attributes, cursor
-coordinates and recovery after simulated background cursor changes.
-The VT probe checks byte-exact console streams and samples the actual CRTC
-cursor after allowing XIOS to commit asynchronous updates, rather than assuming
-the BIOS cursor shadow is authoritative. Only the test waits; production
-output has no added delay.
-See the README display-output section for benchmark scope and results.
+`readfile()` still shifts the existing tail for every imported byte:
+middle `:r` costs O(import bytes x existing tail bytes). Loading an empty
+buffer has no existing tail, so it is not quadratic for this reason.
+Read/close/capacity errors remove all bytes inserted by that read and restore
+the original tail and logical end. Text reads discard CR and stop at Ctrl-Z;
+binary reads use exact length metadata where supported.
 
-## Portability Notes
+`:e!` deliberately clears the old text after filename allocation succeeds.
+A subsequent read failure does not restore that old file. This differs from
+`:r`'s all-or-nothing insertion contract.
 
-- **Toolchain**: Aztec C86 v4.10d (1988), a pre-ANSI K&R-era compiler.
-  It accepts ANSI-style function prototypes (verified empirically across
-  this whole pass) but its standard library is much smaller than a
-  modern one — notably, no `strchr` conflict was found for `strcmp`/
-  `strcpy`/`strlen`/`malloc`/`free`/`atoi`, but `misccmds.c` had to hand-
-  roll its own `strchr()` (see Deferred/Future Work); adding
-  `<stdlib.h>`'s `malloc` prototype alongside a mismatched old-style
-  hand-declaration (`char *malloc()` vs. the real `void *malloc(unsigned)`
-  once one existed) produced a hard "multiply defined symbol" error —
-  return-type mismatches between two visible declarations of the same
-  libc function are not tolerated, even though two *compatible*
-  declarations (e.g. two empty-parens ones) are fine.
-- **Memory model**: near/tiny (16-bit pointers, `char *` and `int` are
-  both 16-bit). The codebase implicitly relies on this in a few spots
-  (e.g. historically, functions returning heap pointers with no visible
-  declaration would still "work" via implicit-`int` return, a pattern we
-  removed as we added real prototypes, but the compatibility exists as
-  the reason it never broke before this pass).
-  do NOT assume this generalizes to any other platform/compiler.
-- **`#asm`/`#endasm` blocks**: Aztec-specific inline assembly syntax, not
-  portable to any modern compiler (GCC/Clang/MSVC all use different
-  inline-asm dialects). Concentrated in `window.c` (`__PCBIOS__` block)
-  and `edit.c` (`__PCBIOS__` `bioskey()`/`keyready()`). Functions with
-  `#asm` bodies that read parameters via `[bp+N]` require Aztec to
-  establish a stack frame, which requires at least one C local variable
-  in the function (a bare `#asm`-only body with no params/locals is
-  treated as a leaf function with no frame) — already handled via a
-  defensive `int dummy;` local in the 3 affected `window.c` functions.
-- **Fixed-size buffers**: private `FILELENG` in `main.c` (38016 bytes, or
-  20480 in the DOS 1 `.COM`) for the whole file,
-  and 1024-byte `vi_undo_buff`/`vi_redo_buff`/`vi_ins_buff`/
-  `vi_repl_buf` — all compile-time constants, not configurable, a
-  direct consequence of the target's limited RAM.
-- **Row count**: 24 rows under CP/M-86 (`__CPM86__`), 25 under plain
-  PC-DOS (`__PCDOS__`) — a real behavioral difference between variants,
-  not just cosmetic (`window.c`'s `windinit()`).
+`vi_save_file()` returns an error string or NULL. DOS flushes and then uses the
+runtime's `ftruncate()`, counting physical CRLF expansion. CP/M pads records
+and uses identity-gated truncation/LRBC metadata; classic/unknown identities
+use temporary-file replacement. Empty binary saves also use replacement.
+Errors retain the modified flag and report retained recovery filenames where
+applicable. In-place saving is not crash-atomic.
+See the [save policy](../README.md#saving-files) for exact identities.
 
-## Deferred / Future Work
+## Rendering and console rules
 
-Explicitly out of scope for this pass, called out here for a follow-up:
+`filetonext()` expands bytes through the 256-entry `chars[]` table.
+Octal/hex/decimal formatting changes table strings, not the underlying file.
+Tabs and other expanded bytes can cross display rows. Delayed wrapping avoids
+consuming an extra row for a newline immediately after a full row.
+`cursupdate()` scrolls only far enough to reveal the final cursor position;
+it scans the visible prefix and the logical line prefix for column accounting.
 
-1. **Global PascalCase rename** — *(update: this has since been done,
-   outside of this modernization pass)* `State`, `Rows`, `Curschar`,
-   `Filemem`, etc. were originally left unrenamed by this pass, but were
-   subsequently renamed throughout the codebase to `vi_`-prefixed
-   `lower_snake_case` (`vi_state`, `vi_rows`, `vi_curs_char`,
-   `vi_file_mem`, ...; see the `extern` block in `stevie.h` for the
-   current full list). No longer open.
-2. **Public (non-`static`) function naming** — left as-is for the same
-   reason (e.g. `windgoto`, `readcmdline`); only file-private (`static`)
-   functions were renamed/normalized where needed in this pass (most
-   were already lower_snake_case, so in practice almost nothing changed
-   here — see per-file notes above for the handful of exceptions like
-   `Savedline` -> `savedline`).
-3. **`misccmds.c`'s hand-rolled `strchr()`** — shadows the real
-   `strchr()` that Aztec's own `<string.h>` provides (confirmed by the
-   `#include <string.h>` + custom-definition conflict encountered and
-   reverted during this pass). Options for a follow-up: (a) delete the
-   custom implementation and rely on `<string.h>`'s real one (needs a
-   behavioral equivalence check — the custom one returns `NULL` for "not
-   found", matches standard semantics as far as tested), or (b) rename
-   the custom function (e.g. `vfindchr`) to stop shadowing the standard
-   name and make the override explicit. Either way, `stevie.h`'s
-   `strchr()` prototype currently has to stay in the old empty-parens
-   (unspecified-args) form to avoid a "multiply defined symbol" error;
-   giving it a real `(char *, int)` prototype requires resolving this
-   first.
-4. **Efficiency — structural fixes** — see the High-rated rows in the
-   Efficiency Findings Log (`readfile()`, `inschar`/`appchar`/`delchar`
-   and everything built on them). A real fix means a gap buffer or
-   piece-table representation for the file, which is a significant
-   rewrite of `main.c`/`misccmds.c`/`linefunc.c`'s shared assumption
-   that the file is one contiguous array — worth a dedicated follow-up
-   effort, not a quick patch.
-5. **Efficiency — Low-risk items** — the `cmdline.c` sequential
-   `strcmp()` dispatch chain fix has been applied (see Efficiency
-   Findings Log above).
+`nexttoscreen()` loads external rows and groups adjacent changed printable
+cells into runs. Runs are positive-length, stay within one row and exclude
+C0 controls. Control bytes and leading colored `~` use the legacy single-byte
+path. Desired/real screen rows are updated consistently; the status row is
+never part of the document diff.
 
-## Verification Record
+BIOS runs use INT 10h/AH=0Ah, coalescing repeated characters with CX and preserving
+cell attributes. Set the page-zero BIOS cursor word at `0040:0050` before
+every BIOS write; background console activity can otherwise redirect output.
+The hardware cursor is updated once per run. No direct video-memory writes are
+used; the BIOS retains CGA synchronization. UI/single-byte output and idle
+cursor recovery retain explicit cursor positioning.
 
-- Baseline (start of this pass): codebase was 100% K&R, zero ANSI
-  prototypes, but already built cleanly under `aztec42_cc`.
-- After every file's conversion, the affected `.o` target(s) were
-  rebuilt in isolation (`make clean && make <file>.o [...]`) and
-  checked for zero new warnings/errors.
-- Final state: `make clean && make` (full rebuild of all 6 binaries —
-  `vicp52.cmd`, `vicp100.cmd`, `vicpbios.cmd`, `vid1bios.com`, `vid1bios.exe`,
-  `vid2bios.exe`) succeeds with **zero warnings and zero errors**.
-- Functional/manual smoke-testing in the emulator (emu2/PCE) is the
-  user's responsibility per the agreed process, not automated here.
+VT runs and cursor sequences use descriptor-level writes, bypassing
+per-character stdio overhead but not the CP/M console driver. Flush pending
+stdio bytes first to preserve ordering. Do not substitute dollar-terminated
+BDOS string output: dollar signs/high-bit bytes must survive unchanged.
+Flush/short-write/write errors diagnose failure and restore keyboard state.
+Only native tests wait for asynchronous XIOS hardware-cursor updates;
+production adds no delay.
+
+Aztec inline assembly uses suffixed symbols (`cur_row_`, etc.) and stack
+arguments at `[bp+4]`/`[bp+6]`. A local `int dummy;` forces the required BP
+frame. Changing C statics or signatures requires checking their included
+assembly, not just C callers.
+
+## Modules and platform boundaries
+
+| Module | Responsibility |
+|---|---|
+| `main.c` | Startup/globals, file allocation/read, screen construction/diff, replay queue |
+| `edit.c` | Real keyboard/state parser, insertion/replacement, cursor/viewport movement |
+| `normal.c` | Normal commands, indentation/join literal undo, undo reset |
+| `cmdline.c` | `:`/search line parsing, bounded command input, optional message cache |
+| `linefunc.c` | Line/column helpers, checked string ownership, search history/scan |
+| `misccmds.c` | Editing primitives, line yank/paste, file information |
+| `hexchars.c` / `help.c` | Character representations and built-in help |
+| `save.c` / `save.h` | OS-specific save, truncation/replacement, exact-length query |
+| `window.c` / included assembly | VT/BIOS output and initialization/restoration |
+| `keyboard.c` / `keyos.c` / `os.asm` | Concurrent console keyboard mapping, OS identity/restoration |
+| `yankmem.c` / `yankmem.h` | Checked external yank/screen APIs |
+| `yankcopy.asm` / `yankcp.asm` / `yankd*.asm` | Segment copies and platform reservation/release |
+| `stevie.h` / `keyboard.h` / `keyos.h` | Shared types, state and public prototypes |
+
+Concurrent BDOS consoles use `vi_key_read()` instead of BIOS keyboard input,
+temporarily disabling function-key expansion and restoring it on exit.
+Legacy CP/M/DOS input paths remain. DOS Plus text-mode restoration is gated by
+its OS identity and never invoked on concurrent systems.
+
+## Verification and remaining costs
+
+Host sanitizer tests exercise production functions and the real command parser;
+some harnesses still extract function bodies (M2). Standard string functions
+come from `<string.h>`; no local `strchr()` override remains.
+
+Native tests cover all six variants, full-capacity text/newline/binary files,
+byte-exact save/reopen, external storage bounds and held-spare heap budgets.
+The current verified budgets are 4 KiB in normal profiles and 2 KiB at CP/M's
+minimum DATA allocation; these are guaranteed test allocations, not measured
+maximum free heap. Real DOS 1 boots additionally exercise COM/EXE on 128/256 KiB.
+
+Display tests compare frozen/current renderers, physical cells/attributes and
+cursor behavior, including simulated BIOS cursor disturbances and VT byte
+streams. Existing display timing results are in the
+[README](../README.md#display-output); do not rerun all display profiles merely
+to measure unrelated CPU work.
+
+Remaining candidates are middle-import batching (P2), repeated cursor/line
+rescans and naive O(n x pattern length) search (P4), disk buffering (P5), and
+character-table compaction (S1). String insertion, line deletion and paste
+already use bulk tail moves. None of these candidates requires committing to
+a gap-buffer rewrite. Measure separately before trading memory for speed.

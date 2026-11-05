@@ -488,9 +488,9 @@ so the two builds share the same escape-parsing code in `edit.c`.
 - **git** (optional) — used to embed a version string via `:v`; falls back
   to `unknown` if not run from a git checkout
 - **CP/M-86 1.1**, from [tsupplis/cpm86-kernel](https://github.com/tsupplis/cpm86-kernel),
-  for the `vivt52.cmd`/`vivt100.cmd`/`vibios.cmd` binaries
+  for the `vicp52.cmd`/`vicp100.cmd`/`vicpbios.cmd` binaries
 - **PC-DOS 1.1**, from [tsupplis/pcdos11-hacking](https://github.com/tsupplis/pcdos11-hacking),
-  for the `vidos.com` binary
+  for the `vid1bios.com` and `vid1bios.exe` binaries
 - An emulator for testing — optional; two suitable options:
   - **PCE** CP/M-86 emulator (`cpm86`), for the CP/M-86 binaries
   - **emu2** — runs both CP/M-86 `.cmd` and DOS `.com` binaries locally,

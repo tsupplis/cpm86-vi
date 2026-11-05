@@ -338,6 +338,10 @@ test-vt-output:
 test-vt-pce:
 	python3 -B test/test_vt_pce.py
 
+.PHONY: test-perf-pce
+test-perf-pce:
+	python3 -B test/test_perf_pce.py
+
 .PHONY: test-capacity-runtime
 test-capacity-runtime:
 	python3 -B test/test_capacity_runtime.py

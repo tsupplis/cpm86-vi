@@ -53,13 +53,8 @@ Checked items have completed their documented implementation and validation.
   and unchanged all-or-nothing failure behavior.
 
 - [x] **P3 - Add efficient changed-run screen output.**
-  **First implementation priority.** Capture a focused display baseline before
-  changing output: full redraw, scrolling, single-character edits and long
-  changed runs, using a fixed 8088 configuration.
-  The renderer already skips unchanged cells and tracks contiguous output, but
-  the BIOS character writer still positions the cursor for each character.
-  Make the backend output contiguous runs without redundant cursor positioning;
-  preserve the existing single-character path for other callers.
+  Row-bounded changed runs avoid redundant BIOS cursor positioning while
+  preserving the existing single-character path for other callers.
   **Done when:** identical frames and cursor behavior, fewer BIOS/terminal calls,
   a measured display-speed improvement, and preserved attributes,
   status-row/background-clock handling and terminal compatibility.
@@ -112,23 +107,15 @@ Checked items have completed their documented implementation and validation.
 
 ## 5. Maintainability: targeted cleanup
 
-- [ ] **M1 - Refresh the design documentation and invariant list.**
+- [x] **M1 - Refresh the design documentation and invariant list.**
   Remove obsolete descriptions of allocation, bulk operations and platform
   layouts.
   **Done when:** documentation matches current behavior and explains the
   important memory, arithmetic and failure-handling rules.
+  **Result:** current module/platform map, ownership/undo/rendering invariants,
+  accurate bulk-vs-per-byte costs and validation/heap-budget scope.
 
 - [ ] **M2 - Reduce source-extraction fragility in tests.**
   Introduce narrow test entry points where existing tests parse function bodies.
   **Done when:** selected tests exercise production code directly without copying
   its implementation or enlarging production binaries.
-
-## Recommended order
-
-P3 is complete. Next: Q1-Q4, the remainder of P1, Q5 and P2. Choose the remaining
-work from measurements. Native VT100/ANSI timing remains optional follow-up.
-
-Every implementation task should preserve the current buffer limits, native
-memory-budget checks and supported-platform behavior.
-
-No autoindent, gap-buffer rewrite or feature expansion beyond this list.
