@@ -73,6 +73,8 @@ char *nextline(char *curr);
 char *prevline(char *curr);
 char *coladvance(char *p, unsigned long col);
 char *strsave(char *string);
+/* Current filename is NULL or owned storage; copy before releasing aliases. */
+int vi_set_filename(char *name);
 void dosearch(int dir, char *str);
 void repsearch(void);
 

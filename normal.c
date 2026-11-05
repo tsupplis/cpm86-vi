@@ -5,9 +5,14 @@
 #include "stevie.h"
 #include <ctype.h>
 #include <stdio.h>
+#include <string.h>
 
 static void tabinout(int inout, unsigned num);
+static void undochange(void);
+static void applychange(int remove);
 static void startinsert(char *initstr);
+static unsigned change_lines, change_count;
+static int change_remove, change_char;
 
 /*
  * normal
@@ -370,17 +375,20 @@ void normal(int c)
         vi_state = REPLACE;
         break;
     case 'J':
-        for (p = vi_curs_char; *p != '\n' && p < (vi_file_end - 1); p++)
+        for (p = vi_curs_char; p < vi_file_end && *p != '\n'; p++)
             ;
-        if (p >= (vi_file_end - 1)) {
+        if (p == vi_file_end || p + 1 == vi_file_end) {
             beep();
             break;
         }
-        vi_curs_char = p;
-        delchar();
         resetundo();
+        vi_curs_char = p;
         vi_uncurs_char = vi_curs_char;
-        addtobuff(vi_undo_buff, 'i', '\n', '\033', 0, 0, 0);
+        delchar();
+        vi_undo_buff[0] = 1;
+        change_lines = change_count = 1;
+        change_remove = 0;
+        change_char = '\n';
         addtobuff(vi_redo_buff, 'J', 0, 0, 0, 0, 0);
         updatescreen();
         break;
@@ -388,7 +396,9 @@ void normal(int c)
         stuffin(vi_redo_buff);
         break;
     case 'u':
-        if (vi_unrpl_chars > 0) {
+        if (change_lines != 0) {
+            undochange();
+        } else if (vi_unrpl_chars > 0) {
             /* Undo Replace mode: restore original characters */
             char *rp = vi_repl_buf;
             int k = vi_unrpl_chars;
@@ -475,35 +485,101 @@ void normal(int c)
  */
 
 static void tabinout(int inout, unsigned num) {
-    unsigned ntodo = num;
-    char *savecurs, *p;
+    unsigned lines = 0, changes = 0, i;
+    char *savecurs = vi_curs_char, *start, *p;
 
+    if (vi_curs_char >= vi_file_end)
+        return;
     beginline();
-    savecurs = vi_curs_char;
-    while (ntodo > 0) {
-        ntodo--;
-        beginline();
-        if (inout == 0)
-            inschar('\t');
-        else {
-            if (*vi_curs_char == '\t')
-                delchar();
-        }
-        if (ntodo > 0) {
-            if ((p = nextline(vi_curs_char)) != NULL)
-                vi_curs_char = p;
-            else
-                break;
-        }
-    }
-    /* We want to end up where we started */
+    start = vi_curs_char;
     vi_curs_char = savecurs;
-    updatescreen();
-    /* Construct re-do and un-do stuff */
-    sprintf(vi_redo_buff, "%u%s", num, inout == 0 ? ">>" : "<<");
+    p = start;
+    do {
+        lines++;
+        if (!inout || *p == '\t')
+            changes++;
+        p = nextline(p);
+    } while (p != NULL && lines < num);
+    if (changes == 0)
+        return;
+    if (lines > sizeof vi_undo_buff * 8U) {
+        message("Indentation too big for undo; command rejected!");
+        return;
+    }
+    if (!inout && changes >= vi_byte_span(vi_file_end, vi_file_max)) {
+        message("Can't add anything, file is too big!");
+        return;
+    }
     resetundo();
-    vi_uncurs_char = savecurs;
-    sprintf(vi_undo_buff, "%u%s", num, inout == 0 ? "<<" : ">>");
+    vi_uncurs_char = start;
+    memset(vi_undo_buff, 0, (lines + 7U) / 8U);
+    for (p = start, i = 0; i < lines; i++) {
+        if (!inout || *p == '\t')
+            vi_undo_buff[i / 8U] |= 1U << (i % 8U);
+        p = nextline(p);
+    }
+    change_lines = lines;
+    change_count = changes;
+    change_remove = !inout;
+    change_char = '\t';
+    applychange(inout);
+    sprintf(vi_redo_buff, "%u%s", num, inout ? "<<" : ">>");
+    CHANGED;
+}
+
+/* One bit per visited line selects literal single-byte edits, including J. */
+static void applychange(int remove)
+{
+    char *p = vi_uncurs_char;
+    unsigned i;
+    for (i = 0; i < change_lines; i++) {
+        if ((unsigned char)vi_undo_buff[i / 8U] & (1U << (i % 8U))) {
+            if (remove) {
+                memmove(p, p + 1, vi_byte_span(p + 1, vi_file_end));
+                vi_file_end--;
+            } else {
+                memmove(p + 1, p, vi_byte_span(p, vi_file_end));
+                *p = change_char;
+                vi_file_end++;
+            }
+        }
+        p = nextline(p);
+        if (p == NULL)
+            p = vi_file_end;
+    }
+    vi_curs_char = vi_uncurs_char;
+    if (change_char == '\n' && vi_curs_char > vi_file_mem)
+        vi_curs_char--;
+}
+
+static void undochange(void)
+{
+    char *p = vi_uncurs_char;
+    unsigned i;
+    int dirty = vi_changed;
+
+    if (!change_remove && change_count > vi_byte_span(vi_file_end, vi_file_max)) {
+        message("Can't add anything, file is too big!");
+        return;
+    }
+    for (i = 0; i < change_lines; i++) {
+        if (p < vi_file_mem || p > vi_file_end ||
+            (p == vi_file_end && (i + 1U != change_lines || change_remove)) ||
+            (change_remove &&
+             ((unsigned char)vi_undo_buff[i / 8U] & (1U << (i % 8U))) &&
+             *p != change_char)) {
+            message("Unable to undo change; command rejected!");
+            return;
+        }
+        p = nextline(p);
+        if (p == NULL)
+            p = vi_file_end;
+    }
+    applychange(change_remove);
+    change_remove = !change_remove;
+    vi_changed = vi_undo_changed;
+    vi_undo_changed = dirty;
+    updatescreen();
 }
 
 static void startinsert(char *initstr)
@@ -524,4 +600,6 @@ void resetundo(void) {
     vi_undel_chars = 0;
     *vi_undo_buff = '\0';
     vi_uncurs_char = NULL;
+    vi_unrpl_chars = 0;
+    change_lines = 0;
 }

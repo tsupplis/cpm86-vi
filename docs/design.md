@@ -13,9 +13,10 @@ whole file being edited lives in one contiguous heap block (`vi_file_mem`
 .. `vi_file_max`), and the screen is rendered by diffing a "next" frame
 against a "real" (currently displayed) frame buffer, only emitting the
 bytes that changed. There is no gap buffer, undo tree, or multi-file
-support — undo is a single-level "redo the opposite editop" scheme built
-from small fixed-size command buffers (`vi_undo_buff`, `vi_redo_buff`,
-`vi_ins_buff`, `vi_repl_buf`).
+support. Undo is single-level, usually replaying the opposite edit through
+small fixed-size command buffers (`vi_undo_buff`, `vi_redo_buff`,
+`vi_ins_buff`, `vi_repl_buf`). Indentation and join use literal-byte undo
+records in the same fixed storage rather than replaying inverse commands.
 
 Keyboard input and screen output are the only genuinely platform-specific
 parts of the program (`edit.c`'s `getch()`/`bioskey()`/`keyready()`, and
@@ -71,7 +72,7 @@ since been renamed (outside this pass) to `vi_`-prefixed
 in the `extern` block near the top of `stevie.h`.
 
 - **File buffer**: `vi_file_mem`/`vi_file_max`/`vi_file_end` — a single
-  fixed-size heap block (`FILELENG` = 38016 bytes, or 24000 in the DOS 1 `.COM`) holding
+  fixed-size heap block (`FILELENG` = 38016 bytes, or 20480 in the DOS 1 `.COM`) holding
   the whole file as raw bytes; `vi_file_end` is the current logical end,
   `vi_file_max` the allocated end. `vi_curs_char` points at the cursor's
   byte. There is no gap buffer — insert/delete shift the tail of the
@@ -82,7 +83,7 @@ in the `extern` block near the top of `stevie.h`.
   only changed cells are redrawn. CP/M-86 and DOS 2 reserve a 64 KiB
   external segment with a 38,016-byte yank region; DOS 1 `.EXE` uses the same
   layout in process-owned memory above its 64 KiB near-data window. DOS 1
-  `.COM` reserves 32 KiB there, with a 24,000-byte yank region.
+  `.COM` reserves 32 KiB there, with a 20,480-byte yank region.
   Both DOS 1 adapters share `yankd11.asm`; `yankd1c.asm` selects the compact
   constants. No DOS 2 memory
   allocation calls are needed on DOS 1. No screen-image heap allocation
@@ -99,6 +100,11 @@ in the `extern` block near the top of `stevie.h`.
   normal-mode or insert-mode interpreters, reproduce or reverse the last
   change. `vi_uncurs_char` is the cursor position to restore before
   replaying.
+  For indentation and join, private metadata selects literal tab/newline edits.
+  The existing undo buffer is a bitmap of changed lines (up to 8192 visited
+  lines), so mixed/no-op outdents do not invent tabs. Preflight rejects capacity
+  or bitmap overflow before mutation; undo can restore a completely full buffer.
+  Modified-state snapshots are captured before editing and swapped on undo.
 - **`struct charinfo { char ch_size; char *ch_str; }`** (`stevie.h`) —
   one entry per byte value 0-255 (table in `hexchars.c`), giving the
   on-screen width and (for non-printable bytes) the placeholder string
@@ -138,7 +144,12 @@ Findings Log — rated Low, applied).
 Line/column navigation (`nextline`, `prevline`, `coladvance`) and
 search (`ssearch`/`fwdsearch`/`bcksearch`, file-private; `dosearch`/
 `repsearch` public), plus the allocator helpers `alloc()` (private) and
-`strsave()` (public). `fwdsearch`/`bcksearch` are a naive O(n·m)
+`strsave()` (public). Allocation failure reports an error and returns NULL;
+callers retain their previous state. `vi_set_filename()` owns filename
+replacement, copying before freeing the previous name so aliases are safe.
+The current filename is NULL or owned heap storage. Repeat search reuses its
+saved pattern without allocating; a failed replacement retains pattern and
+direction. `fwdsearch`/`bcksearch` are a naive O(n·m)
 character-by-character scan (Efficiency Findings Log — Medium, deferred).
 
 ### misccmds.c
@@ -159,9 +170,11 @@ operations (`insstr`, `putline`, `delline`) are O(n²) (High, deferred —
 true fix is a gap buffer, out of scope for this pass).
 
 ### normal.c
-The normal-mode command interpreter (`normal()`, public) and its two
-helpers `tabinout()` (indent/outdent) and `startinsert()`, both
-file-private. `resetundo()` is public (called from `misccmds.c` too).
+The normal-mode command interpreter (`normal()`, public), `tabinout()`
+(indent/outdent), shared literal-byte undo helpers, and `startinsert()`.
+Helpers are file-private. `resetundo()` is public (called from `misccmds.c`
+too); it invalidates both replay and literal-byte records and stale Replace
+state. Opening another file resets undo after filename allocation succeeds.
 This file already used angle-bracket `<ctype.h>`/`<stdio.h>` before this
 pass — the sole exception noted in the initial survey.
 
@@ -301,7 +314,7 @@ See the README display-output section for benchmark scope and results.
   treated as a leaf function with no frame) — already handled via a
   defensive `int dummy;` local in the 3 affected `window.c` functions.
 - **Fixed-size buffers**: private `FILELENG` in `main.c` (38016 bytes, or
-  24000 in the DOS 1 `.COM`) for the whole file,
+  20480 in the DOS 1 `.COM`) for the whole file,
   and 1024-byte `vi_undo_buff`/`vi_redo_buff`/`vi_ins_buff`/
   `vi_repl_buf` — all compile-time constants, not configurable, a
   direct consequence of the target's limited RAM.

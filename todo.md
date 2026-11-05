@@ -3,38 +3,41 @@
 Goal: a small, dependable editor with predictable behavior, good responsiveness,
 and economical use of code and memory.
 
-This is a proposed execution backlog, not a record of completed work.
+Checked items have completed their documented implementation and validation.
 
 ## 1. Quality: concrete correctness work
 
-- [ ] **Q1 - Handle string-allocation failures safely.**
-  `strsave()` in [linefunc.c](linefunc.c) currently passes an unchecked allocation
-  result to `strcpy`. Update its callers too.
+- [x] **Q1 - Handle string-allocation failures safely.**
+  `strsave()` in [linefunc.c](linefunc.c) and its callers check allocation
+  failures; repeat search reuses its saved pattern.
   **Done when:** allocation failure reports an error without crashing, losing the
   previous search, or replacing a valid filename.
 
-- [ ] **Q2 - Fix filename ownership.**
-  Repeated `:f` and `:e` allocate replacement names without consistently releasing
-  the previous allocation.
+- [x] **Q2 - Fix filename ownership.**
+  All filename replacement uses copy-before-free ownership, including aliased
+  names. A failed allocation leaves the old filename and buffer intact.
   **Done when:** repeated renaming/opening does not consume heap; replacing a name
   is safe even when the argument aliases the current name.
 
-- [ ] **Q3 - Make indent/outdent and undo agree.**
-  `tabinout()` in [normal.c](normal.c) constructs undo by applying the opposite
-  operation to every requested line, even when some lines were unchanged.
+- [x] **Q3 - Make indent/outdent and undo agree.**
+  `tabinout()` in [normal.c](normal.c) preflights the complete operation and
+  records changed lines in the existing undo buffer (up to 8,192 visited lines).
   **Done when:** mixed indentation, no-op outdents and capacity rejection preserve
   text correctly; undo restores exactly the original bytes and modified flag.
 
-- [ ] **Q4 - Fix join-command state accounting.**
-  `J` captures undo state after deleting the newline.
+- [x] **Q4 - Fix join-command state accounting.**
+  `J` captures state before deletion and shares literal-byte undo with indentation.
   **Done when:** join followed by undo restores both original text and the
   original clean/dirty state; joining at EOF leaves prior undo intact.
 
-- [ ] **Q5 - Build a command-consistency regression corpus.**
+- [x] **Q5 - Build a command-consistency regression corpus.**
   Exercise commands through the real parser, including counts, cancellation,
   undo and repeat.
   **Done when:** empty, one-line, unterminated and full buffers have deterministic
   expected results; rejected commands preserve the documented state.
+  **Result:** sanitizer-backed table-driven parser coverage across both buffer
+  capacities, allocation-failure/ownership checks, bitmap-boundary tests and
+  native parser checks alongside full-buffer/heap-budget regressions.
 
 ## 2. Responsiveness: measure, then optimize
 

@@ -26,6 +26,7 @@ static long fail_after = -1L;
 static int read_failed, fail_close;
 void message(char *s) { snprintf(last_output, sizeof last_output, "%s", s); }
 char *strsave(char *s) { return s; }
+int vi_set_filename(char *s) { vi_file_name = s; return 1; }
 static int test_getc(FILE *f) {
     if (fail_after == 0L) { read_failed = 1; return EOF; }
     if (fail_after > 0L) fail_after--;

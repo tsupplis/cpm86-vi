@@ -93,7 +93,7 @@ git checkout) as the version shown by the `:v` command; see `gitver.h`
 
 Run `make test-editor-state` with a host C compiler (`cc`, or `CC_HOST`)
 supporting AddressSanitizer and UndefinedBehaviorSanitizer. These tests cover
-the 38,016-byte default/DOS 1 `.EXE` and 24,000-byte DOS 1 `.COM` buffers, including
+the 38,016-byte default/DOS 1 `.EXE` and 20,480-byte DOS 1 `.COM` buffers, including
 exact-limit reads, oversized-read rollback, and full-buffer delete/undo.
 They also cover
 failed saves retaining the modified flag, failed `:r` leaving the buffer
@@ -104,6 +104,16 @@ the middle/end of a buffer. Oversized imports and read/close failures cancel
 the entire insertion and preserve the original buffer and modified state.
 The same tests exercise buffer limits, recovery with Backspace/Escape,
 undo/repeat at the insertion limit, and search wraparound at file boundaries.
+Allocation-failure injection checks that filenames, search history and existing
+text survive rejected commands. Ownership tracking checks repeated `:f`/`:e`
+and aliased filename replacement for leaks and invalid frees. A table-driven
+corpus feeds the real command parser: counts, cancellation, repeat and undo,
+mixed indentation, empty/unterminated lines and full buffers. Specific cases
+can be selected together, for example:
+`python3 -B test/test_editor_state.py quality-commands quality-rejections`.
+
+Aztec compiler intermediates share `TMPDIR/AZTEC/TEMP`. Run native compilations
+serially and use a private `TMPDIR` when other Aztec builds may be active.
 
 ### Editing limits
 
@@ -113,6 +123,11 @@ changing the text or undo state. Insert sessions accept at most 1020 bytes
 (slightly fewer for two-key commands or opened lines), reserving space for
 an automatic EOF newline and replay terminators. Excess input produces a
 warning; Backspace and Escape remain available.
+Indent/outdent preflight the complete change and reuse the undo buffer as a
+bitmap for up to 8,192 visited lines; larger changes are rejected before editing.
+Unchanged outdents and capacity rejection preserve the previous undo record.
+Indent/outdent and join undo restore the original bytes and modified flag,
+including an originally full buffer, without allocating an additional snapshot.
 
 Command lines hold 99 bytes after `:` (98 after `/` or `?`). If input
 overflows, Enter cancels the command rather than executing a truncated name.
@@ -122,7 +137,7 @@ mode) prompts for two digits without temporarily modifying the file.
 Undo/repeat replays the recorded bytes without adding another EOF newline.
 
 Yanked/deleted lines and both screen images share an external memory segment,
-not the near C heap. The editing buffer holds 38,016 bytes, or 24,000 bytes
+not the near C heap. The editing buffer holds 38,016 bytes, or 20,480 bytes
 in the DOS 1 `.COM`. `FILELENG` is defined only in `main.c`; `VI_DOS1_COM`
 selects the compact limit.
 A full-buffer yank therefore no longer needs a second near-heap allocation.
@@ -143,7 +158,7 @@ runtime. Segment reservation is platform-specific:
 - DOS 2.x: allocate 4,096 paragraphs (64 KiB) with INT 21h/AH=48h and release
   them with AH=49h on exit.
 
-The yank region matches the editing limit: 38,016 bytes, or 24,000 bytes in
+The yank region matches the editing limit: 38,016 bytes, or 20,480 bytes in
 the DOS 1 `.COM`. Two 2,000-byte screen slots
 follow it. Rendering uses two 80-byte near row buffers instead of allocating
 two full screens on the near heap. This removes 3,840 bytes of screen heap
@@ -170,7 +185,8 @@ restores a full-file deletion. Character insertion still reserves a byte.
 entry point and runs them under `emu2`, without scripted keyboard input. It checks
 full-buffer loading, yank/delete/undo (including numeric replay), rejected
 growth, and byte-exact saving/reopening for text, all-newline and binary files,
-while holding an additional 4 KiB heap allocation (1 KiB in the DOS 1 `.COM`).
+while holding an additional 4 KiB heap allocation in every variant.
+It also checks parser-driven indent/outdent undo and full-buffer join undo.
 The CP/M checks also verify the DATA header limits and repeat with allocation
 capped at the 60 KiB minimum, holding an additional 2 KiB heap allocation.
 
@@ -183,10 +199,10 @@ It requires PCE, mtools/cpmtools and the same local kernel fixtures as the
 save-runtime tests.
 
 `make test-dos1-pce` runs both full DOS 1 editor probes on private DOS 1.1
-boot images: 24,000 bytes on 128 KiB RAM for `.COM`, 38,016 bytes on 256 KiB
+boot images: 20,480 bytes on 128 KiB RAM for `.COM`, 38,016 bytes on 256 KiB
 RAM for `.EXE`. It verifies binary read/yank/delete/undo/save/reopen cycles
-and rejected oversized input while holding an additional 1 KiB/4 KiB heap
-allocation respectively, then compares the saved bytes.
+and rejected oversized input while holding an additional 4 KiB heap
+allocation in each format, then compares the saved bytes.
 
 `make test-scroll` checks scrolling, paging, status-row protection, screen
 clearing/diffing, and 500 frame/Botchar comparisons against the previous renderer
@@ -292,7 +308,7 @@ add oversized-command cancellation, unsigned count replay and undo checks;
 the six production probes also verify count rejection and 65,535-count
 delete/toggle operations.
 
-Production editing and yank limits are 38,016 bytes, or 24,000 bytes in
+Production editing and yank limits are 38,016 bytes, or 20,480 bytes in
 the DOS 1 `.COM`.
 
 Searches wrap within the file only, handle overlapping matches, and start

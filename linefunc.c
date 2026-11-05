@@ -114,7 +114,23 @@ static char *alloc(unsigned size)
 
 char *strsave(char *string)
 {
-    return (strcpy(alloc((unsigned)(strlen(string) + 1)), string));
+    char *saved = alloc((unsigned)(strlen(string) + 1));
+    return saved == NULL ? NULL : strcpy(saved, string);
+}
+
+int vi_set_filename(char *name)
+{
+    char *saved;
+
+    if (name == vi_file_name)
+        return 1;
+    saved = strsave(name);
+    if (saved == NULL)
+        return 0;
+    if (vi_file_name != NULL)
+        free(vi_file_name);
+    vi_file_name = saved;
+    return 1;
 }
 
 static char *laststr = NULL;
@@ -122,23 +138,26 @@ static int lastdir;
 
 static char *ssearch(int dir, char *str) /* dir: FORWARD or BACKWARD */
 {
-    char *saved = strsave(str);
-
-    if (laststr != NULL)
-        free(laststr);
-    laststr = saved;
-    lastdir = dir;
     if (dir == BACKWARD)
-        return (bcksearch(laststr));
+        return (bcksearch(str));
     else
-        return (fwdsearch(laststr));
+        return (fwdsearch(str));
 }
 
 void dosearch(int dir, char *str)
 {
     char *p;
 
-    if ((p = ssearch(dir, str)) == NULL)
+    if (str != laststr) {
+        p = strsave(str);
+        if (p == NULL)
+            return;
+        if (laststr != NULL)
+            free(laststr);
+        laststr = p;
+    }
+    lastdir = dir;
+    if ((p = ssearch(dir, laststr)) == NULL)
         message("Pattern not found");
     else {
         char *savep;

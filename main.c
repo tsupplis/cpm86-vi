@@ -18,7 +18,7 @@ static void screenalloc(void);
 static void screenerror(void);
 
 #ifdef VI_DOS1_COM
-#define FILELENG 24000U
+#define FILELENG 20480U
 #else
 #define FILELENG 38016U
 #endif
@@ -158,14 +158,18 @@ int main(int argc, char **argv)
     }
 #endif
 
-    vi_file_name = strsave(argv[1]);
-
     windinit();
 
     /* Make sure Rows/Columns are big enough */
     if (vi_rows < 3 || vi_columns < 16) {
         fprintf(stderr, "Rows=%d Columns=%d not big enough!\n", vi_rows, vi_columns);
         windexit(0);
+    }
+
+    if (!vi_set_filename(argv[1])) {
+        fputs("Unable to allocate initial filename!\n", stderr);
+        vi_key_exit();
+        return 1;
     }
 
     switch (mode) {
@@ -396,8 +400,11 @@ int readfile(char *fname, char *fromp, int nochangename) /* if 1, don't change t
     snprintf(buff, sizeof buff, "Reading %s...", fname);
     message(buff);
 
-    if (!nochangename)
-        vi_file_name = strsave(fname);
+    if (!nochangename) {
+        if (!vi_set_filename(fname))
+            return -1;
+        fname = vi_file_name;
+    }
 
     remaining=vi_binary ? vi_file_length(fname) : -1L;
     if ((f = fopen(fname, "r")) == NULL) {

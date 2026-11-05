@@ -150,8 +150,7 @@ void readcmdline(int firstc) /* either ':', '/', or '?' */
         if (strcmp(cmd, "f") == 0) {
             if (arg == NULL)
                 fileinfo();
-            else {
-                vi_file_name = strsave(arg);
+            else if (vi_set_filename(arg)) {
                 filemess("");
             }
             return;
@@ -162,12 +161,12 @@ void readcmdline(int firstc) /* either ':', '/', or '?' */
             if (cmd[1] != '!' && vi_changed) {
                 message("File not written out.  Use 'e!' to override.");
             } else {
-                if (arg != NULL)
-                    vi_file_name = strsave(arg);
+                if (arg != NULL && !vi_set_filename(arg))
+                    return;
                 /* clear mem and read file */
                 vi_file_end = vi_top_char = vi_curs_char = vi_file_mem;
                 UNCHANGED;
-                p = nextline(vi_curs_char);
+                resetundo();
                 readfile(vi_file_name, vi_file_end, 0);
                 updatescreen();
             }

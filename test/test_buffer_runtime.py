@@ -5,6 +5,7 @@ import os
 import shutil
 import struct
 import subprocess
+import sys
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -14,8 +15,8 @@ PROGRAMS = ('vicp52.cmd', 'vicp100.cmd', 'vicpbios.cmd',
 PROBE = r'''
 #include "editor.c"
 
-#define REQUIRE(x) if (!(x)) { \
-    fprintf(stderr, "VI BUFFER FAIL: line %d\n", __LINE__); return 1; }
+static int failure_line;
+#define REQUIRE(x) if (!(x)) { failure_line = __LINE__; goto failure; }
 
 extern void vi_test_donormal(int c);
 static int pattern_mode;
@@ -38,6 +39,24 @@ static int contents(void) {
     return 1;
 }
 
+static int quality_commands(void) {
+    static char original[] = "\ta\nb\n\tc";
+    memcpy(vi_file_mem, original, sizeof original - 1);
+    vi_file_end = vi_file_mem + sizeof original - 1;
+    vi_top_char = vi_curs_char = vi_file_mem;
+    vi_changed = 0;
+    resetundo();
+    REQUIRE(stuffin("3<<u3>>u"));
+    while (anyinput())
+        vi_test_donormal(vgetc());
+    REQUIRE(vi_file_end == vi_file_mem + sizeof original - 1);
+    REQUIRE(!memcmp(vi_file_mem, original, sizeof original - 1) && !vi_changed);
+    resetundo();
+    return 0;
+failure:
+    return 1;
+}
+
 int main(int argc, char **argv) {
     char *spare;
     char expected_undo[16];
@@ -56,8 +75,8 @@ int main(int argc, char **argv) {
             REQUIRE(0);
     }
 #ifdef VI_DOS1_COM
-    spare_size = 1024;
-    REQUIRE(FILELENG == 24000U);
+    spare_size = 4096;
+    REQUIRE(FILELENG == 20480U);
 #else
     spare_size = minimum ? 2048 : 4096;
     REQUIRE(FILELENG == 38016U);
@@ -73,10 +92,16 @@ int main(int argc, char **argv) {
     REQUIRE(spare != NULL);
     memset(spare, 'Z', (unsigned)spare_size);
     vi_binary = 1;
+    if (quality_commands() != 0)
+        goto failure;
     vi_file_end = vi_top_char = vi_curs_char = vi_file_mem;
     screenclear();
     REQUIRE(readfile("INPUT.TXT", vi_file_mem, 1) == 0);
     REQUIRE(contents());
+    REQUIRE(stuffin("Ju"));
+    while (anyinput())
+        vi_test_donormal(vgetc());
+    REQUIRE(contents() && !vi_changed);
 
     REQUIRE(yankline(FILELENG));
     vi_changed = 0;
@@ -143,6 +168,9 @@ int main(int argc, char **argv) {
                     (unsigned)FILELENG, spare_size) >= 0);
     REQUIRE(fclose(report) == 0);
     return 0;
+failure:
+    fprintf(stderr, "VI BUFFER FAIL: line %d\n", failure_line);
+    return 1;
 }
 '''
 
@@ -181,11 +209,14 @@ def build(work, programs=PROGRAMS, probe=PROBE):
 
 
 def main():
+    programs = tuple(sys.argv[1:]) or PROGRAMS
+    if any(program not in PROGRAMS for program in programs):
+        raise SystemExit('Unknown buffer-runtime program')
     with tempfile.TemporaryDirectory(prefix='vi-buffer-runtime-') as directory:
         work = Path(directory)
-        build(work)
-        for program in PROGRAMS:
-            allocations = [(None, 1024 if program.endswith('.com') else 4096)]
+        build(work, programs)
+        for program in programs:
+            allocations = [(None, 4096)]
             if program.endswith('.cmd'):
                 data = struct.unpack_from('<BHHHH', (work / program).read_bytes(), 9)
                 assert (data[0], data[3] * 16, data[4] * 16) == (2, 61440, 65536), program
@@ -198,7 +229,7 @@ def main():
                 if maximum is not None:
                     run(['pcdev_cmdmod', '-m', format(maximum, 'x'), program, '1'], work)
                     args.append('MINIMUM')
-                capacity = 24000 if program.endswith('.com') else 38016
+                capacity = 20480 if program.endswith('.com') else 38016
                 fixtures = (
                     ([], bytes(10 if i % 64 == 63 else 97 + i % 23
                                for i in range(capacity))),

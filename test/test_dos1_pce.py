@@ -17,7 +17,7 @@ def main():
         root = Path(directory)
         build(root, ('vid1bios.com', 'vid1bios.exe'))
         for extension, capacity, spare, ram in (
-                ('com', 24000, 1024, 128), ('exe', 38016, 4096, 256)):
+                ('com', 20480, 4096, 128), ('exe', 38016, 4096, 256)):
             check(root, dos, extension, capacity, spare, ram)
 
 

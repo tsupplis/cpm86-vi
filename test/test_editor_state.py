@@ -3,6 +3,7 @@
 from pathlib import Path
 import os
 import subprocess
+import sys
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -111,6 +112,29 @@ static int test_yank_load(unsigned offset, char *destination, unsigned length) {
 }
 void *test_message_malloc(size_t size) {
     return fail_message_alloc ? NULL : malloc(size);
+}
+static int fail_string_alloc, string_alloc_calls, string_live;
+static void *string_blocks[32];
+void *test_string_malloc(size_t size) {
+    void *p;
+    int i;
+    string_alloc_calls++;
+    if(fail_string_alloc) return NULL;
+    p = malloc(size);
+    assert(p);
+    for(i=0; i<32 && string_blocks[i]; i++);
+    assert(i < 32);
+    string_blocks[i] = p;
+    string_live++;
+    return p;
+}
+void test_string_free(void *p) {
+    int i;
+    for(i=0; i<32 && string_blocks[i] != p; i++);
+    assert(i < 32 && p != NULL);
+    string_blocks[i] = NULL;
+    string_live--;
+    free(p);
 }
 '''
 
@@ -547,6 +571,7 @@ static void check_file_insert_limits(void) {
 }
 static void check_long_messages(void) {
     char name[400];
+    char *saved_name = vi_file_name;
     memset(name, 'a', sizeof name-1); name[sizeof name-1]=0;
     load("abc\n");
     vi_file_name=name; vi_changed=1;
@@ -555,7 +580,7 @@ static void check_long_messages(void) {
     assert(readfile(name, vi_file_mem, 1));
     assert(!strcmp(last_output, "Unable to open file for reading!"));
     expect("abc\n");
-    vi_file_name="TEST.TXT";
+    vi_file_name=saved_name;
 }
 static void check_replay_limits(void) {
     char text[1024];
@@ -754,11 +779,184 @@ static void check_capacity(void) {
     vi_file_max = vi_file_mem + FILELENG;
     load("");
 }
+static void check_string_failures(void) {
+    char *name, *cursor;
+    int calls, live, dirty;
+    load("a b a b a\n");
+    dosearch(FORWARD, "b");
+    assert(vi_curs_char == vi_file_mem+2);
+    calls = string_alloc_calls; live = string_live;
+    fail_string_alloc = 1;
+    assert(strsave("test") == NULL);
+    dosearch(BACKWARD, "a");
+    assert(vi_curs_char == vi_file_mem+2 && string_live == live);
+    assert(strstr(last_output, "unable to find memory"));
+    calls = string_alloc_calls;
+    repsearch();
+    assert(vi_curs_char == vi_file_mem+6 && string_alloc_calls == calls);
+    fail_string_alloc = 0;
+    for(dirty=0; dirty<=1; dirty++) {
+        load("keep\ntext\n");
+        vi_changed=dirty; vi_curs_char++;
+        strcpy(vi_undo_buff,"rZ"); strcpy(vi_redo_buff,"rX");
+        vi_uncurs_char=vi_file_mem;
+        name=vi_file_name; cursor=vi_curs_char;
+        fail_string_alloc=fail_message_alloc=1;
+        command("f replacement.txt\n");
+        assert(vi_file_name == name && strstr(last_output,"unable to find memory"));
+        command("e! replacement.txt\n");
+        assert(vi_file_name == name && vi_curs_char == cursor);
+        assert(vi_changed == dirty);
+        expect("keep\ntext\n");
+        assert(!strcmp(vi_undo_buff,"rZ") && !strcmp(vi_redo_buff,"rX"));
+        assert(readfile("replacement.txt",vi_file_mem,0) == -1);
+        assert(vi_file_name == name);
+        expect("keep\ntext\n");
+        fail_string_alloc=fail_message_alloc=0;
+    }
+}
+static void check_filename_ownership(void) {
+    char *same;
+    int i, live, calls;
+    seed("opened\n");
+    assert(vi_set_filename("XXinsert.txt"));
+    assert(vi_set_filename(vi_file_name+2));
+    assert(!strcmp(vi_file_name,"insert.txt"));
+    same=vi_file_name; calls=string_alloc_calls;
+    fail_string_alloc=1;
+    assert(vi_set_filename(vi_file_name));
+    assert(vi_file_name == same && string_alloc_calls == calls);
+    fail_string_alloc=0;
+    live=string_live;
+    for(i=0; i<200; i++) {
+        command("f first.txt\n");
+        command("f second.txt\n");
+        command("e! insert.txt\n");
+        expect("opened\n");
+        assert(!vi_changed && vi_uncurs_char == NULL);
+        command("e!\n");
+        expect("opened\n");
+        assert(string_live == live);
+    }
+    assert(vi_set_filename("XXinsert.txt"));
+    load("");
+    assert(!readfile(vi_file_name+2,vi_file_mem,0));
+    assert(!strcmp(vi_file_name,"insert.txt"));
+    expect("opened\n");
+}
+static void check_quality_commands(void) {
+    static const struct {
+        const char *before, *keys, *after;
+        int changed, untouched;
+    } cases[] = {
+        {"","J","",0,1}, {"",">>","",0,1}, {"","<<","",0,1},
+        {"\n","<<","\n",0,1}, {"plain","<<","plain",0,1},
+        {"\ta\nb\n\tc","3<<u","\ta\nb\n\tc",0},
+        {"\ta\nb\n\tc","3<<uu","a\nb\nc",1},
+        {"a\nb\nc","3>>u","a\nb\nc",0},
+        {"a\nb\nc","3>>uu","\ta\n\tb\n\tc",1},
+        {"\t","<<u","\t",0}, {"a\n\t","2<<u","a\n\t",0},
+        {"a\n\t\n","2<<u","a\n\t\n",0},
+        {"a\nb","Ju","a\nb",0}, {"a\nb","Juu","ab",1},
+        {"a\n\n","Ju","a\n\n",0}, {"\n\n","Ju","\n\n",0},
+        {"\na","Ju","\na",0}, {"a\nb\nc","J.","abc",1},
+        {"a\nb\nc","2>>.","\t\ta\n\t\tb\nc",1},
+        {"\ta\nb\n\tc","3<<.u","\ta\nb\n\tc",0},
+        {"a\nb","3>\033","a\nb",0,1},
+        {"a\nb","65536>>","a\nb",0,1},
+        {"a\nb",":f other\033","a\nb",0,1},
+        {"abc\n","2~.","ABC\n",1},
+        {"a\nb\nc","2dd","c",1},
+        {"a\nb","65535>>u","a\nb",0},
+        {"\ta\nb","65535<<u","\ta\nb",0},
+        {"a\nb","JJu","a\nb",0},
+        {"a\nb","J.u","a\nb",0},
+        {"a\nb","J<<u","a\nb",0},
+        {"a\nb","RZ\033Ju","Z\nb",1},
+        {"\ta\nb\nc\nd\ne\nf\ng\n\th\n\ti","9<<u",
+         "\ta\nb\nc\nd\ne\nf\ng\n\th\n\ti",0}
+    };
+    unsigned i;
+    int dirty;
+    for(dirty=0; dirty<=1; dirty++)
+        for(i=0; i<sizeof cases/sizeof cases[0]; i++) {
+            load(cases[i].before);
+            vi_changed=dirty;
+            strcpy(vi_undo_buff,"rZ"); strcpy(vi_redo_buff,"rX");
+            vi_uncurs_char=vi_file_mem;
+            run_edit(cases[i].keys);
+            if(vi_file_end-vi_file_mem != (long)strlen(cases[i].after) ||
+               memcmp(vi_file_mem,cases[i].after,strlen(cases[i].after)) ||
+               vi_changed != (dirty || cases[i].changed)) {
+                fprintf(stderr,"Quality corpus failure: case %u, dirty %d\n",i,dirty);
+                assert(0);
+            }
+            assert(vi_state == NORMAL && vi_curs_char >= vi_file_mem &&
+                   (vi_curs_char < vi_file_end || vi_curs_char == vi_file_mem));
+            if(cases[i].untouched) {
+                assert(!strcmp(vi_undo_buff,"rZ") && !strcmp(vi_redo_buff,"rX"));
+                assert(vi_uncurs_char==vi_file_mem);
+            }
+        }
+}
+static void check_quality_rejections(void) {
+    int dirty, i;
+    char many_lines[16385];
+    char *cursor, *maximum=vi_file_mem+FILELENG;
+    for(dirty=0; dirty<=1; dirty++) {
+        load("a\nb\nc");
+        vi_changed=dirty; vi_curs_char++;
+        vi_file_max=vi_file_end+3;
+        strcpy(vi_undo_buff,"rZ"); strcpy(vi_redo_buff,"rX");
+        vi_uncurs_char=vi_file_mem; cursor=vi_curs_char;
+        vi_renum=3; input=">"; normal('>');
+        expect("a\nb\nc");
+        assert(vi_changed==dirty && vi_curs_char==cursor);
+        assert(!strcmp(vi_undo_buff,"rZ") && !strcmp(vi_redo_buff,"rX"));
+        vi_file_max=maximum;
+        load("plain");
+        vi_changed=dirty; vi_curs_char++;
+        strcpy(vi_undo_buff,"rZ"); strcpy(vi_redo_buff,"rX");
+        vi_uncurs_char=vi_file_mem; cursor=vi_curs_char;
+        vi_renum=3; input="<"; normal('<');
+        normal('J');
+        expect("plain");
+        assert(vi_changed==dirty && vi_curs_char==cursor);
+        assert(!strcmp(vi_undo_buff,"rZ") && !strcmp(vi_redo_buff,"rX"));
+        load("");
+        memset(vi_file_mem,'\n',8193); vi_file_end=vi_file_mem+8193;
+        strcpy(vi_undo_buff,"rZ"); strcpy(vi_redo_buff,"rX");
+        vi_changed=dirty;
+        run_edit("8193>>");
+        assert(vi_file_end==vi_file_mem+8193 && vi_changed==dirty);
+        for(i=0;i<8193;i++) assert(vi_file_mem[i]=='\n');
+        assert(!strcmp(vi_undo_buff,"rZ") && !strcmp(vi_redo_buff,"rX"));
+        assert(strstr(last_output,"too big for undo"));
+        load("");
+        memset(vi_file_mem,'a',FILELENG); vi_file_mem[2]='\n';
+        vi_file_end=vi_file_max; vi_changed=dirty;
+        run_edit("Ju");
+        assert(vi_file_end==vi_file_max && vi_changed==dirty);
+        for(i=0;i<FILELENG;i++) assert(vi_file_mem[i]==(i==2?'\n':'a'));
+        vi_file_mem[0]='\t';
+        run_edit("<<u");
+        assert(vi_file_end==vi_file_max && vi_changed==dirty);
+        assert(vi_file_mem[0]=='\t');
+        for(i=1;i<FILELENG;i++) assert(vi_file_mem[i]==(i==2?'\n':'a'));
+        for(i=0;i<8191;i++) {
+            many_lines[2*i]='x'; many_lines[2*i+1]='\n';
+        }
+        strcpy(many_lines+16382,"\tx");
+        load(many_lines); vi_changed=dirty;
+        run_edit("8192<<u");
+        expect(many_lines); assert(vi_changed==dirty);
+    }
+}
 int main(int argc, char **argv) {
     assert(vi_yank_init());
     vi_file_mem = calloc(FILELENG, 1); assert(vi_file_mem);
     vi_file_max = vi_file_mem + FILELENG;
-    vi_file_name = "TEST.TXT";
+    vi_file_name = strsave("TEST.TXT"); assert(vi_file_name);
     vi_rows = 25; vi_columns = 80;
     assert(argc == 2);
     if(!strcmp(argv[1], "save")) check_save();
@@ -786,10 +984,15 @@ int main(int argc, char **argv) {
     else if(!strcmp(argv[1], "large-binary-put")) check_large_binary_put();
     else if(!strcmp(argv[1], "full-buffer")) check_full_buffer();
     else if(!strcmp(argv[1], "capacity")) check_capacity();
+    else if(!strcmp(argv[1], "string-failures")) check_string_failures();
+    else if(!strcmp(argv[1], "filename-ownership")) check_filename_ownership();
+    else if(!strcmp(argv[1], "quality-commands")) check_quality_commands();
+    else if(!strcmp(argv[1], "quality-rejections")) check_quality_rejections();
     else assert(0);
     clearlastmess();
     vi_yank_close();
     free(vi_file_mem);
+    test_string_free(vi_file_name);
     printf("PASS: %s\n", argv[1]);
     return 0;
 }
@@ -830,6 +1033,12 @@ def main():
         work = Path(directory)
         harness = work / 'check.c'
         command_source = work / 'commands.c'
+        line_source = work / 'lines.c'
+        line_source.write_text(
+            '#include <stdlib.h>\nvoid *test_string_malloc(size_t);\n'
+            'void test_string_free(void *);\n'
+            '#define malloc test_string_malloc\n#define free test_string_free\n'
+            f'#include "{ROOT / "linefunc.c"}"\n')
         command_source.write_text(
             '#include <stdlib.h>\nvoid *test_message_malloc(size_t);\n'
             '#define malloc test_message_malloc\n'
@@ -840,23 +1049,28 @@ def main():
                            '\n#undef getc\n#undef ferror\n#undef fclose\n' + CHECKS)
         binary = work / 'check'
         failed = []
+        cases = ('save', 'read', 'replace', 'search', 'insert-read',
+                 'read-limits', 'read-errors', 'word-eof', 'bulk-insert',
+                 'search-bounds', 'command-limits', 'count-limits', 'delete-limits',
+                 'insert-limits', 'literal-limits', 'replay-limits',
+                 'file-insert-limits', 'long-messages', 'yank-failures',
+                 'yank-success', 'yank-message-failure', 'put-failures',
+                 'large-binary-put', 'full-buffer', 'capacity', 'string-failures',
+                 'filename-ownership', 'quality-commands', 'quality-rejections')
+        selected = sys.argv[1:] or cases
+        if any(case not in cases for case in selected):
+            raise SystemExit('Unknown editor-state test case')
         for profile, flags in (
                 ('38016', []), ('DOS1-EXE-38016', ['-D__PCDOS__=11']),
-                ('DOS1-COM-24000', ['-D__PCDOS__=11', '-DVI_DOS1_COM'])):
+                ('DOS1-COM-20480', ['-D__PCDOS__=11', '-DVI_DOS1_COM'])):
             subprocess.run([
                 os.environ.get('CC_HOST', 'cc'), '-std=c99', '-g',
                 '-fsanitize=address,undefined', *flags, '-I', str(ROOT), str(harness),
                 str(command_source), str(ROOT / 'normal.c'),
-                str(ROOT / 'linefunc.c'), str(ROOT / 'yankmem.c'),
+                str(line_source), str(ROOT / 'yankmem.c'),
                 str(ROOT / 'test/yankmock.c'), '-o', str(binary),
             ], check=True)
-            for case in ('save', 'read', 'replace', 'search', 'insert-read',
-                         'read-limits', 'read-errors', 'word-eof', 'bulk-insert',
-                         'search-bounds', 'command-limits', 'count-limits', 'delete-limits',
-                         'insert-limits', 'literal-limits', 'replay-limits',
-                         'file-insert-limits', 'long-messages', 'yank-failures',
-                         'yank-success', 'yank-message-failure',
-                         'put-failures', 'large-binary-put', 'full-buffer', 'capacity'):
+            for case in selected:
                 try:
                     result = subprocess.run([str(binary), case], cwd=work, timeout=10)
                 except subprocess.TimeoutExpired:
