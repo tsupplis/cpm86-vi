@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import shlex
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -56,10 +57,19 @@ def main():
         'overall': 'INCOMPLETE',
         'results': [],
     }
-    steps = [('build-six-formats', ['make', '-j1', '-B', *PROGRAMS])]
-    steps.extend((name, [sys.executable, '-B', 'test/' + script, *flags])
+    build = output / 'build'
+    build.mkdir()
+    for pattern in ('*.c', '*.h', '*.asm', 'Makefile'):
+        for path in ROOT.glob(pattern):
+            shutil.copyfile(path, build / path.name)
+    version = subprocess.check_output(
+        ['git', 'describe', '--tags', '--always', '--dirty'],
+        cwd=ROOT, text=True).strip()
+    steps = [('build-six-formats',
+              ['make', '-j1', '-B', 'GIT_VERSION=' + version, *PROGRAMS], build)]
+    steps.extend((name, [sys.executable, '-B', 'test/' + script, *flags], ROOT)
                  for name, script, *flags in SUITES)
-    steps.insert(7, ('save-runtime', ['sh', 'test/saveruntime']))
+    steps.insert(7, ('save-runtime', ['sh', 'test/saveruntime'], ROOT))
     summary = output / 'summary.json'
     summary.write_text(json.dumps(report, indent=2) + '\n')
     print(f'Regression: {len(steps)} steps, sequential, no retries or benchmarks', flush=True)
@@ -69,16 +79,17 @@ def main():
         env = os.environ.copy()
         env['TMPDIR'] = compiler
         env['PYTHONUNBUFFERED'] = '1'
-        for index, (name, command) in enumerate(steps, 1):
+        for index, (name, command, cwd) in enumerate(steps, 1):
             log = output / (name + '.log')
             print(f'[{index}/{len(steps)}] {name}', flush=True)
             started = time.monotonic()
             with log.open('w') as stream:
+                stream.write('Working directory: ' + str(cwd) + '\n')
                 stream.write('$ ' + shlex.join(command) + '\n')
                 stream.flush()
                 try:
                     result = subprocess.run(
-                        command, cwd=ROOT, env=env, stdout=stream,
+                        command, cwd=cwd, env=env, stdout=stream,
                         stderr=subprocess.STDOUT, check=False)
                     exit_code = result.returncode
                 except OSError as error:
@@ -87,6 +98,7 @@ def main():
             entry = {
                 'name': name,
                 'command': command,
+                'cwd': str(cwd),
                 'exit_code': exit_code,
                 'status': 'PASS' if exit_code == 0 else 'FAIL',
                 'seconds': round(time.monotonic() - started, 1),

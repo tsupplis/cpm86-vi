@@ -92,7 +92,7 @@ git checkout) as the version shown by the `:v` command; see `gitver.h`
 ### Complete correctness regression
 
 Run `make test-regression` for one sequential regression batch. It force-rebuilds
-all six production formats, then runs the existing host, native-runtime and
+all six production formats in a private build directory, then runs the existing host, native-runtime and
 real-kernel correctness suites, including full-buffer/heap-headroom checks,
 keyboard, editing/undo, EOF, display, navigation, I/O, save and yank coverage.
 It requires the host sanitizer compiler, Aztec toolchain, `emu2`, PCE and the
@@ -107,6 +107,8 @@ The command prints the retained log directory and writes `summary.json` there
 with the source revision/worktree state, each command, exit code, duration and
 log path. Any failed step makes the overall command fail. To choose a new output
 directory, run `python3 -B test/regression.py --output /path/to/new-directory`.
+The rebuilt binaries remain in the log directory's `build/` subdirectory;
+regression builds do not share or overwrite the working tree's objects or binaries.
 This aggregates the existing probes; it is not an exhaustive interactive UI test.
 
 Document redraws, status-line repainting and help hide the cursor while writing,

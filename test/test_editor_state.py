@@ -34,6 +34,7 @@ static const char *input;
 static int quit_calls, reject_save;
 static char last_output[256];
 static jmp_buf input_done;
+static void run_edit(const char *s);
 static int editing, limit_messages;
 static int terminal_writes, cursor_visible = 1, screen_updates;
 static unsigned long edit_moves, edit_moved_bytes;
@@ -453,7 +454,6 @@ static void long_word(int n) {
     vi_file_mem[n]='\n';
     vi_file_end=vi_file_mem+n+1;
 }
-static void run_edit(const char *s);
 static void check_delete_limits(void) {
     char *cursor;
     int mode;
