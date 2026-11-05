@@ -35,7 +35,7 @@ static void check(int ok, int line, char *expression) {
     }
 }
 #define CHECK(ok) check((ok), __LINE__, #ok)
-#define TEST_CAPACITY 40064U
+#define TEST_CAPACITY VI_YANK_CAPACITY
 
 #define vi_yank_load actual_yank_load
 #include "yankmem.c"
@@ -288,7 +288,7 @@ def main():
                      '-m', '10000', program, '2'], work)
             result = run([os.environ.get('EMU2', 'emu2'), program], work)
             assert 'VI YANK LENGTH PASS: 0 failures' in result.stdout, result.stdout
-            capacity = 38016
+            capacity = 42112
             assert f'YANK CAPACITY: {capacity}' in result.stdout, result.stdout
             assert f'YANK ROUNDTRIP: {capacity}' in result.stdout, result.stdout
             print('YANK LENGTH PASS:', library, f'({capacity}-byte yank)',

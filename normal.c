@@ -80,6 +80,8 @@ void normal(int c)
     case '\'':
         if (vi_mark != NULL && vi_mark >= vi_file_mem && vi_mark < vi_file_end) {
             vi_curs_char = vi_mark;
+            if (vi_bot_char == NULL || vi_mark < vi_top_char || vi_mark >= vi_bot_char)
+                vi_top_char = vi_mark;
             cursupdate();
             updatescreen();
         } else

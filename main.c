@@ -20,7 +20,7 @@ static void screenerror(void);
 #ifdef VI_DOS1_COM
 #define FILELENG 18432U
 #else
-#define FILELENG 38016U
+#define FILELENG 42112U
 #endif
 
 int vi_rows;    /* Number of Rows and Columns */

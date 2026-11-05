@@ -37,12 +37,12 @@ graph TD
 
 | Binary | Console | Editing/yank capacity | Runtime |
 |---|---|---:|---|
-| `vicp52.cmd` | CP/M VT52 | 38,016 bytes | `c86` |
-| `vicp100.cmd` | CP/M VT100/ANSI | 38,016 bytes | `c86` |
-| `vicpbios.cmd` | CP/M PC BIOS | 38,016 bytes | `c86` |
+| `vicp52.cmd` | CP/M VT52 | 42,112 bytes | `c86` |
+| `vicp100.cmd` | CP/M VT100/ANSI | 42,112 bytes | `c86` |
+| `vicpbios.cmd` | CP/M PC BIOS | 42,112 bytes | `c86` |
 | `vid1bios.com` | DOS 1 PC BIOS | 18,432 bytes | `d11` |
-| `vid1bios.exe` | DOS 1 PC BIOS | 38,016 bytes | `d11` |
-| `vid2bios.exe` | DOS 2 PC BIOS | 38,016 bytes | `c` |
+| `vid1bios.exe` | DOS 1 PC BIOS | 42,112 bytes | `d11` |
+| `vid2bios.exe` | DOS 2 PC BIOS | 42,112 bytes | `c` |
 
 `edit.c` and `window.c` have terminal/OS-specific objects; the DOS 1 formats
 share their BIOS objects. `cmdline.c`, `save.c` and `keyboard.c` have CP/M/DOS
@@ -121,6 +121,8 @@ state and literal-undo metadata are private to their modules.
   changes retain it, and failed imports/pastes leave it unchanged. An undefined
   mark reports an error without moving the cursor. Mark commands do not change
   text, undo or repeat, and are not operator motions.
+  An off-screen jump anchors the viewport at the marked character, avoiding
+  repeated row-by-row rescanning of intervening text.
 
 ### Undo and replay
 

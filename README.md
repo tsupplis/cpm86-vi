@@ -130,7 +130,7 @@ nonblocking peek that retains the next key for normal processing.
 
 Run `make test-editor-state` with a host C compiler (`cc`, or `CC_HOST`)
 supporting AddressSanitizer and UndefinedBehaviorSanitizer. These tests cover
-the 38,016-byte default/DOS 1 `.EXE` and 18,432-byte DOS 1 `.COM` buffers, including
+the 42,112-byte default/DOS 1 `.EXE` and 18,432-byte DOS 1 `.COM` buffers, including
 exact-limit reads, oversized-read rollback, and full-buffer delete/undo.
 They also cover
 failed saves retaining the modified flag, failed `:r` leaving the buffer
@@ -174,7 +174,7 @@ mode) prompts for two digits without temporarily modifying the file.
 Undo/repeat replays the recorded bytes without adding another EOF newline.
 
 Yanked/deleted lines and both screen images share an external memory segment,
-not the near C heap. The editing buffer holds 38,016 bytes, or 18,432 bytes
+not the near C heap. The editing buffer holds 42,112 bytes, or 18,432 bytes
 in the DOS 1 `.COM`. `FILELENG` is defined only in `main.c`; `VI_DOS1_COM`
 selects the compact limit.
 A full-buffer yank therefore no longer needs a second near-heap allocation.
@@ -186,7 +186,7 @@ runtime. Segment reservation is platform-specific:
 - CP/M-86: `pcdev_cmdmod` adds a zero-image EXTRA group after linking,
   reserving 64 KiB at load time without adding 64 KiB to the executable.
   The DATA group requests a minimum of 60 KiB (61,440 bytes), up to 65,536 bytes,
-  for near data, heap and stack; the editing buffer uses 38,016 bytes.
+  for near data, heap and stack; the editing buffer uses 42,112 bytes.
 - DOS 1.x: use process-owned memory above the entire 64 KiB near data
   segment, after checking the PSP's memory ceiling; no DOS 2 calls. The
   external reservation is 32 KiB for `.COM`, 64 KiB for `.EXE`. DOS 1.1
@@ -195,7 +195,7 @@ runtime. Segment reservation is platform-specific:
 - DOS 2.x: allocate 4,096 paragraphs (64 KiB) with INT 21h/AH=48h and release
   them with AH=49h on exit.
 
-The yank region matches the editing limit: 38,016 bytes, or 18,432 bytes in
+The yank region matches the editing limit: 42,112 bytes, or 18,432 bytes in
 the DOS 1 `.COM`. Two 2,000-byte screen slots
 follow it. Rendering uses two 80-byte near row buffers instead of allocating
 two full screens on the near heap. This removes 3,840 bytes of screen heap
@@ -203,8 +203,7 @@ allocations on CP/M-86 and 4,000 bytes on DOS, at the cost of the row buffers,
 small bookkeeping, and additional code. Screens are limited to 80 columns
 and 25 rows; unsupported dimensions fail explicitly.
 
-The 38,016-byte limit leaves 2,048 additional bytes of near-heap headroom
-compared with 40,064, while remaining aligned to 128-byte CP/M records.
+Both editing limits remain aligned to 128-byte CP/M records.
 This alignment lets a full binary buffer be saved and reopened without
 record padding exceeding the editing limit. Line deletion scans the selected
 range once and shifts the remaining tail once, including for files with
@@ -236,7 +235,7 @@ It requires PCE, mtools/cpmtools and the same local kernel fixtures as the
 save-runtime tests.
 
 `make test-dos1-pce` runs both full DOS 1 editor probes on private DOS 1.1
-boot images: 18,432 bytes on 128 KiB RAM for `.COM`, 38,016 bytes on 256 KiB
+boot images: 18,432 bytes on 128 KiB RAM for `.COM`, 42,112 bytes on 256 KiB
 RAM for `.EXE`. It verifies binary read/yank/delete/undo/save/reopen cycles
 and rejected oversized input while holding an additional 4 KiB heap
 allocation in each format, then compares the saved bytes.
@@ -346,7 +345,7 @@ directly because the native runtime's `strlen` stops below 32 KiB.
 separator/capacity rejection, failed-yank preservation, partial-load rollback
 over a large tail, and 40,000-byte insertion/deletion boundaries under host
 sanitizers and all three native runtimes. These tests use the production
-38,016-byte yank regions on all three native runtimes.
+42,112-byte yank regions on all three native runtimes.
 
 Search bounds use unsigned byte spans. Command counts, linewise operations
 and their replay strings support counts through 65,535; larger numeric prefixes
@@ -369,7 +368,7 @@ the measured long-line cursor case is about 1.4x faster; three failed-search
 patterns are 2-2.5x faster, without a cache or skip table. See
 [P4 measurements and scope](docs/performance.md#p4-cursor-and-search-scanning).
 
-Production editing and yank limits are 38,016 bytes, or 18,432 bytes in
+Production editing and yank limits are 42,112 bytes, or 18,432 bytes in
 the DOS 1 `.COM`.
 
 Searches wrap within the file only, handle overlapping matches, and start
@@ -395,6 +394,18 @@ after/before the cursor in the selected direction before wrapping.
 | `^U` | Up 10 lines |
 | `^G` | Show file info |
 | `^L` | Redraw screen |
+| `m` | Set the single buffer-local mark at the cursor |
+| `'` | Return to the exact marked character, if defined |
+
+Neither mark command reads a name or changes undo/repeat. The mark follows its
+original character through insertions and deletions before it. Deleting that
+character invalidates the mark, and undo does not restore an invalidated mark.
+Replacing a character in place retains it. Opening another file clears it,
+including a failed read after `:e!`; changing only the filename retains it.
+Failed imports and pastes leave it unchanged. An undefined mark reports an
+error without moving the cursor. There is no jump toggle or mark operator motion.
+An off-screen mark is revealed at the top of the viewport rather than scrolling
+through every intervening row.
 
 ### Insert / Replace
 

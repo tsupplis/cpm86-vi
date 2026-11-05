@@ -70,6 +70,7 @@ static int quality_commands(void) {
     REQUIRE(vi_curs_char == vi_mark);
     delchar();
     REQUIRE(vi_mark == NULL);
+    vi_changed = 0;
     resetundo();
     return 0;
 failure:
@@ -98,7 +99,7 @@ int main(int argc, char **argv) {
     REQUIRE(FILELENG == 18432U);
 #else
     spare_size = minimum ? 2048 : 4096;
-    REQUIRE(FILELENG == 38016U);
+    REQUIRE(FILELENG == 42112U);
 #endif
     REQUIRE(vi_yank_init());
     REQUIRE(vi_yank_capacity() == FILELENG);
@@ -248,7 +249,7 @@ def main():
                 if maximum is not None:
                     run(['pcdev_cmdmod', '-m', format(maximum, 'x'), program, '1'], work)
                     args.append('MINIMUM')
-                capacity = 18432 if program.endswith('.com') else 38016
+                capacity = 18432 if program.endswith('.com') else 42112
                 fixtures = (
                     ([], bytes(10 if i % 64 == 63 else 97 + i % 23
                                for i in range(capacity))),

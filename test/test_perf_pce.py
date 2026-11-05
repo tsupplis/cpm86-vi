@@ -20,7 +20,7 @@ EXPECTED = {
 
 def parse_report(report):
     assert report.startswith('VI PERF PASS\n'), report
-    assert re.search(r'^capacity 38016 spare 4096$', report, re.M), report
+    assert re.search(r'^capacity 42112 spare 4096$', report, re.M), report
     cases = re.findall(r'^(\w+) ticks (\d+) repeats (\d+)$', report, re.M)
     assert len(cases) == len(EXPECTED), report
     assert {name: int(count) for name, _, count in cases} == EXPECTED, report

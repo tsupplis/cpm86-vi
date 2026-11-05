@@ -35,10 +35,10 @@ def main():
             run(['aztec42_cc', '-I.', '+F', '+0', '-DVI_DOS1_COM',
                  '-o', 'yankpc.o', 'yankprobe.c'], work)
             for library, adapter, output, capacity in (
-                    ('c86', 'yankcp', 'yank.cmd', 38016),
-                    ('d11', 'yankd11', 'yank11.exe', 38016),
+                    ('c86', 'yankcp', 'yank.cmd', 42112),
+                    ('d11', 'yankd11', 'yank11.exe', 42112),
                     ('d11', 'yankd1c', 'yank11.com', 18432),
-                    ('c', 'yankd20', 'yank.exe', 38016)):
+                    ('c', 'yankd20', 'yank.exe', 42112)):
                 probe = 'yankpc.o' if output.endswith('.com') else 'yankprobe.o'
                 run(['aztec42_link', '-o', output, probe, 'yankmem.o',
                      'yankcopy.o', adapter + '.o', '-l' + library], work)

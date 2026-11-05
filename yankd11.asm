@@ -40,7 +40,7 @@ vi_yseg_capacity_ proc near
 ifdef VI_DOS1_COM
     mov ax,18432
 else
-    mov ax,38016
+    mov ax,42112
 endif
     ret
 vi_yseg_capacity_ endp

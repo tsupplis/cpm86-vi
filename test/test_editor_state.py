@@ -935,11 +935,11 @@ static void check_full_buffer(void) {
     for(i=0; i<FILELENG-1; i++) assert(vi_file_mem[i] == 'a');
 }
 static void check_capacity(void) {
-    static unsigned sizes[] = {32767U, 32768U, 40000U, 40064U};
+    static unsigned sizes[] = {32767U, 32768U, 40000U, 40064U, FILELENG};
     char *original = vi_file_mem;
     char expected[40];
     unsigned i;
-    vi_file_mem = calloc(40065U, 1); assert(vi_file_mem);
+    vi_file_mem = calloc(42113U, 1); assert(vi_file_mem);
     for(i=0; i<sizeof sizes/sizeof sizes[0]; i++) {
         vi_file_max = vi_file_mem + sizes[i];
         load("abc\n");
@@ -1259,7 +1259,7 @@ static void *edit_memmove(void *to, const void *from, size_t length) {
         if any(case not in cases for case in selected):
             raise SystemExit('Unknown editor-state test case')
         for profile, flags in (
-                ('38016', []), ('DOS1-EXE-38016', ['-D__PCDOS__=11']),
+                ('42112', []), ('DOS1-EXE-42112', ['-D__PCDOS__=11']),
                 ('DOS1-COM-18432', ['-D__PCDOS__=11', '-DVI_DOS1_COM'])):
             subprocess.run([
                 os.environ.get('CC_HOST', 'cc'), '-std=c99', '-g',
