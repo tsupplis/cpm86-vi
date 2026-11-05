@@ -373,6 +373,7 @@ static void filealloc(void) {
         exit(1);
     }
     vi_file_max = vi_file_mem + FILELENG;
+    vi_marks_clear();
 }
 
 static void screenalloc(void) {
@@ -453,6 +454,7 @@ int readfile(char *fname, char *fromp, int nochangename) /* if 1, don't change t
         message((char *)error);
         return -1;
     }
+    vi_marks_insert(insertp, n);
     if (!vi_binary && unprint > 0) {
         sprintf(
             buff,

@@ -21,6 +21,7 @@ SHARED_OBJS = \
 	hexchars.o \
 	linefunc.o \
 	main.o     \
+	marks.o    \
 	misccmds.o \
 	normal.o   \
 	yankmem.o  \

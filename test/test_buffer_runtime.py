@@ -41,16 +41,35 @@ static int contents(void) {
 
 static int quality_commands(void) {
     static char original[] = "\ta\nb\n\tc";
+    vi_marks_clear();
     memcpy(vi_file_mem, original, sizeof original - 1);
     vi_file_end = vi_file_mem + sizeof original - 1;
     vi_top_char = vi_curs_char = vi_file_mem;
     vi_changed = 0;
     resetundo();
+    vi_curs_char = vi_file_mem + 3;
+    REQUIRE(stuffin("ma"));
+    while (anyinput())
+        vi_test_donormal(vgetc());
+    vi_curs_char = vi_file_mem;
     REQUIRE(stuffin("3<<u3>>u"));
     while (anyinput())
         vi_test_donormal(vgetc());
     REQUIRE(vi_file_end == vi_file_mem + sizeof original - 1);
     REQUIRE(!memcmp(vi_file_mem, original, sizeof original - 1) && !vi_changed);
+    REQUIRE(vi_mark_jump('a', 0) && vi_curs_char == vi_file_mem + 3);
+    memset(vi_file_mem, 'K', FILELENG - 2U);
+    vi_file_end = vi_file_mem + FILELENG - 2U;
+    vi_curs_char = vi_file_end - 1;
+    REQUIRE(vi_mark_set('z'));
+    vi_curs_char = vi_file_mem;
+    inschar('X');
+    REQUIRE(vi_mark_jump('z', 0) && vi_curs_char == vi_file_mem + FILELENG - 2U);
+    vi_curs_char = vi_file_mem;
+    delchar();
+    REQUIRE(vi_mark_jump('z', 0) && vi_curs_char == vi_file_mem + FILELENG - 3U);
+    vi_marks_clear();
+    vi_changed = 0;
     resetundo();
     return 0;
 failure:

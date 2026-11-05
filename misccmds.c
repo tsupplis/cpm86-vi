@@ -172,6 +172,7 @@ void putline(int k)
         *insertp = '\n';
     if (suffix)
         first[savednum] = '\n';
+    vi_marks_insert(insertp, total);
     vi_file_end += total;
     vi_curs_char = first;
     CHANGED;
@@ -195,6 +196,7 @@ void inschar(int c)
     for (p = vi_file_end; p > vi_curs_char; p--) {
         *p = *(p - 1);
     }
+    vi_marks_insert(vi_curs_char, 1);
     *vi_curs_char++ = c;
     vi_file_end++;
     CHANGED;
@@ -215,6 +217,7 @@ void insstr(char *s)
 
     memmove(vi_curs_char + n, vi_curs_char,
             vi_byte_span(vi_curs_char, vi_file_end));
+    vi_marks_insert(vi_curs_char, n);
     for (k = 0; k < n; k++)
         *vi_curs_char++ = *s++;
     vi_file_end += n;
@@ -234,6 +237,7 @@ static void appchar(int c)
     for (p = vi_file_end; p > endp; p--) {
         *p = *(p - 1);
     }
+    vi_marks_insert(endp, 1);
     *(++vi_curs_char) = c;
     vi_file_end++;
     CHANGED;
@@ -254,6 +258,7 @@ void delchar(void) {
     /* Check for degenerate case; there's nothing in the file. */
     if (vi_file_mem == vi_file_end)
         return;
+    vi_marks_delete(vi_curs_char, 1);
     /* Delete the character at Curschar by shifting everything */
     /* in the file down. */
     for (p = vi_curs_char + 1; p < vi_file_end; p++)
@@ -342,6 +347,7 @@ int delword(int deltrailing) /* 1 if trailing white space should be removed */
     if (n == 0)
         return 1;
     memmove(vi_curs_char, scan, vi_byte_span(scan, vi_file_end));
+    vi_marks_delete(vi_curs_char, n);
     vi_file_end -= n;
     CHANGED;
     return 1;
@@ -375,6 +381,7 @@ void delline(unsigned nlines) {
         }
         nchars = vi_byte_span(vi_curs_char, p);
         memmove(vi_curs_char, p, vi_byte_span(p, vi_file_end));
+        vi_marks_delete(vi_curs_char, nchars);
         vi_file_end -= nchars;
         CHANGED;
 

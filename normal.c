@@ -11,6 +11,7 @@ static void tabinout(int inout, unsigned num);
 static void undochange(void);
 static void applychange(int remove);
 static void startinsert(char *initstr);
+static int readmotion(void);
 static unsigned change_lines, change_count;
 static int change_remove, change_char;
 
@@ -28,7 +29,9 @@ void normal(int c)
 
     if (vi_renum > VI_COUNT_MAX) {
         /* Discard the rest of this command, not the next valid command. */
-        if (c == 'd' || c == 'c' || c == 'y' || c == '<' || c == '>' || c == 'r')
+        if (c == 'd' || c == 'c' || c == 'y' || c == '<' || c == '>')
+            readmotion();
+        else if (c == 'r' || c == 'm' || c == '\'' || c == '`')
             vgetc();
         else if (c == ':' || c == '/' || c == '?') {
             do {
@@ -69,6 +72,19 @@ void normal(int c)
         break;
     case 'G':
         gotoline(vi_renum);
+        break;
+    case 'm':
+    case '\'':
+    case '`':
+        nchar = vgetc();
+        if (nchar == '\033' || nchar == EOF)
+            break;
+        if (c == 'm')
+            vi_mark_set(nchar);
+        else if (vi_mark_jump(nchar, c == '\'')) {
+            cursupdate();
+            updatescreen();
+        }
         break;
     case 'l':
         if (!oneright())
@@ -211,7 +227,7 @@ void normal(int c)
         vi_ninsert = 1;
         break;
     case 'd':
-        nchar = vgetc();
+        nchar = readmotion();
         n = (vi_renum == 0 ? 1 : vi_renum);
         switch (nchar) {
         case 'd':
@@ -247,7 +263,7 @@ void normal(int c)
         }
         break;
     case 'c':
-        nchar = vgetc();
+        nchar = readmotion();
         switch (nchar) {
         case 'c':
             if (!yankline(1))
@@ -273,7 +289,7 @@ void normal(int c)
         }
         break;
     case 'y':
-        nchar = vgetc();
+        nchar = readmotion();
         switch (nchar) {
         case 'y':
             yankline(vi_renum == 0 ? 1 : vi_renum);
@@ -283,7 +299,7 @@ void normal(int c)
         }
         break;
     case '>':
-        nchar = vgetc();
+        nchar = readmotion();
         n = (vi_renum == 0 ? 1 : vi_renum);
         switch (nchar) {
         case '>':
@@ -295,7 +311,7 @@ void normal(int c)
         }
         break;
     case '<':
-        nchar = vgetc();
+        nchar = readmotion();
         n = (vi_renum == 0 ? 1 : vi_renum);
         switch (nchar) {
         case '<':
@@ -535,9 +551,11 @@ static void applychange(int remove)
     for (i = 0; i < change_lines; i++) {
         if ((unsigned char)vi_undo_buff[i / 8U] & (1U << (i % 8U))) {
             if (remove) {
+                vi_marks_delete(p, 1);
                 memmove(p, p + 1, vi_byte_span(p + 1, vi_file_end));
                 vi_file_end--;
             } else {
+                vi_marks_insert(p, 1);
                 memmove(p + 1, p, vi_byte_span(p, vi_file_end));
                 *p = change_char;
                 vi_file_end++;
@@ -593,6 +611,17 @@ static void startinsert(char *initstr)
         *vi_ins_ptr++ = c;
     vi_state = INSERT;
     updatescreen();
+}
+
+static int readmotion(void)
+{
+    int c = vgetc();
+    if (c == '\'' || c == '`') {
+        vgetc();
+        message("Mark operator motions are not supported!");
+        return 0;
+    }
+    return c;
 }
 
 void resetundo(void) {

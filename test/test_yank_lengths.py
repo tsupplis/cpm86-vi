@@ -22,6 +22,7 @@ char *vi_file_mem, *vi_file_end, *vi_file_max, *vi_curs_char, *vi_uncurs_char;
 char vi_undo_buff[CMDSIZE], vi_redo_buff[CMDSIZE];
 int vi_changed, vi_undo_changed, vi_undel_chars;
 static unsigned savednum, savedcount;
+static unsigned change_lines;
 static int savedlast;
 static int failures, messages, screens, fail_load;
 void message(char *s) { (void)s; messages++; }
@@ -256,25 +257,26 @@ def main():
             source += '\n' + function(contents, signature)
     with tempfile.TemporaryDirectory(prefix='vi-yank-length-') as directory:
         work = Path(directory)
-        for name in ('stevie.h', 'yankmem.h', 'yankmem.c', 'yankcopy.asm',
+        for name in ('stevie.h', 'marks.c', 'yankmem.h', 'yankmem.c', 'yankcopy.asm',
                      'yankcp.asm', 'yankd11.asm', 'yankd20.asm'):
             shutil.copyfile(ROOT / name, work / name)
         (work / 'length.c').write_text(source + CHECKS)
         shutil.copyfile(ROOT / 'test/yankmock.c', work / 'mock.c')
         run([os.environ.get('CC_HOST', 'cc'), '-std=c99', '-g',
-             '-fsanitize=address,undefined', '-I.', 'length.c', 'mock.c',
+             '-fsanitize=address,undefined', '-I.', 'length.c', 'mock.c', 'marks.c',
              '-o', 'length-host'], work)
         result = run([str(work / 'length-host')], work)
         assert 'VI YANK LENGTH PASS: 0 failures' in result.stdout, result.stdout
         print('YANK LENGTH PASS: host sanitizers', flush=True)
         run(['aztec42_cc', '-I.', '+F', '+0', '-o', 'length.o', 'length.c'], work)
+        run(['aztec42_cc', '-I.', '+F', '+0', '-o', 'marks.o', 'marks.c'], work)
         run(['aztec42_as', 'yankcopy.asm'], work)
         for library, adapter, extension in (
                 ('c86', 'yankcp', 'cmd'), ('d11', 'yankd11', 'exe'),
                 ('c', 'yankd20', 'exe')):
             run(['aztec42_as', adapter + '.asm'], work)
             program = 'length.' + extension
-            run(['aztec42_link', '-o', program, 'length.o', 'yankcopy.o',
+            run(['aztec42_link', '-o', program, 'length.o', 'marks.o', 'yankcopy.o',
                  adapter + '.o', '-l' + library], work)
             if extension == 'cmd':
                 run(['pcdev_cmdmod', '-t', 'EXTRA', '-n', '10000',

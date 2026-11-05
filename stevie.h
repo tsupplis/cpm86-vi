@@ -92,6 +92,13 @@ void delline(unsigned nlines);
 void normal(int c);
 void resetundo(void);
 
+/* marks.c */
+void vi_marks_clear(void);
+int vi_mark_set(int name);
+int vi_mark_jump(int name, int linewise);
+void vi_marks_insert(char *at, unsigned length);
+void vi_marks_delete(char *at, unsigned length);
+
 /* hexchars.c */
 void octchars(void);
 void hexchars(void);

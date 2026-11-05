@@ -51,6 +51,8 @@ void beginline(void) {
 }
 void inschar(int c);
 static int canincrease(unsigned n);
+void vi_marks_insert(char *at, unsigned length);
+void vi_marks_delete(char *at, unsigned length);
 '''
     harness += function(lines, 'unsigned vi_byte_span(const char *first, const char *last)')
     harness += function(lines, 'char *prevline(char *curr)')
@@ -124,6 +126,7 @@ int main(void) {
         cfile.write_text(harness)
         subprocess.run([os.environ.get('CC', 'cc'), '-g', '-fsanitize=address,undefined',
                         '-I', str(ROOT), str(cfile), str(ROOT / 'yankmem.c'),
+                        str(ROOT / 'marks.c'),
                         str(ROOT / 'test/yankmock.c'), '-o', str(exe)], check=True)
         subprocess.run([str(exe)], check=True)
 
