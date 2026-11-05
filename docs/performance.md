@@ -1,7 +1,7 @@
 # Short performance and memory baseline
 
 The measurements below describe their original buffer sizes. Current editing
-and yank limits are 42,112 bytes for CP/M and DOS EXE, and 18,432 bytes for DOS 1
+and yank limits are 42,112 bytes for CP/M and DOS EXE, and 20,480 bytes for DOS 1
 COM; new timing samples should not be compared as identical-capacity runs.
 
 ## Reproduce

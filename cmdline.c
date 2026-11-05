@@ -125,6 +125,12 @@ void readcmdline(int firstc) /* either ':', '/', or '?' */
         if (*arg == '\0')
             arg = NULL;
     }
+#ifdef VI_TINY
+    if (arg != NULL && (cmd[0] == 'w' || cmd[0] == 'x')) {
+        badcmd();
+        return;
+    }
+#endif
     switch (cmd[0]) {
     case 'q':
         if (strcmp(cmd, "q!") == 0)
@@ -139,10 +145,12 @@ void readcmdline(int firstc) /* either ':', '/', or '?' */
         break;
     case 'w':
         if (strcmp(cmd, "w") == 0) {
-            if (arg == NULL) {
-                writeit(vi_file_name);
-            } else
+#ifndef VI_TINY
+            if (arg != NULL)
                 writeit(arg);
+            else
+#endif
+                writeit(vi_file_name);
             return;
         }
         if (strcmp(cmd, "wq") == 0) {
@@ -158,6 +166,7 @@ void readcmdline(int firstc) /* either ':', '/', or '?' */
             return;
         }
         break;
+#ifndef VI_TINY
     case 'f':
         if (strcmp(cmd, "f") == 0) {
             if (arg == NULL)
@@ -186,6 +195,7 @@ void readcmdline(int firstc) /* either ':', '/', or '?' */
             return;
         }
         break;
+#endif
     case '.':
         if (strcmp(cmd, ".=") == 0) {
             char messbuff[80];
@@ -234,6 +244,7 @@ void readcmdline(int firstc) /* either ':', '/', or '?' */
         }
         break;
     }
+#ifndef VI_TINY
     /* "r"/".r" share their first character with other commands above,
      * so they're checked separately rather than added as a new case. */
     if (strcmp(cmd, "r") == 0 || strcmp(cmd, ".r") == 0) {
@@ -253,6 +264,7 @@ void readcmdline(int firstc) /* either ':', '/', or '?' */
         CHANGED;
         return;
     }
+#endif
     /* :N  — go to line N (or last line if N exceeds the file) */
     {
         char *pp = cmd;

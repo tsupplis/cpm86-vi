@@ -161,7 +161,7 @@ void edit(void) {
             }
             /* printf("Curschar=(%d,%d) row/col=(%d,%d)",
                 Curschar,*Curschar,Cursrow,Curscol); */
-            windgoto(vi_curs_row, vi_curs_col);
+            windgoto((int)vi_curs_row, vi_curs_col);
             windrefresh();
             c = vgetc();
             switch (vi_state) {
@@ -548,7 +548,7 @@ static int gethexchar(void) {
     int c;
 
     for (;;) {
-        windgoto(vi_curs_row, vi_curs_col);
+        windgoto((int)vi_curs_row, vi_curs_col);
         windrefresh();
         c = vgetc();
         if (hextoint(c) >= 0)

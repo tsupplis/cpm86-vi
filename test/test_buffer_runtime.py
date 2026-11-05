@@ -96,7 +96,7 @@ int main(int argc, char **argv) {
     }
 #ifdef VI_DOS1_COM
     spare_size = 4096;
-    REQUIRE(FILELENG == 18432U);
+    REQUIRE(FILELENG == 20480U);
 #else
     spare_size = minimum ? 2048 : 4096;
     REQUIRE(FILELENG == 42112U);
@@ -249,7 +249,7 @@ def main():
                 if maximum is not None:
                     run(['pcdev_cmdmod', '-m', format(maximum, 'x'), program, '1'], work)
                     args.append('MINIMUM')
-                capacity = 18432 if program.endswith('.com') else 42112
+                capacity = 20480 if program.endswith('.com') else 42112
                 fixtures = (
                     ([], bytes(10 if i % 64 == 63 else 97 + i % 23
                                for i in range(capacity))),

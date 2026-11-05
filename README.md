@@ -130,7 +130,7 @@ nonblocking peek that retains the next key for normal processing.
 
 Run `make test-editor-state` with a host C compiler (`cc`, or `CC_HOST`)
 supporting AddressSanitizer and UndefinedBehaviorSanitizer. These tests cover
-the 42,112-byte default/DOS 1 `.EXE` and 18,432-byte DOS 1 `.COM` buffers, including
+the 42,112-byte default/DOS 1 `.EXE` and 20,480-byte DOS 1 `.COM` buffers, including
 exact-limit reads, oversized-read rollback, and full-buffer delete/undo.
 They also cover
 failed saves retaining the modified flag, failed `:r` leaving the buffer
@@ -174,14 +174,23 @@ mode) prompts for two digits without temporarily modifying the file.
 Undo/repeat replays the recorded bytes without adding another EOF newline.
 
 Yanked/deleted lines and both screen images share an external memory segment,
-not the near C heap. The editing buffer holds 42,112 bytes, or 18,432 bytes
+not the near C heap. The editing buffer holds 42,112 bytes, or 20,480 bytes
 in the DOS 1 `.COM`. `FILELENG` is defined only in `main.c`; `VI_DOS1_COM`
 selects the compact limit.
 A full-buffer yank therefore no longer needs a second near-heap allocation.
 All builds use small code/data compilation. DOS `.EXE` builds have separate
 code and data segments; the DOS 1 `.COM` combines them in one 64 KiB window.
 Both DOS 1 formats link the DOS 1.1 `d11` runtime, not the DOS 2
-runtime. Segment reservation is platform-specific:
+runtime. DOS 1 COM defines `VI_TINY` for all its C objects and omits the
+full-screen help text. `H`, `:h` and `:help` report that help is omitted; see
+the command reference below instead. Other formats retain full help.
+Tiny also omits `:e`, `:e!`, `:r`, `:.r`, `:f` and save-as. It edits the
+startup file only; quit and launch another instance to change files.
+`:w`, `:wq`, `:x`, `:q` and `:q!` remain available. File arguments to save
+commands are rejected rather than ignored, and failed saves still retain the
+modified buffer. Full builds keep all existing file commands.
+Excluded feature sections use `#ifndef VI_TINY`; dedicated COM objects prevent
+tiny settings from leaking into full builds. Segment reservation is platform-specific:
 
 - CP/M-86: `pcdev_cmdmod` adds a zero-image EXTRA group after linking,
   reserving 64 KiB at load time without adding 64 KiB to the executable.
@@ -195,7 +204,7 @@ runtime. Segment reservation is platform-specific:
 - DOS 2.x: allocate 4,096 paragraphs (64 KiB) with INT 21h/AH=48h and release
   them with AH=49h on exit.
 
-The yank region matches the editing limit: 42,112 bytes, or 18,432 bytes in
+The yank region matches the editing limit: 42,112 bytes, or 20,480 bytes in
 the DOS 1 `.COM`. Two 2,000-byte screen slots
 follow it. Rendering uses two 80-byte near row buffers instead of allocating
 two full screens on the near heap. This removes 3,840 bytes of screen heap
@@ -235,7 +244,7 @@ It requires PCE, mtools/cpmtools and the same local kernel fixtures as the
 save-runtime tests.
 
 `make test-dos1-pce` runs both full DOS 1 editor probes on private DOS 1.1
-boot images: 18,432 bytes on 128 KiB RAM for `.COM`, 42,112 bytes on 256 KiB
+boot images: 20,480 bytes on 128 KiB RAM for `.COM`, 42,112 bytes on 256 KiB
 RAM for `.EXE`. It verifies binary read/yank/delete/undo/save/reopen cycles
 and rejected oversized input while holding an additional 4 KiB heap
 allocation in each format, then compares the saved bytes.
@@ -368,7 +377,7 @@ the measured long-line cursor case is about 1.4x faster; three failed-search
 patterns are 2-2.5x faster, without a cache or skip table. See
 [P4 measurements and scope](docs/performance.md#p4-cursor-and-search-scanning).
 
-Production editing and yank limits are 42,112 bytes, or 18,432 bytes in
+Production editing and yank limits are 42,112 bytes, or 20,480 bytes in
 the DOS 1 `.COM`.
 
 Searches wrap within the file only, handle overlapping matches, and start

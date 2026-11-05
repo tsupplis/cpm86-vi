@@ -40,9 +40,15 @@ graph TD
 | `vicp52.cmd` | CP/M VT52 | 42,112 bytes | `c86` |
 | `vicp100.cmd` | CP/M VT100/ANSI | 42,112 bytes | `c86` |
 | `vicpbios.cmd` | CP/M PC BIOS | 42,112 bytes | `c86` |
-| `vid1bios.com` | DOS 1 PC BIOS | 18,432 bytes | `d11` |
+| `vid1bios.com` | DOS 1 PC BIOS | 20,480 bytes | `d11` |
 | `vid1bios.exe` | DOS 1 PC BIOS | 42,112 bytes | `d11` |
 | `vid2bios.exe` | DOS 2 PC BIOS | 42,112 bytes | `c` |
+
+DOS 1 COM compiles dedicated C objects with `VI_TINY` and `VI_DOS1_COM`.
+`VI_TINY` guards optional feature sections. Full-screen help, edit/import/rename
+commands and save-as are omitted, with diagnostics retained for unavailable
+commands. Saving/quitting the startup file remains supported. Other formats do not
+define `VI_TINY` and retain their existing feature set.
 
 `edit.c` and `window.c` have terminal/OS-specific objects; the DOS 1 formats
 share their BIOS objects. `cmdline.c`, `save.c` and `keyboard.c` have CP/M/DOS

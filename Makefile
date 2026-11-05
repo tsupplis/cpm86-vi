@@ -26,6 +26,9 @@ SHARED_OBJS = \
 	yankmem.o  \
 	yankcopy.o
 
+TINY_OBJS = helpd1.o hexd1.o lined1.o maind1.o miscd1.o normd1.o \
+	yankmd1.o cmdd1.o saved1.o edttiny.o wintiny.o keytiny.o
+
 # --------------------------------------------------------------------
 # Top-level targets
 # --------------------------------------------------------------------
@@ -50,7 +53,7 @@ vicp100.cmd: $(SHARED_OBJS) yankcp.o cmdline.o savecp.o edtcp100.o wincp100.o ke
 	$(CMDMOD) -t EXTRA -n 10000 -m 10000 $@ 2
 	$(RM) $(basename $@).lnk
 
-vid1bios.com: $(filter-out main.o,$(SHARED_OBJS)) maind1.o yankd1c.o cmddos.o savedos.o edtd1bio.o wind1bio.o keydos.o
+vid1bios.com: $(TINY_OBJS) yankcopy.o yankd1c.o
 	printf '%s\n' '-o $@ $^' > $(basename $@).lnk
 	$(LD) -f $(basename $@).lnk $(DOS11_LDFLAGS)
 	$(RM) $(basename $@).lnk
@@ -177,9 +180,25 @@ main.o: main.c
 	$(CC) $(CFLAGS) -o $@ main.c
 	$(STRIP) $@
 
-maind1.o: main.c stevie.h yankmem.h keyboard.h save.h
-	$(CC) $(CFLAGS) -DVI_DOS1_COM -o $@ main.c
+helpd1.o: help.c
+hexd1.o: hexchars.c
+lined1.o: linefunc.c
+maind1.o: main.c
+miscd1.o: misccmds.c
+normd1.o: normal.c
+yankmd1.o: yankmem.c
+cmdd1.o: cmdline.c
+saved1.o: save.c
+edttiny.o: edit.c
+wintiny.o: window.c
+keytiny.o: keyboard.c
+
+# Tiny C objects never share compilation with the full-featured formats.
+$(TINY_OBJS): stevie.h keyboard.h yankmem.h save.h Makefile
+	$(CC) $(CFLAGS) -DVI_TINY -DVI_DOS1_COM -D__PCDOS__=11 -D__PCBIOS__ -o $@ $(filter %.c,$^)
 	$(STRIP) $@
+
+wintiny.o: gitver.h windrun.asm
 
 misccmds.o: misccmds.c
 	$(CC) $(CFLAGS) -o $@ misccmds.c

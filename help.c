@@ -5,6 +5,7 @@
 #include <ctype.h>
 #include "stevie.h"
 
+#ifndef VI_TINY
 static void helpstr(char *s)
 {
 	while (*s)
@@ -52,3 +53,9 @@ void help(void)
 	message("");
 	updatescreen();
 }
+#else
+void help(void)
+{
+	message("Help omitted in tiny build; see README.");
+}
+#endif

@@ -68,7 +68,7 @@ void normal(int c)
         fileinfo();
         break;
     case 'G':
-        gotoline(vi_renum);
+        gotoline((unsigned)vi_renum);
         break;
     case 'm':
         if (vi_curs_char >= vi_file_mem && vi_curs_char < vi_file_end) {
@@ -293,7 +293,7 @@ void normal(int c)
         nchar = vgetc();
         switch (nchar) {
         case 'y':
-            yankline(vi_renum == 0 ? 1 : vi_renum);
+            yankline(vi_renum == 0 ? 1U : (unsigned)vi_renum);
             break;
         default:
             beep();

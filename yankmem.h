@@ -2,7 +2,7 @@
 #define VI_YANKMEM_H
 
 #ifdef VI_DOS1_COM
-#define VI_YANK_CAPACITY 18432U
+#define VI_YANK_CAPACITY 20480U
 #else
 #define VI_YANK_CAPACITY 42112U
 #endif

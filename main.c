@@ -18,7 +18,7 @@ static void screenalloc(void);
 static void screenerror(void);
 
 #ifdef VI_DOS1_COM
-#define FILELENG 18432U
+#define FILELENG 20480U
 #else
 #define FILELENG 42112U
 #endif
@@ -352,7 +352,7 @@ void updatescreen(void) {
     filetonext();
     windcursor(0);
     nexttoscreen();
-    windgoto(vi_curs_row, vi_curs_col);
+    windgoto((int)vi_curs_row, vi_curs_col);
     windcursor(1);
     windrefresh();
 }
@@ -368,7 +368,7 @@ void screenclear(void) {
             !vi_screen_store(VI_SCREEN_NEXT, row, screen_line))
             screenerror();
     }
-    windgoto(vi_curs_row, vi_curs_col);
+    windgoto((int)vi_curs_row, vi_curs_col);
     windcursor(1);
     windrefresh();
 }
@@ -441,7 +441,7 @@ int readfile(char *fname, char *fromp, int nochangename) /* if 1, don't change t
                 unprint++;
             buff[used++] = c;
         }
-        if (error != NULL)
+        if (error)
             break;
         if (used != 0) {
             /* Reuse the status buffer; move the tail once per filtered chunk. */
@@ -456,7 +456,7 @@ int readfile(char *fname, char *fromp, int nochangename) /* if 1, don't change t
         error = "Read/close failed; read cancelled!";
     if (fclose(f) == EOF)
         error = "Read/close failed; read cancelled!";
-    if (error != NULL) {
+    if (error) {
         memmove(insertp, fromp, vi_byte_span(fromp, vi_file_end));
         vi_file_end -= n;
         message((char *)error);
@@ -471,10 +471,17 @@ int readfile(char *fname, char *fromp, int nochangename) /* if 1, don't change t
         message(buff);
         /* sleep(2); */
     }
+#ifdef VI_TINY
+    if (unprint > 0)
+        p = "\"%s\" %u characters (%u un-printable)";
+    else
+        p = "\"%s\" %u characters";
+#else
     if (unprint > 0)
         p = "\"%s\" %u characters (%u un-printable)  (Press 'H' for help)";
     else
         p = "\"%s\" %u characters  (Press 'H' for help)";
+#endif
     snprintf(buff, sizeof buff, p, fname, n, unprint);
     message(buff);
     return (0);

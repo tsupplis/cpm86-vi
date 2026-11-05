@@ -31,7 +31,8 @@ HARNESS = r'''
 
 unsigned char vi_char_width[256];
 static const char *input;
-static int quit_calls, reject_save;
+static int quit_calls, reject_save, save_calls;
+static char saved_filename[128];
 static char last_output[256];
 static jmp_buf input_done;
 static void run_edit(const char *s);
@@ -92,6 +93,8 @@ int hextoint(int c) {
 }
 const char *vi_save_file(const char *n, const char *a, const char *b, int binary) {
     assert(a == vi_file_mem && b == vi_file_end);
+    save_calls++;
+    snprintf(saved_filename, sizeof saved_filename, "%s", n);
     return reject_save ? "Injected save failure" : NULL;
 }
 long vi_file_length(const char *name) { return -1L; }
@@ -533,6 +536,45 @@ static void check_single_mark(void) {
     delchar(); assert(vi_mark == vi_file_mem + length - 1);
     normal('\''); assert(vi_curs_char == vi_mark);
     delchar(); assert(vi_mark == NULL);
+}
+static void check_tiny_commands(void) {
+    static const char *rejected[] = {
+        "e\n", "e! other.txt\n", "r other.txt\n", ".r other.txt\n",
+        "f\n", "f other.txt\n", "w other.txt\n", "wq other.txt\n", "x other.txt\n"
+    };
+    unsigned i;
+    int writes, quits;
+    char *filename;
+    load("abc\n");
+    assert(vi_set_filename("START.TXT"));
+    filename = vi_file_name;
+    vi_curs_char++; normal('m');
+    vi_changed = 1;
+    strcpy(vi_undo_buff, "rZ"); strcpy(vi_redo_buff, "rX");
+    writes = save_calls; quits = quit_calls;
+    for (i = 0; i < sizeof rejected / sizeof rejected[0]; i++) {
+        command(rejected[i]);
+        expect("abc\n");
+        assert(vi_file_name == filename && vi_mark == vi_file_mem + 1);
+        assert(vi_changed && vi_curs_char == vi_file_mem + 1);
+        assert(save_calls == writes && quit_calls == quits);
+        assert(!strcmp(vi_undo_buff, "rZ") && !strcmp(vi_redo_buff, "rX"));
+        assert(strstr(last_output, "Unrecognized"));
+    }
+    reject_save = 1;
+    command("w\n");
+    assert(vi_changed && save_calls == writes + 1);
+    assert(!strcmp(saved_filename, "START.TXT") && quit_calls == quits);
+    reject_save = 0;
+    command("w\n"); assert(!vi_changed && save_calls == writes + 2);
+    vi_changed = 1;
+    command("q\n"); assert(quit_calls == quits && vi_changed);
+    command("wq\n"); assert(quit_calls == quits + 1 && !vi_changed);
+    vi_changed = 1;
+    command("x\n"); assert(quit_calls == quits + 2 && !vi_changed);
+    command("q\n"); assert(quit_calls == quits + 3);
+    vi_changed = 1;
+    command("q!\n"); assert(quit_calls == quits + 4);
 }
 static void check_search_bounds(void) {
     char *before;
@@ -1154,6 +1196,7 @@ int main(int argc, char **argv) {
     else if(!strcmp(argv[1], "insert-backspace")) check_insert_backspace();
     else if(!strcmp(argv[1], "keyboard-batch")) check_keyboard_batch();
     else if(!strcmp(argv[1], "single-mark")) check_single_mark();
+    else if(!strcmp(argv[1], "tiny-commands")) check_tiny_commands();
     else if(!strcmp(argv[1], "search-bounds")) check_search_bounds();
     else if(!strcmp(argv[1], "command-limits")) check_command_limits();
     else if(!strcmp(argv[1], "count-limits")) check_count_limits();
@@ -1256,11 +1299,12 @@ static void *edit_memmove(void *to, const void *from, size_t length) {
                  'large-binary-put', 'full-buffer', 'capacity', 'string-failures',
                  'filename-ownership', 'quality-commands', 'quality-rejections')
         selected = sys.argv[1:] or cases
-        if any(case not in cases for case in selected):
+        if any(case not in cases + ('tiny-commands',) for case in selected):
             raise SystemExit('Unknown editor-state test case')
         for profile, flags in (
                 ('42112', []), ('DOS1-EXE-42112', ['-D__PCDOS__=11']),
-                ('DOS1-COM-18432', ['-D__PCDOS__=11', '-DVI_DOS1_COM'])):
+                ('COM-capacity-full-20480', ['-D__PCDOS__=11', '-DVI_DOS1_COM']),
+                ('DOS1-COM-TINY-20480', ['-D__PCDOS__=11', '-DVI_DOS1_COM', '-DVI_TINY'])):
             subprocess.run([
                 os.environ.get('CC_HOST', 'cc'), '-std=c99', '-g',
                 '-fsanitize=address,undefined', *flags, '-I', str(ROOT), str(harness),
@@ -1268,7 +1312,16 @@ static void *edit_memmove(void *to, const void *from, size_t length) {
                 str(line_source), str(ROOT / 'yankmem.c'),
                 str(ROOT / 'test/yankmock.c'), '-o', str(binary),
             ], check=True)
-            for case in selected:
+            profile_cases = selected
+            if '-DVI_TINY' in flags:
+                profile_cases = ('tiny-commands', 'replace', 'search', 'word-eof',
+                                 'bulk-insert', 'insert-backspace', 'keyboard-batch',
+                                 'search-bounds', 'delete-limits', 'insert-limits',
+                                 'literal-limits', 'replay-limits', 'yank-failures',
+                                 'yank-success', 'put-failures', 'full-buffer')
+            elif selected == ['tiny-commands']:
+                continue
+            for case in profile_cases:
                 try:
                     result = subprocess.run([str(binary), case], cwd=work, timeout=10)
                 except subprocess.TimeoutExpired:

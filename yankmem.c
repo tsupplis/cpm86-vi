@@ -44,7 +44,7 @@ unsigned vi_yank_capacity(void)
 int vi_yank_store(const char *source, unsigned length)
 {
     if (!yank_segment || length > yank_capacity ||
-        (length && source == NULL))
+        (length && !source))
         return 0;
     vi_yseg_write(yank_segment, 0, source, length);
     yank_length = length;
@@ -65,7 +65,7 @@ int vi_screen_configure(unsigned rows, unsigned columns)
 int vi_screen_store(unsigned image, unsigned row, const char *source)
 {
     if (!yank_segment || !screen_columns || image > VI_SCREEN_NEXT ||
-        row >= screen_rows || source == NULL)
+        row >= screen_rows || !source)
         return 0;
     vi_yseg_write(yank_segment, yank_capacity + image * VI_SCREEN_IMAGE_SIZE +
                   row * screen_columns, source, screen_columns);

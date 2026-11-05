@@ -18,6 +18,7 @@ PROGRAMS = (
 )
 SUITES = (
     ('keys', 'test_keys.py'),
+    ('help', 'test_help.py'),
     ('scroll', 'test_scroll.py'),
     ('save-host', 'test_save.py'),
     ('editor-state', 'test_editor_state.py'),

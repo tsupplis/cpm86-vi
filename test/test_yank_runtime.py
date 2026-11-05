@@ -37,7 +37,7 @@ def main():
             for library, adapter, output, capacity in (
                     ('c86', 'yankcp', 'yank.cmd', 42112),
                     ('d11', 'yankd11', 'yank11.exe', 42112),
-                    ('d11', 'yankd1c', 'yank11.com', 18432),
+                    ('d11', 'yankd1c', 'yank11.com', 20480),
                     ('c', 'yankd20', 'yank.exe', 42112)):
                 probe = 'yankpc.o' if output.endswith('.com') else 'yankprobe.o'
                 run(['aztec42_link', '-o', output, probe, 'yankmem.o',

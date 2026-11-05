@@ -105,14 +105,18 @@ Checked items have completed their documented implementation and validation.
   **Done when:** forward/backward nesting works; unmatched brackets leave the
   cursor unchanged and signal failure.
 
-- [ ] **F3 - Add one mark and return-to-mark.**
+- [x] **F3 - Add one mark and return-to-mark.**
   Store a single buffer-local cursor position, not a named-mark table or jump
   history. Set it explicitly; return to its exact position only if defined.
   **Done when:** surviving edits keep the mark attached to its character;
   deleting that character invalidates it, undo does not resurrect it, and
   replacing the file buffer clears it. An undefined mark reports an error
   without moving the cursor. Preserve the existing heap-headroom requirements.
-  Backlog only: no marks implementation is currently present.
+  **Result:** `m` sets the single mark; `'` returns to its exact character.
+  A single near pointer is adjusted only for committed edits. Host parser and
+  all native buffer profiles cover the mark, including large addresses and
+  preserved heap budgets. DOS 1 COM uses 20,480-byte editing/yank buffers;
+  EXE/CP/M builds use 42,112 bytes. The complete regression passes.
 
 ## 4. Size reduction: one measured candidate
 
