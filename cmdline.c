@@ -176,6 +176,7 @@ void readcmdline(int firstc) /* either ':', '/', or '?' */
                 if (arg != NULL && !vi_set_filename(arg))
                     return;
                 /* clear mem and read file */
+                vi_mark = NULL;
                 vi_file_end = vi_top_char = vi_curs_char = vi_file_mem;
                 UNCHANGED;
                 resetundo();

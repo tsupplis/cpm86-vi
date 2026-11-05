@@ -40,6 +40,7 @@ extern char *vi_file_end;
 extern char *vi_top_char;
 extern char *vi_bot_char;
 extern char *vi_curs_char;
+extern char *vi_mark;
 extern char *vi_ins_start;
 extern int vi_curs_col;
 extern unsigned long vi_curs_row, vi_curs_vcol;
@@ -63,6 +64,7 @@ void filemess(char *s);
 
 /* linefunc.c */
 unsigned vi_byte_span(const char *first, const char *last);
+void vi_mark_adjust(char *at, unsigned length, int remove);
 unsigned long vi_count_digit(unsigned long count, unsigned digit);
 char *nextline(char *curr);
 char *prevline(char *curr);
@@ -113,6 +115,7 @@ int anyinput(void);
 
 /* edit.c */
 int windgetc(void);
+int windpeek(void);
 void edit(void);
 void getout(void);
 void cursupdate(void);

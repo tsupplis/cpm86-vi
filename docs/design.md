@@ -40,7 +40,7 @@ graph TD
 | `vicp52.cmd` | CP/M VT52 | 38,016 bytes | `c86` |
 | `vicp100.cmd` | CP/M VT100/ANSI | 38,016 bytes | `c86` |
 | `vicpbios.cmd` | CP/M PC BIOS | 38,016 bytes | `c86` |
-| `vid1bios.com` | DOS 1 PC BIOS | 20,480 bytes | `d11` |
+| `vid1bios.com` | DOS 1 PC BIOS | 18,432 bytes | `d11` |
 | `vid1bios.exe` | DOS 1 PC BIOS | 38,016 bytes | `d11` |
 | `vid2bios.exe` | DOS 2 PC BIOS | 38,016 bytes | `c` |
 
@@ -113,6 +113,14 @@ state and literal-undo metadata are private to their modules.
 - A new search copies the pattern before releasing the old one; failed
   allocation preserves both pattern and direction. Repeat search allocates
   nothing.
+- A single near pointer stores the buffer-local mark. `m` sets it at the
+  current character; `'` returns to that exact character without toggling or
+  reading a name. Insertions before or at the mark move it with its character.
+  Deleting the character clears the mark permanently, including across undo;
+  in-place replacement retains it. Buffer replacement clears it, filename-only
+  changes retain it, and failed imports/pastes leave it unchanged. An undefined
+  mark reports an error without moving the cursor. Mark commands do not change
+  text, undo or repeat, and are not operator motions.
 
 ### Undo and replay
 

@@ -19,6 +19,7 @@ HARNESS = r'''
 #include "yankmem.h"
 
 char *vi_file_mem, *vi_file_end, *vi_file_max, *vi_curs_char, *vi_uncurs_char;
+char *vi_mark;
 char vi_undo_buff[CMDSIZE], vi_redo_buff[CMDSIZE];
 int vi_changed, vi_undo_changed, vi_undel_chars, vi_unrpl_chars;
 static unsigned change_lines;
@@ -249,7 +250,7 @@ int main(void) {
 def main():
     source = HARNESS
     for name, signatures in (
-            ('linefunc.c', ('unsigned vi_byte_span(', 'char *prevline(')),
+            ('linefunc.c', ('unsigned vi_byte_span(', 'void vi_mark_adjust(', 'char *prevline(')),
             ('edit.c', ('int oneleft(', 'void beginline(')),
             ('normal.c', ('void resetundo(',)),
             ('main.c', ('void addtobuff(',)),

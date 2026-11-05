@@ -43,6 +43,15 @@ int vi_key_concurrent(void)
 #endif
 }
 
+int vi_key_ready(void)
+{
+#ifdef __CPM86__
+    return pending_bracket || pending_key || (bdos(11, 0) & 255);
+#else
+    return 0;
+#endif
+}
+
 int vi_key_read(void)
 {
 #ifdef __CPM86__

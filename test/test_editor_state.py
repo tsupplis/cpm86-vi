@@ -36,6 +36,7 @@ static char last_output[256];
 static jmp_buf input_done;
 static void run_edit(const char *s);
 static int editing, limit_messages;
+static int keyboard_burst;
 static int terminal_writes, cursor_visible = 1, screen_updates;
 static unsigned long edit_moves, edit_moved_bytes;
 void windgoto(int r, int c) {}
@@ -60,6 +61,9 @@ char *viversion(void) { return "test"; }
 int windgetc(void) {
     if(editing && (!input || !*input)) longjmp(input_done, 1);
     assert(input && *input); return (unsigned char)*input++;
+}
+int windpeek(void) {
+    return keyboard_burst && input && *input ? (unsigned char)*input : -1;
 }
 void beginline(void) {
     while(vi_curs_char > vi_file_mem && vi_curs_char[-1] != '\n')
@@ -144,6 +148,7 @@ void test_string_free(void *p) {
 
 CHECKS = r'''
 static void load(const char *s) {
+    vi_mark = NULL;
     memset(vi_file_mem, 0, FILELENG);
     memcpy(vi_file_mem, s, strlen(s));
     vi_file_end = vi_file_mem + strlen(s);
@@ -406,6 +411,128 @@ static void check_insert_backspace(void) {
     edit_moves = 0;
     delchar(); expect(""); assert(vi_changed && edit_moves == 0);
     delchar(); expect(""); assert(edit_moves == 0);
+}
+static void check_keyboard_batch(void) {
+    int count, i;
+    char keys[12];
+    for (count = 1; count <= 9; count++) {
+        load("tail\n");
+        keys[0] = 'i';
+        for (i = 0; i < count; i++) keys[i + 1] = 'A' + i;
+        strcpy(keys + count + 1, "\033");
+        edit_moves = 0;
+        keyboard_burst = 1;
+        run_edit(keys);
+        keyboard_burst = 0;
+        assert(edit_moves == (unsigned)(count + 1) / 2);
+        assert(vi_ninsert == count && vi_file_end == vi_file_mem + count + 5);
+        assert(!memcmp(vi_file_mem, keys + 1, count));
+        assert(!memcmp(vi_file_mem + count, "tail\n", 5));
+        run_edit("u"); expect("tail\n"); assert(!vi_changed);
+        run_edit("."); assert(!memcmp(vi_file_mem, keys + 1, count));
+    }
+    keyboard_burst = 1;
+    check_insert_backspace();
+    load("tail\n");
+    run_edit("iab\tcd\033"); expect("ab    cdtail\n");
+    load("tail\n");
+    run_edit("iab\026\033cd\033"); expect("ab\033cdtail\n");
+    load("tail\n");
+    vi_file_max = vi_file_end + 3;
+    run_edit("iABC\033"); expect("Atail\n");
+    assert(vi_ninsert == 1 && strstr(last_output, "Mode"));
+    keyboard_burst = 0;
+}
+static void check_single_mark(void) {
+    FILE *f;
+    char *saved, *maximum;
+    unsigned length;
+    load("abc\n");
+    vi_curs_char += 2;
+    normal('\'');
+    assert(vi_curs_char == vi_file_mem + 2 && strstr(last_output, "not set"));
+    strcpy(vi_undo_buff, "rZ"); strcpy(vi_redo_buff, "rX");
+    normal('m');
+    assert(vi_mark == vi_file_mem + 2 && !vi_changed);
+    assert(!strcmp(vi_undo_buff, "rZ") && !strcmp(vi_redo_buff, "rX"));
+    vi_curs_char = vi_file_mem;
+    normal('\''); assert(vi_curs_char == vi_file_mem + 2);
+    normal('\''); assert(vi_curs_char == vi_mark);
+    vi_renum = VI_COUNT_MAX + 1UL;
+    vi_curs_char = vi_file_mem;
+    normal('m'); assert(vi_mark == vi_file_mem + 2);
+    normal('\''); assert(vi_curs_char == vi_file_mem);
+    vi_renum = 0;
+    run_edit("iX\033"); assert(vi_mark == vi_file_mem + 3);
+    run_edit("u"); expect("abc\n"); assert(vi_mark == vi_file_mem + 2);
+    run_edit("."); expect("Xabc\n"); assert(vi_mark == vi_file_mem + 3);
+    vi_curs_char = vi_file_mem; normal('m');
+    run_edit("u"); expect("abc\n"); assert(vi_mark == NULL);
+    load("abc\n");
+    vi_curs_char++; normal('m');
+    input = "Z"; normal('r'); assert(vi_mark == vi_file_mem + 1);
+    vi_curs_char = vi_file_mem; delchar();
+    assert(vi_mark == vi_file_mem);
+    delchar(); assert(vi_mark == NULL);
+    load("abc\n");
+    normal('m'); run_edit("xu"); expect("abc\n"); assert(vi_mark == NULL);
+    load("one two\n");
+    vi_curs_char += 5; normal('m');
+    vi_curs_char = vi_file_mem; delword(1);
+    expect("two\n"); assert(vi_mark == vi_file_mem + 1);
+    load("one\ntwo\n");
+    vi_curs_char += 5; normal('m');
+    vi_curs_char = vi_file_mem; run_edit("ddu");
+    expect("one\ntwo\n"); assert(vi_mark == vi_file_mem + 5);
+    load("one\ntwo\n");
+    vi_curs_char += 3; normal('m');
+    run_edit("Ju"); expect("one\ntwo\n"); assert(vi_mark == NULL);
+    load("\ta\nb\n\tc");
+    vi_curs_char += 3; normal('m');
+    run_edit("3<<u3>>u"); expect("\ta\nb\n\tc");
+    assert(vi_mark == vi_file_mem + 3);
+    vi_curs_char = vi_file_mem; normal('m');
+    run_edit("<<u"); expect("\ta\nb\n\tc"); assert(vi_mark == NULL);
+    load("keep\n");
+    assert(yankline(1));
+    load("tail\n"); vi_curs_char++; normal('m');
+    fail_yank_load = 1; putline(1); fail_yank_load = 0;
+    expect("tail\n"); assert(vi_mark == vi_file_mem + 1);
+    putline(1); expect("keep\ntail\n"); assert(vi_mark == vi_file_mem + 6);
+    f = fopen("mark.txt", "wb"); assert(f);
+    assert(fputs("XY\n", f) >= 0 && !fclose(f));
+    load("tail\n"); vi_curs_char++; normal('m');
+    assert(readfile("mark.txt", vi_file_mem, 1) == 0);
+    expect("XY\ntail\n"); assert(vi_mark == vi_file_mem + 4);
+    saved = vi_mark;
+    fail_after = 1;
+    assert(readfile("mark.txt", vi_file_mem, 1) == -1);
+    fail_after = -1; read_failed = 0;
+    expect("XY\ntail\n"); assert(vi_mark == saved);
+    fail_close = 1;
+    assert(readfile("mark.txt", vi_file_mem, 1) == -1);
+    fail_close = 0; assert(vi_mark == saved);
+    maximum = vi_file_max; vi_file_max = vi_file_end;
+    inschar('!'); assert(vi_mark == saved);
+    assert(readfile("mark.txt", vi_file_mem, 1) == -1 && vi_mark == saved);
+    vi_file_max = maximum;
+    command("f renamed.txt\n"); assert(vi_mark == saved);
+    vi_changed = 1;
+    command("e mark.txt\n"); assert(vi_mark == saved);
+    command("e! mark.txt\n"); expect("XY\n"); assert(vi_mark == NULL);
+    normal('m');
+    command("e! no-such-mark-file.txt\n"); expect(""); assert(vi_mark == NULL);
+    normal('m'); assert(vi_mark == NULL && strstr(last_output, "No character"));
+    load("");
+    length = FILELENG - 2U;
+    memset(vi_file_mem, 'a', length);
+    vi_file_end = vi_file_mem + length;
+    vi_curs_char = vi_file_end - 1; normal('m');
+    vi_curs_char = vi_file_mem; inschar('X');
+    assert(vi_mark == vi_file_mem + length);
+    delchar(); assert(vi_mark == vi_file_mem + length - 1);
+    normal('\''); assert(vi_curs_char == vi_mark);
+    delchar(); assert(vi_mark == NULL);
 }
 static void check_search_bounds(void) {
     char *before;
@@ -1025,6 +1152,8 @@ int main(int argc, char **argv) {
     else if(!strcmp(argv[1], "word-eof")) check_word_eof();
     else if(!strcmp(argv[1], "bulk-insert")) check_bulk_insert();
     else if(!strcmp(argv[1], "insert-backspace")) check_insert_backspace();
+    else if(!strcmp(argv[1], "keyboard-batch")) check_keyboard_batch();
+    else if(!strcmp(argv[1], "single-mark")) check_single_mark();
     else if(!strcmp(argv[1], "search-bounds")) check_search_bounds();
     else if(!strcmp(argv[1], "command-limits")) check_command_limits();
     else if(!strcmp(argv[1], "count-limits")) check_count_limits();
@@ -1118,6 +1247,8 @@ static void *edit_memmove(void *to, const void *from, size_t length) {
         cases = ('save', 'read', 'replace', 'search', 'insert-read',
                  'read-limits', 'read-errors', 'word-eof', 'bulk-insert',
                  'insert-backspace',
+                 'keyboard-batch',
+                 'single-mark',
                  'search-bounds', 'command-limits', 'count-limits', 'delete-limits',
                  'insert-limits', 'literal-limits', 'replay-limits',
                  'file-insert-limits', 'long-messages', 'yank-failures',
@@ -1129,7 +1260,7 @@ static void *edit_memmove(void *to, const void *from, size_t length) {
             raise SystemExit('Unknown editor-state test case')
         for profile, flags in (
                 ('38016', []), ('DOS1-EXE-38016', ['-D__PCDOS__=11']),
-                ('DOS1-COM-20480', ['-D__PCDOS__=11', '-DVI_DOS1_COM'])):
+                ('DOS1-COM-18432', ['-D__PCDOS__=11', '-DVI_DOS1_COM'])):
             subprocess.run([
                 os.environ.get('CC_HOST', 'cc'), '-std=c99', '-g',
                 '-fsanitize=address,undefined', *flags, '-I', str(ROOT), str(harness),

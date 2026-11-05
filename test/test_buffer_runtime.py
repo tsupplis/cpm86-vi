@@ -46,11 +46,30 @@ static int quality_commands(void) {
     vi_top_char = vi_curs_char = vi_file_mem;
     vi_changed = 0;
     resetundo();
+    vi_curs_char += 3;
+    normal('m');
+    vi_curs_char = vi_file_mem;
     REQUIRE(stuffin("3<<u3>>u"));
     while (anyinput())
         vi_test_donormal(vgetc());
     REQUIRE(vi_file_end == vi_file_mem + sizeof original - 1);
     REQUIRE(!memcmp(vi_file_mem, original, sizeof original - 1) && !vi_changed);
+    REQUIRE(vi_mark == vi_file_mem + 3);
+    normal('\'');
+    REQUIRE(vi_curs_char == vi_file_mem + 3);
+    memset(vi_file_mem, 'K', FILELENG - 2U);
+    vi_file_end = vi_file_mem + FILELENG - 2U;
+    vi_curs_char = vi_file_end - 1;
+    normal('m');
+    vi_curs_char = vi_file_mem;
+    inschar('X');
+    REQUIRE(vi_mark == vi_file_mem + FILELENG - 2U);
+    delchar();
+    REQUIRE(vi_mark == vi_file_mem + FILELENG - 3U);
+    normal('\'');
+    REQUIRE(vi_curs_char == vi_mark);
+    delchar();
+    REQUIRE(vi_mark == NULL);
     resetundo();
     return 0;
 failure:
@@ -76,7 +95,7 @@ int main(int argc, char **argv) {
     }
 #ifdef VI_DOS1_COM
     spare_size = 4096;
-    REQUIRE(FILELENG == 20480U);
+    REQUIRE(FILELENG == 18432U);
 #else
     spare_size = minimum ? 2048 : 4096;
     REQUIRE(FILELENG == 38016U);
@@ -229,7 +248,7 @@ def main():
                 if maximum is not None:
                     run(['pcdev_cmdmod', '-m', format(maximum, 'x'), program, '1'], work)
                     args.append('MINIMUM')
-                capacity = 20480 if program.endswith('.com') else 38016
+                capacity = 18432 if program.endswith('.com') else 38016
                 fixtures = (
                     ([], bytes(10 if i % 64 == 63 else 97 + i % 23
                                for i in range(capacity))),

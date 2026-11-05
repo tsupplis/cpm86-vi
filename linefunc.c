@@ -12,10 +12,25 @@ static char *ssearch(int dir, char *str);
 static char *fwdsearch(char *str);
 static char *bcksearch(char *str);
 
+char *vi_mark = NULL;
+
 /* Ordered endpoints in one near segment; subtract addresses, not signed ptrdiffs. */
 unsigned vi_byte_span(const char *first, const char *last)
 {
     return (unsigned)((unsigned long)last - (unsigned long)first);
+}
+
+/* Keep the mark on its original character; deletion is not undone. */
+void vi_mark_adjust(char *at, unsigned length, int remove)
+{
+    if (vi_mark == NULL || vi_mark < at)
+        return;
+    if (!remove)
+        vi_mark += length;
+    else if (vi_byte_span(at, vi_mark) < length)
+        vi_mark = NULL;
+    else
+        vi_mark -= length;
 }
 
 unsigned long vi_count_digit(unsigned long count, unsigned digit)

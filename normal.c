@@ -70,6 +70,21 @@ void normal(int c)
     case 'G':
         gotoline(vi_renum);
         break;
+    case 'm':
+        if (vi_curs_char >= vi_file_mem && vi_curs_char < vi_file_end) {
+            vi_mark = vi_curs_char;
+            message("Mark set");
+        } else
+            message("No character to mark!");
+        break;
+    case '\'':
+        if (vi_mark != NULL && vi_mark >= vi_file_mem && vi_mark < vi_file_end) {
+            vi_curs_char = vi_mark;
+            cursupdate();
+            updatescreen();
+        } else
+            message("Mark is not set!");
+        break;
     case 'l':
         if (!oneright())
             beep();
@@ -535,9 +550,11 @@ static void applychange(int remove)
     for (i = 0; i < change_lines; i++) {
         if ((unsigned char)vi_undo_buff[i / 8U] & (1U << (i % 8U))) {
             if (remove) {
+                vi_mark_adjust(p, 1, 1);
                 memmove(p, p + 1, vi_byte_span(p + 1, vi_file_end));
                 vi_file_end--;
             } else {
+                vi_mark_adjust(p, 1, 0);
                 memmove(p + 1, p, vi_byte_span(p, vi_file_end));
                 *p = change_char;
                 vi_file_end++;

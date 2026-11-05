@@ -120,11 +120,17 @@ byte-copy loops. Tab refreshes once after its
 four spaces rather than once per space. The regression checks these output and
 copy counts as well as cursor visibility and final position.
 
+Insert mode groups up to two already-waiting printable ASCII keystrokes into
+one insertion and refresh. It never waits to fill a batch. Escape, Backspace,
+Tab, newlines, literal input and extended keys remain separate; undo/repeat and
+capacity limits are preserved. BIOS, VT and Concurrent CP/M input use a
+nonblocking peek that retains the next key for normal processing.
+
 ### Host regression tests
 
 Run `make test-editor-state` with a host C compiler (`cc`, or `CC_HOST`)
 supporting AddressSanitizer and UndefinedBehaviorSanitizer. These tests cover
-the 38,016-byte default/DOS 1 `.EXE` and 20,480-byte DOS 1 `.COM` buffers, including
+the 38,016-byte default/DOS 1 `.EXE` and 18,432-byte DOS 1 `.COM` buffers, including
 exact-limit reads, oversized-read rollback, and full-buffer delete/undo.
 They also cover
 failed saves retaining the modified flag, failed `:r` leaving the buffer
@@ -168,7 +174,7 @@ mode) prompts for two digits without temporarily modifying the file.
 Undo/repeat replays the recorded bytes without adding another EOF newline.
 
 Yanked/deleted lines and both screen images share an external memory segment,
-not the near C heap. The editing buffer holds 38,016 bytes, or 20,480 bytes
+not the near C heap. The editing buffer holds 38,016 bytes, or 18,432 bytes
 in the DOS 1 `.COM`. `FILELENG` is defined only in `main.c`; `VI_DOS1_COM`
 selects the compact limit.
 A full-buffer yank therefore no longer needs a second near-heap allocation.
@@ -189,7 +195,7 @@ runtime. Segment reservation is platform-specific:
 - DOS 2.x: allocate 4,096 paragraphs (64 KiB) with INT 21h/AH=48h and release
   them with AH=49h on exit.
 
-The yank region matches the editing limit: 38,016 bytes, or 20,480 bytes in
+The yank region matches the editing limit: 38,016 bytes, or 18,432 bytes in
 the DOS 1 `.COM`. Two 2,000-byte screen slots
 follow it. Rendering uses two 80-byte near row buffers instead of allocating
 two full screens on the near heap. This removes 3,840 bytes of screen heap
@@ -230,7 +236,7 @@ It requires PCE, mtools/cpmtools and the same local kernel fixtures as the
 save-runtime tests.
 
 `make test-dos1-pce` runs both full DOS 1 editor probes on private DOS 1.1
-boot images: 20,480 bytes on 128 KiB RAM for `.COM`, 38,016 bytes on 256 KiB
+boot images: 18,432 bytes on 128 KiB RAM for `.COM`, 38,016 bytes on 256 KiB
 RAM for `.EXE`. It verifies binary read/yank/delete/undo/save/reopen cycles
 and rejected oversized input while holding an additional 4 KiB heap
 allocation in each format, then compares the saved bytes.
@@ -363,7 +369,7 @@ the measured long-line cursor case is about 1.4x faster; three failed-search
 patterns are 2-2.5x faster, without a cache or skip table. See
 [P4 measurements and scope](docs/performance.md#p4-cursor-and-search-scanning).
 
-Production editing and yank limits are 38,016 bytes, or 20,480 bytes in
+Production editing and yank limits are 38,016 bytes, or 18,432 bytes in
 the DOS 1 `.COM`.
 
 Searches wrap within the file only, handle overlapping matches, and start

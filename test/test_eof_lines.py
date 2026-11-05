@@ -37,6 +37,7 @@ def main():
 static char memory[512];
 char *vi_file_mem=memory, *vi_file_end, *vi_file_max=memory+sizeof memory;
 char *vi_curs_char, *vi_uncurs_char;
+char *vi_mark;
 unsigned long vi_renum;
 int vi_changed, vi_state;
 char vi_undo_buff[1024], vi_redo_buff[1024];
@@ -53,6 +54,7 @@ void inschar(int c);
 static int canincrease(unsigned n);
 '''
     harness += function(lines, 'unsigned vi_byte_span(const char *first, const char *last)')
+    harness += function(lines, 'void vi_mark_adjust(')
     harness += function(lines, 'char *prevline(char *curr)')
     for sig in ('static int canincrease(unsigned n)\n', 'void inschar(int c)',
                 'int yankline(unsigned n)', 'void putline(int k)',

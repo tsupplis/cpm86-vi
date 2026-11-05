@@ -18,7 +18,7 @@ static void screenalloc(void);
 static void screenerror(void);
 
 #ifdef VI_DOS1_COM
-#define FILELENG 20480U
+#define FILELENG 18432U
 #else
 #define FILELENG 38016U
 #endif
@@ -374,6 +374,7 @@ void screenclear(void) {
 }
 
 static void filealloc(void) {
+    vi_mark = NULL;
     if ((vi_file_mem = malloc((unsigned)FILELENG)) == NULL) {
         fprintf(stderr, "Unable to allocate %u bytes for file memory!\n",
                 (unsigned)FILELENG);
@@ -461,6 +462,7 @@ int readfile(char *fname, char *fromp, int nochangename) /* if 1, don't change t
         message((char *)error);
         return -1;
     }
+    vi_mark_adjust(insertp, n, 0);
     if (!vi_binary && unprint > 0) {
         sprintf(
             buff,

@@ -19,6 +19,7 @@ HARNESS = r'''
 #include "save.h"
 
 char *vi_file_mem, *vi_file_end, *vi_file_max, *vi_curs_char, *vi_top_char;
+char *vi_mark;
 char *vi_file_name = "INPUT.TXT";
 int vi_binary, vi_changed;
 static char last_output[256];
@@ -256,6 +257,7 @@ def main():
     source = HARNESS
     source += function((ROOT / 'linefunc.c').read_text(),
                        'unsigned vi_byte_span(const char *first, const char *last)')
+    source += function((ROOT / 'linefunc.c').read_text(), 'void vi_mark_adjust(')
     source += '\n#undef getc\n#define getc test_getc\n'
     source += '#undef ferror\n#define ferror test_ferror\n'
     source += '#define fclose test_fclose\n'

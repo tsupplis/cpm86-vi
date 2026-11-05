@@ -17,6 +17,7 @@ HARNESS = r'''
 #include "stevie.h"
 
 char *vi_file_mem, *vi_file_end, *vi_file_max, *vi_curs_char;
+char *vi_mark;
 char vi_ins_buff[CMDSIZE], *vi_ins_ptr;
 int vi_ninsert, vi_changed;
 static int failures, messages;
@@ -113,6 +114,7 @@ def main():
     edit = (ROOT / 'edit.c').read_text()
     source = HARNESS
     source += function(lines, 'unsigned vi_byte_span(const char *first, const char *last)')
+    source += function(lines, 'void vi_mark_adjust(')
     for signature in ('static int canincrease(unsigned n)\n',
                       'void inschar(int c)', 'void insstr(char *s)'):
         source += '\n' + function(misc, signature)

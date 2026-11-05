@@ -31,7 +31,9 @@ static int keyready(void) {
 #include "keyready.asm"
 }
 
-static int getch(void) {
+static int getch(int wait) {
+    static char scans[] = "\110\120\115\113\107\111\122\121\117\123";
+    static char translated[] = "ABCDHIL\n\032\177";
     int c, al, ah;
 
     if (pending >= 0) {
@@ -46,42 +48,25 @@ static int getch(void) {
          * Poll instead, re-asserting our cursor position every time
          * around, so any interference is fought at high frequency
          * instead of just once, best-effort, after the fact. */
-        while (!keyready())
+        while (!keyready()) {
+            if (!wait)
+                return -1;
             windrefreshcursor();
+        }
         c = bioskey();
         al = c & 0xff;
         ah = (c >> 8) & 0xff;
         if (al != 0)
             return al;
         /* Extended key: no ASCII, decode the BIOS scan code in AH. */
-        switch (ah) {
-        case 0x48:
-            pending = 'A';
-            return 27; /* Up */
-        case 0x50:
-            pending = 'B';
-            return 27; /* Down */
-        case 0x4D:
-            pending = 'C';
-            return 27; /* Right */
-        case 0x4B:
-            pending = 'D';
-            return 27; /* Left */
-        case 0x47:
-            pending = 'H';
-            return 27; /* Home */
-        case 0x49:
-            pending = 'I';
-            return 27; /* Page Up */
-        case 0x51:
-            return '\n'; /* Page Down */
-        case 0x4F:
-            return '\032'; /* End */
-        case 0x52:
-            pending = 'L';
-            return 27; /* Insert */
-        case 0x53:
-            return '\177'; /* Delete */
+        for (al = 0; al < 10; al++) {
+            if (ah != (unsigned char)scans[al])
+                continue;
+            c = translated[al];
+            if (al >= 7)
+                return c;
+            pending = c;
+            return 27;
         }
     }
 }
@@ -90,26 +75,22 @@ static int getch(void) {
 
 #define GETCH_BUFLEN 64
 static char getch_buffer[GETCH_BUFLEN];
+static int getch_size, getch_offset;
 
-static int getch(void) {
-    int i, c, d;
-    static int s = 0;
-    static int o = 0;
-
-    if (s > 0) {
-        c = (unsigned char)getch_buffer[o];
-        s--;
-        o++;
-        o = o % GETCH_BUFLEN;
+static int getch(int wait) {
+    int c, d;
+    if (getch_size > 0) {
+        c = (unsigned char)getch_buffer[getch_offset];
+        getch_size--;
+        getch_offset = (getch_offset + 1) % GETCH_BUFLEN;
         return c;
     }
     while (!(c = bdos(6, 0xFF)))
-        continue;
-    while (s < GETCH_BUFLEN && (d = bdos(6, 0xFF))) {
-        if (1) {
-            getch_buffer[(o + s) % GETCH_BUFLEN] = d;
-            s++;
-        }
+        if (!wait)
+            return -1;
+    while (getch_size < GETCH_BUFLEN && (d = bdos(6, 0xFF))) {
+        getch_buffer[(getch_offset + getch_size) % GETCH_BUFLEN] = d;
+        getch_size++;
     }
     return c;
 }
@@ -117,9 +98,28 @@ static int getch(void) {
 #endif /* __PCBIOS__ / __VTCMD__ */
 
 /* OS-independent wrapper around whichever getch() is active above. */
+static int peeked = -1;
 int windgetc(void) {
+    int c;
+    if (peeked >= 0) {
+        c = peeked;
+        peeked = -1;
+        return c;
+    }
     if (vi_key_concurrent()) return vi_key_read();
-    return getch();
+    return getch(1);
+}
+
+int windpeek(void)
+{
+    if (peeked >= 0)
+        return peeked;
+    if (vi_key_concurrent()) {
+        if (vi_key_ready())
+            peeked = vi_key_read();
+    } else
+        peeked = getch(0);
+    return peeked;
 }
 
 void edit(void) {
@@ -507,31 +507,38 @@ static int insertbyte(int c, int reserve_eof)
 static void insertchar(int c)
 {
     char *p;
-    int n = 0;
+    int n = 0, physical = !vstuffed();
 
-    if (!anyinput()) {
-        insertbyte(c, !vstuffed());
+    if (physical && (c < ' ' || c >= 127)) {
+        insertbyte(c, 1);
     } else {
-        /* If there's any pending input, grab */
-        /* it all at once. */
         p = vi_ins_ptr;
         for (;;) {
-            if (insertroom(1, 0)) {
-                if (vi_byte_span(vi_file_end, vi_file_max) > (unsigned)n + 1U) {
-                    *vi_ins_ptr++ = c;
-                    vi_ninsert++;
-                    n++;
-                } else {
+            if (insertroom(n + 1, physical)) {
+                if (vi_byte_span(vi_file_end, vi_file_max) > (unsigned)n + 1U + physical)
+                    p[n++] = c;
+                else
                     message("Can't add anything, file is too big!");
-                }
             }
-            if (vpeekc() == '\033' || vpeekc() == -1)
-                break;
+            if (physical) {
+                if (n == 2)
+                    break;
+                c = windpeek();
+                if (c < ' ' || c >= 127)
+                    break;
+            } else {
+                c = vpeekc();
+                if (c == '\033' || c == -1)
+                    break;
+            }
             c = vgetc();
         }
-        *vi_ins_ptr = '\0';
-        if (n)
+        if (n) {
+            p[n] = '\0';
             insstr(p);
+            vi_ins_ptr += n;
+            vi_ninsert += n;
+        }
     }
     cursupdate();
     updatescreen();

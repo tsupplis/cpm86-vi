@@ -38,7 +38,7 @@ vi_yseg_init_ endp
     public vi_yseg_capacity_
 vi_yseg_capacity_ proc near
 ifdef VI_DOS1_COM
-    mov ax,20480
+    mov ax,18432
 else
     mov ax,38016
 endif

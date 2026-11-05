@@ -241,7 +241,7 @@ artificially split. File size includes headers/alignment, and images do not
 describe all runtime heap/stack/BSS requirements.
 
 CP/M DATA reserves 61,440-65,536 bytes; EXTRA reserves 65,536 bytes without
-payload. DOS 1 COM has a combined 64 KiB near window, a 20,480-byte editing
+payload. At measurement time DOS 1 COM had a combined 64 KiB near window, a 20,480-byte editing
 buffer and 32 KiB external reservation. Other editing buffers hold 38,016 bytes
 with a 64 KiB external reservation. Two 2,000-byte external screens follow the
 matching yank region. See [design.md](design.md) for reservation mechanisms.
