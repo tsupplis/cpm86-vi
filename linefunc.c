@@ -186,40 +186,57 @@ void repsearch(void) {
 
 static char *fwdsearch(char *str)
 {
-    unsigned leng = strlen(str);
+    unsigned leng = strlen(str), probe;
     char *p, *last;
+    char first, selected;
 
     if (leng == 0 || leng > vi_byte_span(vi_file_mem, vi_file_end))
         return NULL;
+    /* Reject repeated-prefix near misses before calling memcmp(). */
+    probe = 1;
+    while (probe < leng && str[probe] == *str) probe++;
+    if (probe == leng) probe = 0;
+    first = *str;
+    selected = str[probe];
     last = vi_file_end - leng;
     p = vi_curs_char < vi_file_end ? vi_curs_char + 1 : vi_file_end;
     for (; p <= last; p++)
-        if (memcmp(p, str, (unsigned)leng) == 0)
+        if (*p == first && p[probe] == selected &&
+            memcmp(p, str, (unsigned)leng) == 0)
             return p;
     for (p = vi_file_mem; p <= last && p <= vi_curs_char; p++)
-        if (memcmp(p, str, (unsigned)leng) == 0)
+        if (*p == first && p[probe] == selected &&
+            memcmp(p, str, (unsigned)leng) == 0)
             return p;
     return NULL;
 }
 
 static char *bcksearch(char *str)
 {
-    unsigned leng = strlen(str);
+    unsigned leng = strlen(str), probe;
     char *p, *last;
+    char first, selected;
 
     if (leng == 0 || leng > vi_byte_span(vi_file_mem, vi_file_end))
         return NULL;
+    probe = 1;
+    while (probe < leng && str[probe] == *str) probe++;
+    if (probe == leng) probe = 0;
+    first = *str;
+    selected = str[probe];
     last = vi_file_end - leng;
     p = vi_curs_char > last ? last + 1 : vi_curs_char;
     while (p > vi_file_mem) {
         p--;
-        if (memcmp(p, str, (unsigned)leng) == 0)
+        if (*p == first && p[probe] == selected &&
+            memcmp(p, str, (unsigned)leng) == 0)
             return p;
     }
     p = last + 1;
     while (p > vi_curs_char) {
         p--;
-        if (memcmp(p, str, (unsigned)leng) == 0)
+        if (*p == first && p[probe] == selected &&
+            memcmp(p, str, (unsigned)leng) == 0)
             return p;
     }
     return NULL;

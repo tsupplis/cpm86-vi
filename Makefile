@@ -362,6 +362,10 @@ test-yank-lengths:
 test-navigation-runtime:
 	python3 -B test/test_navigation_runtime.py
 
+.PHONY: test-navigation-perf-pce
+test-navigation-perf-pce:
+	python3 -B test/test_navigation_perf.py
+
 .PHONY: test-yank-runtime test-yank-pce
 test-yank-runtime:
 	python3 test/test_yank_runtime.py

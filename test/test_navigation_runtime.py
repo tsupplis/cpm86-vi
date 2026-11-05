@@ -25,6 +25,11 @@ unsigned long vi_curs_row, vi_curs_vcol, vi_renum;
 static unsigned long received;
 static int command, failures;
 static char last_message[128];
+static unsigned long comparisons;
+static int counted_memcmp(const void *a, const void *b, size_t n) {
+    comparisons++;
+    return memcmp(a, b, n);
+}
 void normal(int c) { command = c; received = vi_renum; }
 void clearlastmess(void) {}
 void updatescreen(void) {}
@@ -39,6 +44,136 @@ static void check(int ok, int line, char *expression) {
 '''
 
 CHECKS = r'''
+static char *reference_forward(char *str)
+{
+    unsigned length = strlen(str);
+    char *p, *last;
+    if (length == 0 || length > vi_byte_span(vi_file_mem, vi_file_end))
+        return NULL;
+    last = vi_file_end - length;
+    p = vi_curs_char < vi_file_end ? vi_curs_char + 1 : vi_file_end;
+    for (; p <= last; p++)
+        if (!memcmp(p, str, length)) return p;
+    for (p = vi_file_mem; p <= last && p <= vi_curs_char; p++)
+        if (!memcmp(p, str, length)) return p;
+    return NULL;
+}
+
+static char *reference_backward(char *str)
+{
+    unsigned length = strlen(str);
+    char *p, *last;
+    if (length == 0 || length > vi_byte_span(vi_file_mem, vi_file_end))
+        return NULL;
+    last = vi_file_end - length;
+    p = vi_curs_char > last ? last + 1 : vi_curs_char;
+    while (p > vi_file_mem) {
+        p--;
+        if (!memcmp(p, str, length)) return p;
+    }
+    p = last + 1;
+    while (p > vi_curs_char) {
+        p--;
+        if (!memcmp(p, str, length)) return p;
+    }
+    return NULL;
+}
+
+static void reference_cursor_position(void)
+{
+    char *p;
+    int c, n;
+    vi_curs_row = vi_curs_col = vi_curs_vcol = 0;
+    for (p = vi_top_char; p < vi_curs_char; p++) {
+        c = (unsigned char)*p;
+        if (c == '\n') {
+            vi_curs_row++;
+            vi_curs_col = 0;
+        } else {
+            n = vi_char_width[c];
+            while (n-- > 0) {
+                if (vi_curs_col == vi_columns) {
+                    vi_curs_row++;
+                    vi_curs_col = 0;
+                }
+                vi_curs_col++;
+            }
+        }
+    }
+    if (vi_curs_col == vi_columns) {
+        if (vi_curs_char < vi_file_end && *vi_curs_char == '\n')
+            vi_curs_col--;
+        else {
+            vi_curs_row++;
+            vi_curs_col = 0;
+        }
+    }
+    p = vi_curs_char;
+    while (p > vi_file_mem && p[-1] != '\n') p--;
+    while (p < vi_curs_char)
+        vi_curs_vcol += vi_char_width[(unsigned char)*p++];
+}
+
+static void parity(void)
+{
+    static char *patterns[] = {
+        "", "a", "b", "aaaaab", "abaaa", "aba", "aa", "abab",
+        "baaaaa", "\377a", "\001", "\r\n", "aaaaaaaaa"
+    };
+    unsigned trial, length, i, j, position, top;
+    unsigned long random = 17, row, column;
+    int col;
+    char pattern[10];
+    for (trial = 0; trial < 128; trial++) {
+        length = trial % 97;
+        for (i = 0; i < length; i++) {
+            random = random * 1664525UL + 1013904223UL;
+            vi_file_mem[i] = random % 8 == 0 ? 0 :
+                            random % 8 == 1 ? 255 :
+                            random % 8 == 2 ? '\n' : 'a' + random % 3;
+        }
+        vi_file_end = vi_file_mem + length;
+        for (position = 0; position <= length; position++) {
+            vi_curs_char = vi_file_mem + position;
+            for (j = 0; j < sizeof patterns / sizeof patterns[0]; j++) {
+                CHECK(fwdsearch(patterns[j]) == reference_forward(patterns[j]));
+                CHECK(bcksearch(patterns[j]) == reference_backward(patterns[j]));
+            }
+            if (position < length && vi_file_mem[position] != 0) {
+                i = 0;
+                while (i < 9 && position + i < length &&
+                       vi_file_mem[position + i] != 0) {
+                    pattern[i] = vi_file_mem[position + i];
+                    i++;
+                }
+                pattern[i] = 0;
+                CHECK(fwdsearch(pattern) == reference_forward(pattern));
+                CHECK(bcksearch(pattern) == reference_backward(pattern));
+            }
+            top = position / 2;
+            vi_top_char = vi_file_mem + top;
+            vi_columns = 1 + trial % 80;
+            reference_cursor_position();
+            row = vi_curs_row; col = vi_curs_col; column = vi_curs_vcol;
+            cursor_position();
+            CHECK(vi_curs_row == row && vi_curs_col == col &&
+                  vi_curs_vcol == column);
+        }
+    }
+    vi_columns = 80;
+    memset(vi_file_mem, 'a', 8192U);
+    vi_file_end = vi_file_mem + 8192U;
+    vi_curs_char = vi_file_mem + 4095U;
+    for (j = 3; j <= 8; j++) {
+        if (j != 3 && j != 4 && j != 8) continue;
+        comparisons = 0;
+        CHECK(fwdsearch(patterns[j]) == NULL);
+        CHECK(comparisons == 0);
+        CHECK(bcksearch(patterns[j]) == NULL);
+        CHECK(comparisons == 0);
+    }
+}
+
 static void searches(unsigned size) {
     memset(vi_file_mem, 'x', size);
     vi_file_end = vi_file_mem + size;
@@ -135,6 +270,7 @@ int main(void) {
         vi_char_width[i] = 1;
     vi_char_width[1] = 5;
     vi_char_width[9] = 8;
+    parity();
     for (i = 0; i < sizeof sizes / sizeof sizes[0]; i++) {
         searches(sizes[i]);
         lines(sizes[i]);
@@ -170,7 +306,11 @@ def main():
                         'int oneup(', 'int onedown('))):
         contents = (ROOT / name).read_text()
         for signature in signatures:
+            if 'search(char *str)' in signature:
+                source += '\n#define memcmp counted_memcmp\n'
             source += '\n' + function(contents, signature)
+            if 'search(char *str)' in signature:
+                source += '\n#undef memcmp\n'
     with tempfile.TemporaryDirectory(prefix='vi-navigation-') as directory:
         work = Path(directory)
         shutil.copyfile(ROOT / 'stevie.h', work / 'stevie.h')

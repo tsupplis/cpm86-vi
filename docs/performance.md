@@ -158,6 +158,68 @@ navigation checks and all 27 full-buffer/heap-budget cases pass. All six
 production binaries, ZIP and both disk images were rebuilt. Capacities and
 held-spare budgets are unchanged; no heap allocation was added.
 
+## P4: cursor and search scanning
+
+The long-line virtual column previously walked backward to find a newline,
+then walked the same prefix forward to sum widths. It now sums widths while
+walking backward once. This preserves delayed screen wrapping and unsigned
+virtual columns without adding cache state.
+
+Search called `memcmp()` at every candidate start. It now first checks the
+initial pattern byte and the first byte different from it, falling back to
+byte zero for uniform patterns. This cheaply rejects repeated-prefix misses
+whether the distinguishing byte is near the beginning, middle or end.
+Full comparisons still determine matches; candidate order and overlap/wrapping
+rules are unchanged. Worst-case search complexity is unchanged.
+
+One same-process 8088/DOS 1.1/CGA comparison against the frozen pre-P4 functions:
+
+| Case | Repeats | Old ticks | P4 ticks |
+|---|---:|---:|---:|
+| Long-line cursor | 8 | 44 | 31 |
+| Forward miss: `aaaaab` | 2 | 39 | 16 |
+| Forward miss: `abaaa` | 2 | 30 | 15 |
+| Forward miss: `baaaaa` | 2 | 29 | 12 |
+| Backward miss: `aaaaab` | 2 | 38 | 15 |
+| Backward miss: `abaaa` | 2 | 30 | 15 |
+| Backward miss: `baaaaa` | 2 | 28 | 11 |
+
+These are approximately **1.4x faster cursor calculation** and **2-2.5x faster
+for these misses**, not universal search or whole-editor speedups. The fixture
+is 8,192 `a` bytes; cursor offset 4,095 and viewport offset 4,080. Search leaves
+the cursor at 4,095. Timed calls exclude status output, redraw and fixture setup,
+unlike the earlier P1/P2 failed-search case. Both sides use the same runtime,
+width table and fixture; intervals total about 19 seconds of emulated time.
+Coarse ticks and a single sample limit precision.
+
+Reproduce the explicitly bounded comparison:
+
+```
+make test-navigation-perf-pce
+```
+
+Or save its text report:
+
+```
+python3 -B test/test_navigation_perf.py --output navigation.txt
+```
+
+Expanded `test-navigation-runtime` compares both search directions and cursor
+geometry against frozen references on 128 deterministic short binary fixtures,
+at every cursor position including EOF. Cases include empty/long/uniform
+patterns, overlaps, wrapped hits, embedded NUL/high bytes and widths 1-80.
+Instrumented tests prove the three misses above make no full `memcmp()` calls.
+Existing large-buffer/count/85,000-column checks remain covered.
+Host sanitizers and all three native runtimes pass, as do the 500 renderer
+parity cases, 87 editor-state cases and 27 full-buffer/heap-budget cases.
+
+All six binaries and packages were rebuilt. EXE code grows 192 bytes; resident
+DATA is unchanged, with only a few extra automatic search bytes and no heap
+allocation. DOS COM grows from 28,866 to 29,054 file bytes; DOS 1/2 EXEs from
+29,382/28,654 to 29,574/28,846. The two VT CMDs grow one 512-byte file-alignment
+unit to 33,792 bytes; BIOS CMD stays 33,792. Buffer capacities and held-spare
+budgets remain unchanged.
+
 ## Production images and memory
 
 Original P1 snapshot, retained for comparison:

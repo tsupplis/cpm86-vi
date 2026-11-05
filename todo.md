@@ -78,10 +78,15 @@ Checked items have completed their documented implementation and validation.
   pass, including settled hardware cursors. Both VT protocols have host
   byte/error-path tests; native VT100 timing remains unmeasured.
 
-- [ ] **P4 - Investigate long-line cursor and search costs.**
+- [x] **P4 - Investigate long-line cursor and search costs.**
   Measure rescanning before introducing caches or a new search algorithm.
   **Done when:** identify the dominant cost; implement only a demonstrated
   improvement, with bounded memory and unchanged navigation/search semantics.
+  **Result:** one-pass logical-column accounting and first/distinct-byte search
+  rejection, without persistent state or a skip table. The short comparison
+  shows about 1.4x faster cursor calculation and 2-2.5x faster measured misses.
+  Frozen-reference parity, large native navigation, 87 editor-state and 27
+  full-buffer cases pass. See [measurements](docs/performance.md#p4-cursor-and-search-scanning).
 
 - [ ] **P5 - Measure disk buffering separately from buffer manipulation.**
   Compare current buffered stdio with modest block sizes.

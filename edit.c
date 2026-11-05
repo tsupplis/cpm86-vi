@@ -592,9 +592,10 @@ static void cursor_position(void)
     /* The desired column belongs to the logical line, even when its first
      * screen row has scrolled off the top. Match the displayed char widths. */
     p = vi_curs_char;
-    while (p > vi_file_mem && p[-1] != '\n') p--;
-    while (p < vi_curs_char)
-        vi_curs_vcol += vi_char_width[(unsigned char)*p++];
+    while (p > vi_file_mem && p[-1] != '\n') {
+        p--;
+        vi_curs_vcol += vi_char_width[(unsigned char)*p];
+    }
 }
 
 /* Advance one visible text row, keeping expanded characters intact when

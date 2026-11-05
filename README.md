@@ -325,6 +325,13 @@ add oversized-command cancellation, unsigned count replay and undo checks;
 the six production probes also verify count rejection and 65,535-count
 delete/toggle operations.
 
+It also compares cursor geometry and both search directions against frozen
+references across short binary fixtures and every cursor/EOF position.
+`make test-navigation-perf-pce` runs one short standard-speed 8088 comparison:
+the measured long-line cursor case is about 1.4x faster; three failed-search
+patterns are 2-2.5x faster, without a cache or skip table. See
+[P4 measurements and scope](docs/performance.md#p4-cursor-and-search-scanning).
+
 Production editing and yank limits are 38,016 bytes, or 20,480 bytes in
 the DOS 1 `.COM`.
 

@@ -175,7 +175,15 @@ This changes display text, not the underlying file.
 Tabs and other expanded bytes can cross display rows. Delayed wrapping avoids
 consuming an extra row for a newline immediately after a full row.
 `cursupdate()` scrolls only far enough to reveal the final cursor position;
-it scans the visible prefix and the logical line prefix for column accounting.
+it scans the visible prefix for screen coordinates. Logical-column accounting
+sums widths in one backward pass to the preceding newline, without first
+finding that newline and rescanning forward. No column cache needs invalidation.
+
+Search still visits candidate starts in the original wrapped forward/backward
+order. It checks the first pattern byte and the first different pattern byte
+before calling `memcmp()` for the complete match. Uniform patterns reuse byte
+zero as the probe. Candidate-end bounds also bound the probe access; the full
+comparison preserves overlapping matches and binary-file search behavior.
 
 `nexttoscreen()` loads external rows and groups adjacent changed printable
 cells into runs. Runs are positive-length, stay within one row and exclude
@@ -244,8 +252,11 @@ streams. Existing display timing results are in the
 [README](../README.md#display-output); do not rerun all display profiles merely
 to measure unrelated CPU work.
 
-Remaining performance candidates are repeated cursor/line rescans and naive
-O(n x pattern length) search (P4), and disk buffering (P5).
+P4 removes redundant logical-column scanning and rejects obvious search misses
+without a full comparison. It adds no persistent state or search table. Cursor
+work remains linear in the scanned prefixes, and search still has
+O(n x pattern length) worst-case behavior; neither is a cache or algorithm rewrite.
+Disk buffering (P5) remains to be measured separately.
 Character-table compaction (S1) is complete. String insertion, line deletion and paste
 use bulk tail moves; file imports use bounded chunks. None requires committing to
 a gap-buffer rewrite. Measure separately before trading memory for speed.
