@@ -378,6 +378,35 @@ static void check_bulk_insert(void) {
     inschar('Y');
     assert(edit_moves == 1);
 }
+static void check_insert_backspace(void) {
+    unsigned length = FILELENG - 3U;
+    load("tail\n");
+    run_edit("iab\bC\033");
+    expect("aCtail\n");
+    assert(vi_ninsert == 2);
+    run_edit("u"); expect("tail\n"); assert(!vi_changed);
+    run_edit("."); expect("aCtail\n");
+    load("tail\n");
+    run_edit("iX\n\bY\033");
+    expect("XYtail\n");
+    run_edit("u"); expect("tail\n"); assert(!vi_changed);
+    load("tail\n");
+    run_edit("i\b\033");
+    expect("tail\n"); assert(!vi_changed);
+    load("");
+    memset(vi_file_mem, 'a', length);
+    vi_file_end = vi_file_mem + length;
+    edit_moves = edit_moved_bytes = 0;
+    run_edit("iX\b\033");
+    assert(vi_file_end == vi_file_mem + length && vi_curs_char == vi_file_mem);
+    assert(edit_moves == 2 && edit_moved_bytes == 2UL * length);
+    while (length != 0)
+        assert(vi_file_mem[--length] == 'a');
+    load("x");
+    edit_moves = 0;
+    delchar(); expect(""); assert(vi_changed && edit_moves == 0);
+    delchar(); expect(""); assert(edit_moves == 0);
+}
 static void check_search_bounds(void) {
     char *before;
     int i, dir;
@@ -419,7 +448,7 @@ static void check_command_limits(void) {
     before_updates = screen_updates;
     run_edit("i\t\033");
     expect("    abc\n");
-    assert(screen_updates == before_updates + 2);
+    assert(screen_updates == before_updates + 3);
     memset(command_text, ' ', 99);
     command_text[0]='v'; command_text[99]='\n'; command_text[100]=0;
     command(command_text); assert(!strcmp(last_output, "test"));
@@ -995,6 +1024,7 @@ int main(int argc, char **argv) {
     else if(!strcmp(argv[1], "read-errors")) check_read_errors();
     else if(!strcmp(argv[1], "word-eof")) check_word_eof();
     else if(!strcmp(argv[1], "bulk-insert")) check_bulk_insert();
+    else if(!strcmp(argv[1], "insert-backspace")) check_insert_backspace();
     else if(!strcmp(argv[1], "search-bounds")) check_search_bounds();
     else if(!strcmp(argv[1], "command-limits")) check_command_limits();
     else if(!strcmp(argv[1], "count-limits")) check_count_limits();
@@ -1087,6 +1117,7 @@ static void *edit_memmove(void *to, const void *from, size_t length) {
         failed = []
         cases = ('save', 'read', 'replace', 'search', 'insert-read',
                  'read-limits', 'read-errors', 'word-eof', 'bulk-insert',
+                 'insert-backspace',
                  'search-bounds', 'command-limits', 'count-limits', 'delete-limits',
                  'insert-limits', 'literal-limits', 'replay-limits',
                  'file-insert-limits', 'long-messages', 'yank-failures',

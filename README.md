@@ -114,8 +114,9 @@ This aggregates the existing probes; it is not an exhaustive interactive UI test
 Document redraws, status-line repainting and help hide the cursor while writing,
 then restore it before waiting for input. Ordinary command-line Backspace erases
 only the deleted cell; recovery from an overflow warning or control-character
-input still repaints the command. Single-character insertion and append use the
-same overlap-safe block move as bulk insertion, and Tab refreshes once after its
+input still repaints the command. Single-character insertion, append and deletion
+(including insert-mode Backspace) use overlap-safe block moves instead of C
+byte-copy loops. Tab refreshes once after its
 four spaces rather than once per space. The regression checks these output and
 copy counts as well as cursor visibility and final position.
 

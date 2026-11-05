@@ -191,6 +191,11 @@ static void large_copies(void) {
     for (i = 0; i < 40000U; i++)
         CHECK(vi_file_mem[i] == 'x');
     state(40000U);
+    delchar();
+    CHECK(vi_file_end == vi_file_mem + 39999U && vi_curs_char == vi_file_mem);
+    for (i = 0; i < 39999U; i++)
+        CHECK(vi_file_mem[i] == 'x');
+    state(40000U);
     vi_file_mem[1] = ' ';
     CHECK(delword(0));
     CHECK(vi_file_end == vi_file_mem + 39999U && vi_file_mem[0] == ' ');

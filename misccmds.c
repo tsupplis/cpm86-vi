@@ -251,8 +251,9 @@ void delchar(void) {
         return;
     /* Delete the character at Curschar by shifting everything */
     /* in the file down. */
-    for (p = vi_curs_char + 1; p < vi_file_end; p++)
-        *(p - 1) = *p;
+    p = vi_curs_char + 1;
+    if (p < vi_file_end)
+        memmove(vi_curs_char, p, vi_byte_span(p, vi_file_end));
     /* If we just took off the last character of a non-blank line, */
     /* we don't want to end up positioned at the newline. */
     if (*vi_curs_char == '\n' && vi_curs_char > vi_file_mem && *(vi_curs_char - 1) != '\n')
