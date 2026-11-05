@@ -201,8 +201,9 @@ cell attributes and avoids teletype's per-character cursor updates. The BIOS
 data-area page-zero cursor is set before each BIOS write, so background console
 cursor changes do not redirect subsequent writes; the hardware cursor is
 updated at the end of each run. There are no direct video-memory writes.
-Status messages and other single-character callers retain the original output
-path. VT52/VT100 retain their existing character-output semantics.
+Status messages, control characters and other single-character callers retain
+the original output path. VT52/VT100 retain their existing character-output
+semantics.
 
 `make test-display-pce` compares a frozen old diff/output path with the new
 path on private DOS 1.1 and DOS Plus images, using a standard-speed 8088
@@ -218,12 +219,12 @@ sixteen long-row updates; smaller is better):
 
 | Kernel/build | Video | Old ticks | New ticks | Speedup |
 |---|---|---:|---:|---:|
-| DOS 1.1 `.COM` | CGA | 436 | 125 | 3.49x |
-| DOS 1.1 `.COM` | MDA | 360 | 109 | 3.30x |
-| DOS 1.1 `.EXE` | CGA | 437 | 124 | 3.52x |
-| DOS 1.1 `.EXE` | MDA | 362 | 108 | 3.35x |
-| DOS Plus CP/M BIOS `.CMD` | CGA | 526 | 136 | 3.87x |
-| DOS Plus DOS 2 `.EXE` | CGA | 540 | 140 | 3.86x |
+| DOS 1.1 `.COM` | CGA | 435 | 128 | 3.40x |
+| DOS 1.1 `.COM` | MDA | 359 | 111 | 3.23x |
+| DOS 1.1 `.EXE` | CGA | 437 | 127 | 3.44x |
+| DOS 1.1 `.EXE` | MDA | 359 | 111 | 3.23x |
+| DOS Plus CP/M BIOS `.CMD` | CGA | 528 | 138 | 3.83x |
+| DOS Plus DOS 2 `.EXE` | CGA | 539 | 141 | 3.82x |
 
 These are diff/output benchmarks with prebuilt desired frames, not whole-editor
 or disk-I/O speedups. Timed runs include invalidating the old screen image and

@@ -290,6 +290,21 @@ static void invalidate(int mode)
     }
 }
 
+/* Batching must not turn a legacy teletype control into a printed glyph. */
+static int control_frame(void (*render)(void))
+{
+    setup(3);
+    if (!vi_screen_load(VI_SCREEN_NEXT, 2, screen_line))
+        return 0;
+    screen_line[10] = '\r';
+    screen_line[11] = 'Z';
+    if (!vi_screen_store(VI_SCREEN_NEXT, 2, screen_line))
+        return 0;
+    render();
+    return cell(2, 10) == (0x0700U | 'Y') &&
+           cell(2, 11) == (0x0700U | 'Z');
+}
+
 int main(int argc, char **argv)
 {
     static int repeats[] = {4, 4, 32, 16};
@@ -338,6 +353,8 @@ int main(int argc, char **argv)
     }
     if (positions[1][0] >= positions[0][0] ||
         positions[1][3] >= positions[0][3])
+        ok = 0;
+    if (!control_frame(reference_diff) || !control_frame(nexttoscreen))
         ok = 0;
     vi_yank_close();
     report = fopen("RESULT.TXT", "w");

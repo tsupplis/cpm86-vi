@@ -49,7 +49,7 @@ This is a proposed execution backlog, not a record of completed work.
   **Done when:** tail movement is substantially reduced, with byte-exact results
   and unchanged all-or-nothing failure behavior.
 
-- [ ] **P3 - Add efficient changed-run screen output.**
+- [x] **P3 - Add efficient changed-run screen output.**
   **First implementation priority.** Capture a focused display baseline before
   changing output: full redraw, scrolling, single-character edits and long
   changed runs, using a fixed 8088 configuration.
@@ -60,6 +60,12 @@ This is a proposed execution backlog, not a record of completed work.
   **Done when:** identical frames and cursor behavior, fewer BIOS/terminal calls,
   a measured display-speed improvement, and preserved attributes,
   status-row/background-clock handling and terminal compatibility.
+  **Result:** BIOS bulk diff/output benchmarks are 3.23x-3.83x faster on the
+  standard-speed 8088 setup. Seven real-kernel display profiles pass, including
+  Concurrent DOS 4.1, with colored attributes, cursor recovery, status-row
+  protection and legacy control-character behavior checked. All six full-buffer
+  variants and both DOS 1 kernel roundtrips pass. VT52/VT100 retain their original
+  output semantics; XIOS throughput improvements need a separate benchmark.
 
 - [ ] **P4 - Investigate long-line cursor and search costs.**
   Measure rescanning before introducing caches or a new search algorithm.
@@ -111,12 +117,8 @@ This is a proposed execution backlog, not a record of completed work.
 
 ## Recommended order
 
-Start with P3: a focused display baseline, then changed-run output and regression
-validation. This does not require completing the broader P1 benchmark suite
-first.
-
-Then Q1-Q4, the remainder of P1, Q5 and P2. Choose the remaining work from
-measurements.
+P3 is complete. Next: Q1-Q4, the remainder of P1, Q5 and P2. Choose the remaining
+work from measurements, including a separate VT52/VT100 XIOS display baseline.
 
 Every implementation task should preserve the current buffer limits, native
 memory-budget checks and supported-platform behavior.

@@ -253,8 +253,9 @@ a gap buffer or index rebuild — significant redesign risk).
 | `window.c` PCBIOS `windrefreshcursor()`/`windputc()` | Re-issues an `INT 10h` cursor-position call for single-character/UI output and idle cursor recovery | Low (intentional tradeoff) | Retained for these callers; bulk renderer output uses `windputrun()`. |
 
 The run backend uses the standard page-zero cursor word at `0040:0050`.
-Runs must not cross a row or include a newline; the renderer supplies bounded
-display cells, not NUL-terminated strings. BIOS handles the actual video writes,
+Runs must not cross a row or include C0 controls; these retain the legacy
+single-character path, including carriage returns in binary data. The renderer
+supplies bounded display cells, not NUL-terminated strings. BIOS handles the actual video writes,
 including CGA synchronization. VT52/VT100 runs retain the existing per-character
 terminal output path. Native display probes compare against the frozen
 single-character renderer and check physical screen cells, attributes, cursor

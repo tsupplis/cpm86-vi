@@ -322,12 +322,16 @@ static void nexttoscreen(void) {
                     windputc(nc);
                     windcolorreset();
                     col++;
+                } else if ((unsigned char)nc < ' ') {
+                    windputc(nc);
+                    col++;
                 } else {
                     first = col;
                     do {
                         col++;
                     } while (col < vi_columns &&
-                             screen_line[col] != screen_previous[col]);
+                             screen_line[col] != screen_previous[col] &&
+                             (unsigned char)screen_line[col] >= ' ');
                     windputrun(screen_line + first, (unsigned)(col - first));
                 }
                 gocol = col;

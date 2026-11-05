@@ -45,7 +45,10 @@ void windputrun(const char *text, unsigned length) {
     check(length>0 && length<=vi_columns-terminal_position%vi_columns,
           "output runs stay within one row");
     runs++;
-    while(length--) windputc((unsigned char)*text++);
+    while(length--) {
+        check((unsigned char)*text>=' ',"control characters keep single-byte output");
+        windputc((unsigned char)*text++);
+    }
 }
 void windclear(void) { memset(displayed,' ',sizeof displayed); }
 void windcolor(int color) { check(color==2,"tilde color"); }
@@ -161,6 +164,7 @@ int main(void) {
     file[4]='X';
     updatescreen();
     check(runs==1 && writes==1,"single-cell edit writes one short run");
+    load("a\rb\n");
     lines[0]=0; for(i=0;i<20;i++) strcat(lines,"01234\n");
     load(lines);
     for(i=1;i<20;i++) {
