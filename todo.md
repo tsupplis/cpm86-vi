@@ -107,11 +107,16 @@ Checked items have completed their documented implementation and validation.
 
 ## 4. Size reduction: one measured candidate
 
-- [ ] **S1 - Evaluate a more compact nonprintable-character representation.**
+- [x] **S1 - Evaluate a more compact nonprintable-character representation.**
   Investigate [hexchars.c](hexchars.c).
   **Done when:** compare code/data savings against rendering cost. Keep a
   replacement only if octal/hex/decimal output remains identical and
   responsiveness stays acceptable.
+  **Result:** compact cached strings and a byte-width array save 498 resident
+  DATA bytes, 96 EXE code bytes and about 1.5 KiB per executable. All bases and
+  byte values match; short renderer samples differ by at most one tick.
+  On-demand formatting was rejected for slower expanded-byte rendering.
+  See [comparison and validation](docs/performance.md#s1-compact-cached-display-text).
 
 ## 5. Maintainability: targeted cleanup
 

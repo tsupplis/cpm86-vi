@@ -17,7 +17,7 @@ HARNESS = r'''
 #include <string.h>
 #include "stevie.h"
 
-struct charinfo chars[256];
+unsigned char vi_char_width[256];
 char *vi_file_mem, *vi_file_end, *vi_file_max, *vi_curs_char, *vi_top_char;
 char *vi_file_name = "probe";
 int vi_rows = 25, vi_columns = 80, vi_curs_col, vi_changed;
@@ -132,9 +132,9 @@ int main(void) {
     }
     vi_file_max = vi_file_mem + 40065U;
     for (i = 0; i < 256; i++)
-        chars[i].ch_size = 1;
-    chars[1].ch_size = 5;
-    chars[9].ch_size = 8;
+        vi_char_width[i] = 1;
+    vi_char_width[1] = 5;
+    vi_char_width[9] = 8;
     for (i = 0; i < sizeof sizes / sizeof sizes[0]; i++) {
         searches(sizes[i]);
         lines(sizes[i]);

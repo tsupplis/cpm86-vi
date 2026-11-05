@@ -28,12 +28,7 @@
 #define CHANGED vi_changed = 1
 #define UNCHANGED vi_changed = 0
 
-struct charinfo {
-    char ch_size;
-    char *ch_str;
-};
-
-extern struct charinfo chars[];
+extern unsigned char vi_char_width[256];
 
 extern int vi_state;
 extern int vi_rows;
@@ -101,6 +96,8 @@ void resetundo(void);
 void octchars(void);
 void hexchars(void);
 void decchars(void);
+/* Expanded bytes only; five-cell text remains valid until a mode change. */
+const char *vi_char_text(unsigned char c);
 int hextoint(int c);
 
 /* main.c */

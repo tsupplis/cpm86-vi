@@ -29,7 +29,7 @@ HARNESS = r'''
 #include "stevie.h"
 #include "yankmem.h"
 
-struct charinfo chars[256];
+unsigned char vi_char_width[256];
 static const char *input;
 static int quit_calls, reject_save;
 static char last_output[256];

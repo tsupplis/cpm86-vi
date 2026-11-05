@@ -571,7 +571,7 @@ static void cursor_position(void)
             vi_curs_row++;
             vi_curs_col = 0;
         } else {
-            n = chars[c].ch_size;
+            n = vi_char_width[c];
             while (n-- > 0) {
                 if (vi_curs_col == vi_columns) {
                     vi_curs_row++;
@@ -594,7 +594,7 @@ static void cursor_position(void)
     p = vi_curs_char;
     while (p > vi_file_mem && p[-1] != '\n') p--;
     while (p < vi_curs_char)
-        vi_curs_vcol += chars[(unsigned char)*p++].ch_size;
+        vi_curs_vcol += vi_char_width[(unsigned char)*p++];
 }
 
 /* Advance one visible text row, keeping expanded characters intact when
@@ -607,7 +607,7 @@ static char *next_screen_row(char *p)
 
     while (p < vi_file_end) {
         if (*p == '\n') return p + 1;
-        n = chars[(unsigned char)*p].ch_size;
+        n = vi_char_width[(unsigned char)*p];
         if (col + n > vi_columns && p > start) return p;
         col += n;
         p++;

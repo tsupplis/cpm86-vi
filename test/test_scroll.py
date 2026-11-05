@@ -20,7 +20,7 @@ source=r'''
 #include <string.h>
 #include "stevie.h"
 #include "yankmem.h"
-struct charinfo chars[256];
+unsigned char vi_char_width[256];
 int vi_state=NORMAL, vi_rows=6, vi_columns=10;
 int vi_curs_col;
 unsigned long vi_curs_row, vi_curs_vcol;
@@ -29,6 +29,7 @@ static char screen_line[VI_SCREEN_MAX_COLUMNS], screen_previous[VI_SCREEN_MAX_CO
 static char file[4096], screen[VI_SCREEN_IMAGE_SIZE], reference_screen[VI_SCREEN_IMAGE_SIZE];
 static char displayed[VI_SCREEN_IMAGE_SIZE];
 static char displays[256][17];
+const char *vi_char_text(unsigned char c) { return displays[c]; }
 static int renders, terminal_position, writes, runs;
 static void check(int ok, char *why) { if (!ok) { fprintf(stderr,"FAIL: %s\n",why); exit(1); } }
 static void screenerror(void) { check(0,"external screen storage"); }
@@ -88,8 +89,8 @@ static void reference(char *image, char **bottom) {
         else {
             lastmemp=memp;
             c=(unsigned char)*memp++;
-            if((n=chars[c].ch_size)>1) {
-                p=chars[c].ch_str;
+            if((n=vi_char_width[c])>1) {
+                p=displays[c];
                 while(n>1) extra[nextra++]=p[--n];
                 c=p[0];
             }
@@ -154,10 +155,10 @@ int main(void) {
     check(vi_yank_init(),"reserve external segment");
     for(i=0;i<256;i++) {
         displays[i][0]=(char)i; displays[i][1]=0;
-        chars[i].ch_size=1; chars[i].ch_str=displays[i];
+        vi_char_width[i]=1;
     }
-    chars[1].ch_size=2; chars[1].ch_str="^A";
-    chars[9].ch_size=8; chars[9].ch_str="        ";
+    vi_char_width[1]=2; strcpy(displays[1],"^A");
+    vi_char_width[9]=8; strcpy(displays[9],"        ");
     load("abcdefghij\nklmnopqrst\n");
     check(runs==vi_rows-1,"one output run per changed row");
     runs=writes=0;

@@ -342,6 +342,10 @@ test-vt-pce:
 test-perf-pce:
 	python3 -B test/test_perf_pce.py
 
+.PHONY: test-characters
+test-characters:
+	python3 -B test/test_characters.py
+
 .PHONY: test-capacity-runtime
 test-capacity-runtime:
 	python3 -B test/test_capacity_runtime.py

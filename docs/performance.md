@@ -103,6 +103,61 @@ All six production variants were rebuilt. Their code/load images grew only
 COM is now 30,428 file bytes; DOS 1 EXE 30,942; DOS 2 EXE 30,214.
 CMD file lengths are unchanged. These changes do not reduce buffer capacities.
 
+## S1: compact cached display text
+
+The retained representation uses a 256-byte width array and a 966-byte cache
+for C0/DEL/high-byte display strings. LF and CR leave two unused cache slots,
+avoiding expensive index calculations. Numbers are formatted only at mode
+selection, never during redraw; cursor movement still uses a direct width lookup.
+
+The old pointer/width table plus strings occupied 1,722 bytes on Aztec.
+The new arrays occupy 1,222 bytes. Including the two extra format-string bytes,
+resident DATA falls **498 bytes**; code falls **96 bytes** in the measured EXEs.
+Initialized data shrinks more because cached strings now live in zero-filled
+storage rather than the load image. File-size savings must not be confused with
+resident-memory savings.
+
+| Binary | P2 file bytes | S1 file bytes | Saved bytes |
+|---|---:|---:|---:|
+| `vicp52.cmd` | 34,816 | 33,280 | 1,536 |
+| `vicp100.cmd` | 34,816 | 33,280 | 1,536 |
+| `vicpbios.cmd` | 35,328 | 33,792 | 1,536 |
+| `vid1bios.com` | 30,428 | 28,866 | 1,562 |
+| `vid1bios.exe` | 30,942 | 29,382 | 1,560 |
+| `vid2bios.exe` | 30,214 | 28,654 | 1,560 |
+
+A short same-process A/B probe compares the old layout with the compact cache
+using identical renderer control flow, on the standard 8088/DOS 1.1/CGA profile.
+Each interval is four `filetonext()` calls, excluding initialization and terminal
+output. Printable input is 512 `A` bytes; expanded input cycles byte values with
+single-cell bytes replaced by byte 1. A third mixed-byte fixture checks frame
+parity without timing. All three bases match every screen cell, status-row guard
+and bottom-of-viewport pointer.
+
+| Base | Printable: old / compact ticks | Expanded: old / compact ticks |
+|---|---:|---:|
+| Octal | 7 / 7 | 26 / 26 |
+| Hex | 7 / 6 | 26 / 27 |
+| Decimal | 7 / 6 | 26 / 27 |
+
+Differences are at most one coarse timer tick; this sample does not establish
+a meaningful rendering regression or speedup. An earlier on-demand formatting
+candidate was rejected: expanded rendering took 12-19% longer. The retained
+cache trades some potential memory savings for predictable rendering cost.
+
+`make test-characters` checks all 256 widths and every expanded string in
+octal/hex/decimal, repeated mode switches and hex-key conversion under host
+sanitizers and all three native runtimes. To explicitly repeat the bounded A/B:
+
+```
+python3 -B test/test_characters.py --timing --output characters.txt
+```
+
+The 500 scrolling/rendering parity cases, 87 editor-state cases, host/native
+navigation checks and all 27 full-buffer/heap-budget cases pass. All six
+production binaries, ZIP and both disk images were rebuilt. Capacities and
+held-spare budgets are unchanged; no heap allocation was added.
+
 ## Production images and memory
 
 Original P1 snapshot, retained for comparison:

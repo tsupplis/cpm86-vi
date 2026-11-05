@@ -90,7 +90,7 @@ char *coladvance(char *p, unsigned long col)
     unsigned width;
 
     while (p < vi_file_end && *p != '\n' && col > 0) {
-        width = chars[(unsigned char)*p].ch_size;
+        width = vi_char_width[(unsigned char)*p];
         if (col < width)
             break;
         col -= width;

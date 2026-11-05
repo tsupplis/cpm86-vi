@@ -236,10 +236,10 @@ static void filetonext(void) {
             /* when getting a character from the file, we */
             /* may have to turn it into something else on */
             /* the way to putting it into 'Nextscreen'. */
-            if ((n = chars[c].ch_size) > 1) {
-                char *p;
+            if ((n = vi_char_width[c]) > 1) {
+                const char *p;
                 nextra = 0;
-                p = chars[c].ch_str;
+                p = vi_char_text((unsigned char)c);
                 /* copy 'ch-str'ing into 'extra' in reverse */
                 while (n > 1)
                     extra[nextra++] = p[--n];

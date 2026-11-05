@@ -84,7 +84,8 @@ belongs to status/commands, not document rendering. Two 80-byte near buffers
 replace near-heap screen images.
 
 Core globals are defined in `main.c` and declared in `stevie.h`, using `vi_`
-names. `chars[]` lives in `hexchars.c`. Search history, yank metadata, console
+names. `vi_char_width[]` and the private escape cache live in `hexchars.c`.
+Search history, yank metadata, console
 state and literal-undo metadata are private to their modules.
 
 ## Editing and ownership invariants
@@ -165,8 +166,12 @@ See the [save policy](../README.md#saving-files) for exact identities.
 
 ## Rendering and console rules
 
-`filetonext()` expands bytes through the 256-entry `chars[]` table.
-Octal/hex/decimal formatting changes table strings, not the underlying file.
+`filetonext()` reads the 256-byte `vi_char_width[]` array. Expanded bytes use
+`vi_char_text()` to index a private 161-by-6 cache: C0 plus DEL/high bytes,
+including two unused LF/CR slots to keep indexing cheap. Octal/hex/decimal
+mode selection fills the cache before rendering; redraws do not format numbers.
+Returned strings remain valid until a mode change. No string literal is mutated.
+This changes display text, not the underlying file.
 Tabs and other expanded bytes can cross display rows. Delayed wrapping avoids
 consuming an extra row for a newline immediately after a full row.
 `cursupdate()` scrolls only far enough to reveal the final cursor position;
@@ -239,8 +244,8 @@ streams. Existing display timing results are in the
 [README](../README.md#display-output); do not rerun all display profiles merely
 to measure unrelated CPU work.
 
-Remaining candidates are repeated cursor/line rescans and naive
-O(n x pattern length) search (P4), disk buffering (P5), and
-character-table compaction (S1). String insertion, line deletion and paste
+Remaining performance candidates are repeated cursor/line rescans and naive
+O(n x pattern length) search (P4), and disk buffering (P5).
+Character-table compaction (S1) is complete. String insertion, line deletion and paste
 use bulk tail moves; file imports use bounded chunks. None requires committing to
 a gap-buffer rewrite. Measure separately before trading memory for speed.

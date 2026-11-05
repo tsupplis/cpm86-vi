@@ -280,6 +280,11 @@ and JSON output. Batched imports reduce the middle-import sample from 159 to
 buffers. Chunk-boundary, capacity and rollback checks pass on host and all three
 native runtimes.
 
+`make test-characters` checks all byte widths, octal/hex/decimal display strings
+and mode switches on host and all three native runtimes. The compact display
+cache saves 498 resident DATA bytes and about 1.5 KiB per executable, without
+formatting numbers during redraw. See [the size/timing comparison](docs/performance.md#s1-compact-cached-display-text).
+
 `make test-capacity-runtime` checks unsigned byte spans, capacity rejection,
 EOF reservation and large tail copies at 32,000, 32,767, 32,768, 40,000 and
 40,064 bytes
