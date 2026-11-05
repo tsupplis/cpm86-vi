@@ -109,6 +109,14 @@ log path. Any failed step makes the overall command fail. To choose a new output
 directory, run `python3 -B test/regression.py --output /path/to/new-directory`.
 This aggregates the existing probes; it is not an exhaustive interactive UI test.
 
+Document redraws, status-line repainting and help hide the cursor while writing,
+then restore it before waiting for input. Ordinary command-line Backspace erases
+only the deleted cell; recovery from an overflow warning or control-character
+input still repaints the command. Single-character insertion and append use the
+same overlap-safe block move as bulk insertion, and Tab refreshes once after its
+four spaces rather than once per space. The regression checks these output and
+copy counts as well as cursor visibility and final position.
+
 ### Host regression tests
 
 Run `make test-editor-state` with a host C compiler (`cc`, or `CC_HOST`)

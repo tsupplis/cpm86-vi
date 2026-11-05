@@ -17,7 +17,7 @@ static int writeit(char *fname);
 
 void readcmdline(int firstc) /* either ':', '/', or '?' */
 {
-    int c, overflow = 0;
+    int c, col, overflow = 0;
     char buff[100];
     char *p, *q, *cmd, *arg;
 
@@ -41,10 +41,22 @@ void readcmdline(int firstc) /* either ':', '/', or '?' */
         if (c == '\b' || c == '\177') {
             if (p > buff) {
                 p--;
+                col = (int)(p - buff) + (firstc == ':');
+                for (q = buff; q < p && (unsigned char)*q >= ' '; q++)
+                    ;
+                windcursor(0);
+                if (!overflow && q == p && (unsigned char)*p >= ' ' &&
+                    col < vi_columns - 1) {
+                    windgoto(vi_rows - 1, col);
+                    windputc(' ');
+                    windgoto(vi_rows - 1, col);
+                } else {
+                    gotocmd(1, 0, firstc == ':' ? ':' : 0);
+                    for (q = buff; q < p; q++)
+                        windputc(*q);
+                }
                 overflow = 0;
-                gotocmd(1, 0, firstc == ':' ? ':' : 0);
-                for (q = buff; q < p; q++)
-                    windputc(*q);
+                windcursor(1);
                 windrefresh();
             } else {
                 /* Backspace on empty line cancels */
@@ -264,6 +276,7 @@ static void badcmd(void) { message("Unrecognized command"); }
 static void gotocmd(int clr, int fresh, int firstc) {
     int n;
 
+    windcursor(0);
     windgoto(vi_rows - 1, 0);
     windcolor(2);
     if (clr) {
@@ -274,8 +287,10 @@ static void gotocmd(int clr, int fresh, int firstc) {
     }
     if (firstc)
         windputc(firstc);
-    if (fresh)
+    if (fresh) {
+        windcursor(1);
         windrefresh();
+    }
 }
 
 void message(char *s)
@@ -288,12 +303,14 @@ void message(char *s)
         free(last_message);
         last_message = NULL;
     }
-    gotocmd(1, 1, 0);
+    gotocmd(1, 0, 0);
     /* take off any trailing newline */
     if ((p = strchr(s, '\0')) != NULL && *p == '\n')
         *p = '\0';
     windstr(s);
     windcolorreset();
+    windcursor(1);
+    windrefresh();
     /* Caching is optional: reporting an allocation failure must not recurse. */
     p = malloc((unsigned)(strlen(s) + 1));
     if (p != NULL)

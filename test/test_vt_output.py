@@ -35,7 +35,7 @@ int ioctl(int fd, int request, struct sgttyb *state) {
     (void)fd; (void)request; (void)state; return 0;
 }
 int probe_flush(FILE *stream) {
-    return failure == 1 ? EOF : fflush(stream);
+    return failure == 1 || failure == 4 ? EOF : fflush(stream);
 }
 ssize_t probe_write(int fd, const void *text, size_t length) {
     writes++;
@@ -49,6 +49,8 @@ int main(int argc, char **argv) {
     setvbuf(stdout, buffered, _IOFBF, sizeof buffered);
     if (argc > 1) {
         failure = atoi(argv[1]);
+        if (failure == 4)
+            windrefresh();
         windgoto(0, 0);
         return 2;
     }
@@ -116,7 +118,7 @@ def main():
                          b'\x1b[32m~\x1b[0m\x1b[?25l\x1b[?25h'
                          b'\x1b[2J\x1b[H\x1b[23;80HZsuffix')
             assert result.stdout == expected, (terminal, result.stdout, expected)
-            for failure in (1, 2, 3):
+            for failure in (1, 2, 3, 4):
                 result = subprocess.run([str(work / 'probe'), str(failure)],
                                         capture_output=True)
                 assert result.returncode == 1, (terminal, failure, result.stderr)

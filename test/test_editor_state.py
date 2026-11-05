@@ -35,17 +35,20 @@ static int quit_calls, reject_save;
 static char last_output[256];
 static jmp_buf input_done;
 static int editing, limit_messages;
+static int terminal_writes, cursor_visible = 1, screen_updates;
+static unsigned long edit_moves, edit_moved_bytes;
 void windgoto(int r, int c) {}
+void windcursor(int on) { cursor_visible = on; }
 void windcolor(int fg) {}
 void windcolorreset(void) {}
-void windputc(int c) {}
+void windputc(int c) { terminal_writes++; }
 void windrefresh(void) {}
 void windstr(char *s) {
     snprintf(last_output, sizeof last_output, "%s", s);
     if(strstr(s, "full") || strstr(s, "too long") || strstr(s, "too big"))
         limit_messages++;
 }
-void updatescreen(void) {}
+void updatescreen(void) { screen_updates++; }
 void cursupdate(void) {}
 void screenclear(void) {}
 void beep(void) {}
@@ -361,6 +364,18 @@ static void check_bulk_insert(void) {
     load("abcd");
     vi_file_max = vi_file_end + 2;
     insstr("XYZ"); expect("abcd"); assert(!vi_changed);
+    load("");
+    memset(vi_file_mem, 'a', FILELENG - 2U);
+    vi_file_end = vi_file_mem + FILELENG - 2U;
+    vi_curs_char = vi_file_mem + 1;
+    edit_moves = edit_moved_bytes = 0;
+    inschar('X');
+    assert(edit_moves == 1 && edit_moved_bytes == FILELENG - 3U);
+    assert(vi_curs_char == vi_file_mem + 2 && vi_file_mem[1] == 'X');
+    assert(vi_file_mem[FILELENG - 2U] == 'a');
+    vi_file_max = vi_file_end + 1;
+    inschar('Y');
+    assert(edit_moves == 1);
 }
 static void check_search_bounds(void) {
     char *before;
@@ -390,8 +405,20 @@ static void check_search_bounds(void) {
 }
 static void check_command_limits(void) {
     char command_text[1200];
-    int before = quit_calls;
+    int before = quit_calls, plain_writes, before_updates;
     load("abc\n");
+    terminal_writes = 0;
+    command("v\n");
+    plain_writes = terminal_writes;
+    terminal_writes = 0;
+    command("vX\b\n");
+    assert(!strcmp(last_output, "test"));
+    assert(terminal_writes == plain_writes + 2 && cursor_visible);
+    load("abc\n");
+    before_updates = screen_updates;
+    run_edit("i\t\033");
+    expect("    abc\n");
+    assert(screen_updates == before_updates + 2);
     memset(command_text, ' ', 99);
     command_text[0]='v'; command_text[99]='\n'; command_text[100]=0;
     command(command_text); assert(!strcmp(last_output, "test"));
@@ -1008,6 +1035,14 @@ def main():
                   'static void appchar(int c);\n'
                   'static unsigned savednum, savedcount;\n'
                   'static int savedlast;\n')
+    primitives += r'''
+static void *edit_memmove(void *to, const void *from, size_t length) {
+    edit_moves++;
+    edit_moved_bytes += length;
+    return memmove(to, from, length);
+}
+#define memmove edit_memmove
+'''
     primitives += '#define vi_yank_store test_yank_store\n'
     primitives += '#define vi_yank_load test_yank_load\n'
     primitives += function(misc, 'int yankline(unsigned n)') + '\n'
@@ -1018,6 +1053,7 @@ def main():
                       'void delline(unsigned nlines)', 'static void appchar(int c)\n',
                       'void opencmd(void)'):
         primitives += function(misc, signature) + '\n'
+    primitives += '\n#undef memmove\n'
     queue = source[source.index('static char getcbuff'): ]
     edit = (ROOT / 'edit.c').read_text()
     editor = ('static void donormal(int c);\nstatic void insertchar(int c);\n'

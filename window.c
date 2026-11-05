@@ -89,15 +89,19 @@ int cpm_version_31(void)
 
 #include <unistd.h>
 
+static void winderror(void)
+{
+	fputs("Unable to write terminal output!\n", stderr);
+	vi_key_exit();
+	exit(1);
+}
+
 static void windout(const char *text, unsigned length)
 {
 	/* Keep legacy stdio output ordered before the descriptor-level write. */
 	if (fflush(stdout) == EOF ||
-	    write(fileno(stdout), text, length) != (int)length) {
-		fputs("Unable to write terminal output!\n", stderr);
-		vi_key_exit();
-		exit(1);
-	}
+	    write(fileno(stdout), text, length) != (int)length)
+		winderror();
 }
 
 void windinit(void)
@@ -139,6 +143,7 @@ void windexit(int r)
     vi_key_exit();
     windclear();
     windgoto(0,0);
+    windcursor(1);
     windrefresh();
 #ifdef __CPM86__
     vi_os_close();
@@ -213,7 +218,8 @@ void windputrun(const char *text, unsigned length)
 
 void windrefresh(void)
 {
-	/* Need a redraw here? */
+	if (fflush(stdout) == EOF)
+		winderror();
 }
 
 void beep(void)
@@ -292,6 +298,7 @@ void windexit(int r)
     vi_key_exit();
     windclear();
     windgoto(0,0);
+    windcursor(1);
     windrefresh();
 #ifdef __CPM86__
     vi_os_close();

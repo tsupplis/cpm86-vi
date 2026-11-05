@@ -185,16 +185,13 @@ void putline(int k)
 
 void inschar(int c)
 {
-    register char *p;
-
     /* Move everything in the file over to make */
     /* room for the new char. */
     if (!canincrease(1))
         return;
 
-    for (p = vi_file_end; p > vi_curs_char; p--) {
-        *p = *(p - 1);
-    }
+    memmove(vi_curs_char + 1, vi_curs_char,
+            vi_byte_span(vi_curs_char, vi_file_end));
     *vi_curs_char++ = c;
     vi_file_end++;
     CHANGED;
@@ -223,7 +220,7 @@ void insstr(char *s)
 
 static void appchar(int c)
 {
-    char *p, *endp;
+    char *endp;
 
     /* Move everything in the file over to make */
     /* room for the new char. */
@@ -231,9 +228,7 @@ static void appchar(int c)
         return;
 
     endp = vi_curs_char + 1;
-    for (p = vi_file_end; p > endp; p--) {
-        *p = *(p - 1);
-    }
+    memmove(endp + 1, endp, vi_byte_span(endp, vi_file_end));
     *(++vi_curs_char) = c;
     vi_file_end++;
     CHANGED;

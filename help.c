@@ -13,6 +13,7 @@ static void helpstr(char *s)
 
 void help(void)
 {
+	windcursor(0);
 	windclear();
 
 	windgoto( 0, 0); helpstr("  --- Movement --------------------   --- Insert / Replace -----------");
@@ -42,6 +43,7 @@ void help(void)
 	helpstr(" Press any key ...");
 	windcolorreset();
 
+	windcursor(1);
 	windrefresh();
 	vgetc();
 	screenclear();

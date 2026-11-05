@@ -31,6 +31,7 @@ static char displayed[VI_SCREEN_IMAGE_SIZE];
 static char displays[256][17];
 const char *vi_char_text(unsigned char c) { return displays[c]; }
 static int renders, terminal_position, writes, runs;
+static int cursor_visible = 1, cursor_hides, cursor_shows;
 static void check(int ok, char *why) { if (!ok) { fprintf(stderr,"FAIL: %s\n",why); exit(1); } }
 static void screenerror(void) { check(0,"external screen storage"); }
 void windgoto(int r, int c) {
@@ -38,6 +39,7 @@ void windgoto(int r, int c) {
     terminal_position=r*vi_columns+c;
 }
 void windputc(int c) {
+    check(!cursor_visible,"cursor hidden while document cells are redrawn");
     check(terminal_position<(vi_rows-1)*vi_columns,"no terminal writes in status row");
     displayed[terminal_position++]=(char)c;
     writes++;
@@ -52,6 +54,11 @@ void windputrun(const char *text, unsigned length) {
     }
 }
 void windclear(void) { memset(displayed,' ',sizeof displayed); }
+void windcursor(int on) {
+    cursor_visible=on;
+    if(on) cursor_shows++;
+    else cursor_hides++;
+}
 void windcolor(int color) { check(color==2,"tilde color"); }
 void windcolorreset(void) {}
 void windrefresh(void) {}
@@ -116,6 +123,8 @@ static void reference(char *image, char **bottom) {
 source+=function('main.c','static void filetonext(void)')
 source+=function('main.c','static void nexttoscreen(void)')
 source+=function('main.c','void screenclear(void)')
+source+=function('main.c','void updatescreen(void)').replace(
+    'void updatescreen(void)', 'static void refreshscreen(void)')
 source+=r'''
 void updatescreen(void) {
     char *bottom;
@@ -123,11 +132,13 @@ void updatescreen(void) {
     renders++;
     readscreen(VI_SCREEN_NEXT,reference_screen);
     reference(reference_screen,&bottom);
-    filetonext();
+    refreshscreen();
     readscreen(VI_SCREEN_NEXT,screen);
     check(!memcmp(screen,reference_screen,size),"renderer matches original frame");
     check(vi_bot_char==bottom,"renderer matches original Botchar");
-    nexttoscreen();
+    check(cursor_visible,"cursor restored after redraw");
+    check(terminal_position==(int)vi_curs_row*vi_columns+vi_curs_col,
+          "cursor restored at editing position, not end of changed run");
     check(!memcmp(displayed,screen,size),"terminal matches desired frame");
     readscreen(VI_SCREEN_REAL,reference_screen);
     check(!memcmp(screen,reference_screen,size),"real image tracks terminal");
@@ -226,6 +237,8 @@ int main(void) {
     for(i=0;i<vi_rows*vi_columns;i++)
         check(screen[i]==' ' && reference_screen[i]==' ' && displayed[i]==' ',"clear both screens");
     check(vi_yank_load(0,screen_line,4) && !memcmp(screen_line,"keep",4),"clear preserves yank");
+    check(cursor_visible && cursor_hides==cursor_shows,
+          "all redraws and clears restore cursor visibility");
     vi_yank_close();
     puts("PASS: scrolling, paging, 500 renderer parity cases, screen diff/clear and status-row guards");
     return 0;

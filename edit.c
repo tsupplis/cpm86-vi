@@ -327,6 +327,7 @@ void edit(void) {
                         *p++ = *q++;
                     *p++ = '\033';
                     *p = '\0';
+                    cursupdate();
                     updatescreen();
                     break;
                 case '\b':
@@ -357,12 +358,14 @@ void edit(void) {
                         printf("(c=%d)", c);
                     if (insertbyte(c, !vstuffed()))
                         message("Insert Mode");
+                    cursupdate();
                     updatescreen();
                     break;
                 }
                 case 0x16: /* ^V — insert next character literally */
                     c = vgetc();
                     insertbyte(c, !vstuffed());
+                    cursupdate();
                     updatescreen();
                     break;
                 case 0x09: /* Tab — expand to spaces unless preceded by ^V */
@@ -372,10 +375,10 @@ void edit(void) {
                         message("Can't add anything, file is too big!");
                         break;
                     }
-                    insertchar(' ');
-                    insertchar(' ');
-                    insertchar(' ');
-                    insertchar(' ');
+                    for (c1 = 0; c1 < 4; c1++)
+                        insertbyte(' ', !vstuffed());
+                    cursupdate();
+                    updatescreen();
                     break;
                 case 0x0F:
                     break;
@@ -411,6 +414,7 @@ void edit(void) {
                         vi_undo_changed = vi_changed;
                     }
                     replptr = NULL;
+                    cursupdate();
                     updatescreen();
                     break;
                 case '\b': /* backspace: restore original char */
@@ -529,6 +533,7 @@ static void insertchar(int c)
         if (n)
             insstr(p);
     }
+    cursupdate();
     updatescreen();
 }
 

@@ -350,12 +350,17 @@ static void nexttoscreen(void) {
 
 void updatescreen(void) {
     filetonext();
+    windcursor(0);
     nexttoscreen();
+    windgoto(vi_curs_row, vi_curs_col);
+    windcursor(1);
+    windrefresh();
 }
 
 void screenclear(void) {
     int row;
 
+    windcursor(0);
     windclear();
     memset(screen_line, ' ', (unsigned)vi_columns);
     for (row = 0; row < vi_rows; row++) {
@@ -363,6 +368,9 @@ void screenclear(void) {
             !vi_screen_store(VI_SCREEN_NEXT, row, screen_line))
             screenerror();
     }
+    windgoto(vi_curs_row, vi_curs_col);
+    windcursor(1);
+    windrefresh();
 }
 
 static void filealloc(void) {
