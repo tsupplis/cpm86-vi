@@ -332,6 +332,12 @@ test-display-pce:
 test-display-compat:
 	python3 -B test/test_display_pce.py --compat-only
 
+.PHONY: test-vt-output test-vt-pce
+test-vt-output:
+	python3 -B test/test_vt_output.py
+test-vt-pce:
+	python3 -B test/test_vt_pce.py
+
 .PHONY: test-capacity-runtime
 test-capacity-runtime:
 	python3 -B test/test_capacity_runtime.py

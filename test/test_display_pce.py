@@ -11,7 +11,7 @@ import tempfile
 from test_buffer_runtime import ROOT, build, run
 
 
-def check(root, name, image, config, exitprog, program, video, ram=None, timing=True):
+def run_probe(root, name, image, config, exitprog, program, video, ram=None, timing=True):
     work = root / name
     work.mkdir()
     shutil.copyfile(image, work / 'boot.img')
@@ -76,6 +76,12 @@ def check(root, name, image, config, exitprog, program, video, ram=None, timing=
     else:
         report = run(['mtype', '-i', 'boot.img', '::RESULT.TXT'], work).stdout
     print(name + '\n' + report, flush=True)
+    return report
+
+
+def check(root, name, image, config, exitprog, program, video, ram=None, timing=True):
+    report = run_probe(root, name, image, config, exitprog, program, video,
+                       ram, timing)
     assert report.startswith('VI DISPLAY PASS'), report
     cases = re.findall(r'(\d) ticks (\d+) (\d+) cursor (\d+) (\d+) chars (\d+) (\d+)',
                        report)

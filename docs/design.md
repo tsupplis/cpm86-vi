@@ -250,16 +250,24 @@ a gap buffer or index rebuild — significant redesign risk).
 | `main.c` `readfile()` | O(n²) file load — shifts the whole in-memory buffer down for every character read | High | Documented only |
 | `edit.c` `cursupdate()` | Re-scans from `vi_top_char` to `vi_curs_char` every keystroke to recompute the virtual column | Medium | Documented only |
 | `main.c` `nexttoscreen()` / `window.c` `windputrun()` | Per-character BIOS output repeated cursor positioning and teletype work | Medium | **Applied** — row-bounded changed runs use AH=0Ah, coalesce repeated characters, set the BIOS data-area cursor before each write and update the hardware cursor once per run. Existing cell attributes are preserved. |
+| `window.c` VT `windgoto()`/`windputrun()` | Per-character stdio overhead for runs and cursor escape sequences | Medium | **Applied** — one descriptor-level write per run/sequence, preceded by a stdio flush to preserve ordering. The same CP/M console driver handles the same bytes. |
 | `window.c` PCBIOS `windrefreshcursor()`/`windputc()` | Re-issues an `INT 10h` cursor-position call for single-character/UI output and idle cursor recovery | Low (intentional tradeoff) | Retained for these callers; bulk renderer output uses `windputrun()`. |
 
 The run backend uses the standard page-zero cursor word at `0040:0050`.
 Runs must not cross a row or include C0 controls; these retain the legacy
 single-character path, including carriage returns in binary data. The renderer
 supplies bounded display cells, not NUL-terminated strings. BIOS handles the actual video writes,
-including CGA synchronization. VT52/VT100 runs retain the existing per-character
-terminal output path. Native display probes compare against the frozen
+including CGA synchronization. VT52/VT100 runs bypass per-character stdio calls,
+not the console driver; control characters retain their old single-byte path.
+They do not use BDOS string output, so dollar signs and high-bit bytes need no
+special treatment. Flush failures and short/failed writes terminate with an
+explicit diagnostic and keyboard restoration. Native display probes compare against the frozen
 single-character renderer and check physical screen cells, attributes, cursor
 coordinates and recovery after simulated background cursor changes.
+The VT probe checks byte-exact console streams and samples the actual CRTC
+cursor after allowing XIOS to commit asynchronous updates, rather than assuming
+the BIOS cursor shadow is authoritative. Only the test waits; production
+output has no added delay.
 See the README display-output section for benchmark scope and results.
 
 ## Portability Notes

@@ -64,8 +64,13 @@ This is a proposed execution backlog, not a record of completed work.
   standard-speed 8088 setup. Seven real-kernel display profiles pass, including
   Concurrent DOS 4.1, with colored attributes, cursor recovery, status-row
   protection and legacy control-character behavior checked. All six full-buffer
-  variants and both DOS 1 kernel roundtrips pass. VT52/VT100 retain their original
-  output semantics; XIOS throughput improvements need a separate benchmark.
+  variants and both DOS 1 kernel roundtrips pass.
+  **VT follow-up complete:** VT52/VT100 runs and cursor sequences now bypass
+  per-character stdio overhead while preserving console bytes and ordering.
+  Short DOS Plus/CGA measurements show 1.45x faster bulk output; single-cell
+  timings are effectively unchanged. DOS Plus and Concurrent DOS VT52 checks
+  pass, including settled hardware cursors. Both VT protocols have host
+  byte/error-path tests; native VT100 timing remains unmeasured.
 
 - [ ] **P4 - Investigate long-line cursor and search costs.**
   Measure rescanning before introducing caches or a new search algorithm.
@@ -118,7 +123,7 @@ This is a proposed execution backlog, not a record of completed work.
 ## Recommended order
 
 P3 is complete. Next: Q1-Q4, the remainder of P1, Q5 and P2. Choose the remaining
-work from measurements, including a separate VT52/VT100 XIOS display baseline.
+work from measurements. Native VT100/ANSI timing remains optional follow-up.
 
 Every implementation task should preserve the current buffer limits, native
 memory-budget checks and supported-platform behavior.

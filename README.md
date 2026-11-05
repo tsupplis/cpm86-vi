@@ -202,8 +202,12 @@ data-area page-zero cursor is set before each BIOS write, so background console
 cursor changes do not redirect subsequent writes; the hardware cursor is
 updated at the end of each run. There are no direct video-memory writes.
 Status messages, control characters and other single-character callers retain
-the original output path. VT52/VT100 retain their existing character-output
-semantics.
+the original output path. VT52/VT100 use one descriptor-level `write()` per
+changed run or cursor sequence, avoiding per-character stdio overhead.
+Pending stdio output is flushed first to preserve ordering. The existing
+CP/M console driver still handles every byte: no direct XIOS calls, new BDOS
+services, string terminators or production delays are introduced. Flush and
+short/failed-write errors are reported explicitly.
 
 `make test-display-pce` compares a frozen old diff/output path with the new
 path on private DOS 1.1 and DOS Plus images, using a standard-speed 8088
@@ -229,7 +233,24 @@ sixteen long-row updates; smaller is better):
 These are diff/output benchmarks with prebuilt desired frames, not whole-editor
 or disk-I/O speedups. Timed runs include invalidating the old screen image and
 exclude the interrupt-counting/injection hook. Single-cell timings were
-essentially unchanged. No equivalent XIOS/VT throughput gain is claimed.
+essentially unchanged. VT measurements are separate from these BIOS results.
+
+`make test-vt-output` compiles both complete VT backends on the host and checks
+all 1,920 cursor positions, all byte values, buffered-output ordering, and
+flush/write/short-write failure handling. `make test-vt-pce` compares frozen
+character-at-a-time output with the new VT52 path on DOS Plus and Concurrent
+DOS 4.1. It checks identical BDOS byte streams, physical cells/attributes and
+hardware cursor positions. The functional checks allow two timer ticks for
+XIOS to commit asynchronous cursor updates; this wait exists only in the probe.
+Use `python3 -B test/test_vt_pce.py --compat-only` to skip performance timing.
+
+The short DOS Plus/CGA 8088 measurement (`speed = 1`) took **253 -> 174 ticks**
+for two full repaints, two row-shifted repaints and eight long-row updates:
+**1.45x faster**, or about **31% less time**. Sixteen single-cell updates took
+37 -> 36 ticks, effectively unchanged at this resolution. BDOS byte counts
+remain identical; the improvement removes library overhead, not terminal
+traffic. No native VT100/ANSI timing result is claimed, and these are not
+whole-editor speedups.
 
 `make test-capacity-runtime` checks unsigned byte spans, capacity rejection,
 EOF reservation and large tail copies at 32,000, 32,767, 32,768, 40,000 and

@@ -87,6 +87,19 @@ int cpm_version_31(void)
 /* ------------------------------------------------------------------ */
 #if defined(__VTCMD__ )
 
+#include <unistd.h>
+
+static void windout(const char *text, unsigned length)
+{
+	/* Keep legacy stdio output ordered before the descriptor-level write. */
+	if (fflush(stdout) == EOF ||
+	    write(fileno(stdout), text, length) != (int)length) {
+		fputs("Unable to write terminal output!\n", stderr);
+		vi_key_exit();
+		exit(1);
+	}
+}
+
 void windinit(void)
 {
 	struct sgttyb stty;
@@ -107,9 +120,17 @@ void windinit(void)
 void windgoto(int r, int c)
 {
 #if defined(__VT52__)
-	printf("\033Y%c%c",r+0x20,c+0x20);
+	char position[4];
+	position[0] = '\033';
+	position[1] = 'Y';
+	position[2] = r + 0x20;
+	position[3] = c + 0x20;
+	windout(position, sizeof position);
 #elif defined(__VT100__)
-	printf("\033[%d;%dH",r+1,c+1);
+	char position[24];
+	unsigned length;
+	length = (unsigned)sprintf(position, "\033[%d;%dH", r + 1, c + 1);
+	windout(position, length);
 #endif
 }
 
@@ -187,8 +208,7 @@ void windputc(int c)
 
 void windputrun(const char *text, unsigned length)
 {
-	while (length--)
-		windputc((unsigned char)*text++);
+	windout(text, length);
 }
 
 void windrefresh(void)
