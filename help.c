@@ -35,8 +35,8 @@ void help(void)
 	windgoto(17, 0); helpstr("  :e[!] [f]  :r f   edit / read file   J        join lines");
 	windgoto(18, 0); helpstr("  :f [n]  :.=  :$=  :set oct|hex|dec   >> <<    indent     ");
 	windgoto(19, 0); helpstr("  :nnn              goto line nnn      n~       toggle case ");
-	windgoto(20, 0); helpstr("  :h/H              help              ma       set mark a-z");
-	windgoto(21, 0); helpstr("  :v                show version      'a / `a  mark line / exact");
+	windgoto(20, 0); helpstr("  :h/H              help ");
+	windgoto(21, 0); helpstr("  :v                show version");
 	windgoto(vi_rows-1, 0);
 	windcolor(2);
 	helpstr(" Press any key ...");

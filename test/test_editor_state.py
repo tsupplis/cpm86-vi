@@ -140,7 +140,6 @@ void test_string_free(void *p) {
 
 CHECKS = r'''
 static void load(const char *s) {
-    vi_marks_clear();
     memset(vi_file_mem, 0, FILELENG);
     memcpy(vi_file_mem, s, strlen(s));
     vi_file_end = vi_file_mem + strlen(s);
@@ -900,160 +899,6 @@ static void check_quality_commands(void) {
             }
         }
 }
-static void mark_at(int name, unsigned offset) {
-    char *saved = vi_curs_char;
-    assert(vi_mark_jump(name, 0));
-    assert(vi_curs_char == vi_file_mem + offset);
-    vi_curs_char = saved;
-}
-static void mark_unset(int name) {
-    char *saved = vi_curs_char;
-    assert(!vi_mark_jump(name, 0));
-    assert(vi_curs_char == saved);
-    assert(strstr(last_output, "Mark is not set"));
-}
-static void check_marks(void) {
-    unsigned i;
-    char *maximum = vi_file_max;
-    load("  alpha\n\tbeta\nlast");
-    vi_curs_char = vi_file_mem + 3;
-    input = "a"; normal('m');
-    run_edit("0`a"); assert(vi_curs_char == vi_file_mem + 3);
-    run_edit("'a"); assert(vi_curs_char == vi_file_mem + 2);
-    vi_curs_char = vi_file_mem + 11;
-    input = "z"; normal('m');
-    run_edit("0'z"); assert(vi_curs_char == vi_file_mem + 9);
-    run_edit("`z"); assert(vi_curs_char == vi_file_mem + 11);
-    strcpy(vi_undo_buff, "rZ"); strcpy(vi_redo_buff, "rX");
-    vi_uncurs_char = vi_file_mem;
-    run_edit("mb`a'z");
-    assert(!vi_changed && vi_uncurs_char == vi_file_mem);
-    assert(!strcmp(vi_undo_buff, "rZ") && !strcmp(vi_redo_buff, "rX"));
-    run_edit("mA`A'A");
-    assert(!vi_changed && vi_state == NORMAL);
-    run_edit("m\033`\033'\033");
-    mark_at('a', 3); mark_at('z', 11);
-    vi_curs_char = vi_file_end;
-    assert(!vi_mark_set('a')); mark_at('a', 3);
-    command("f renamed.txt\n"); mark_at('a', 3);
-
-    load("x\n \t\n  ");
-    vi_curs_char = vi_file_mem + 4; assert(vi_mark_set('a'));
-    run_edit("'a"); assert(vi_curs_char == vi_file_mem + 4);
-    vi_curs_char = vi_file_mem + 6; assert(vi_mark_set('b'));
-    run_edit("'b"); assert(vi_curs_char == vi_file_mem + 6);
-    load(""); assert(!vi_mark_set('a'));
-    run_edit("65536ma65536`a65536'a");
-    assert(vi_state == NORMAL && !vi_changed);
-    mark_unset('a');
-
-    load("abc\n");
-    assert(vi_mark_set('a'));
-    run_edit("d'ac`ay'a<'a>`a65536d'a");
-    expect("abc\n"); assert(!vi_changed && vi_state == NORMAL);
-    mark_at('a', 0);
-    run_edit("iX\033"); expect("Xabc\n"); mark_at('a', 1);
-    vi_curs_char = vi_file_mem; assert(vi_mark_set('b'));
-    run_edit("u"); expect("abc\n"); mark_at('a', 0); mark_unset('b');
-    run_edit("u"); expect("Xabc\n"); mark_at('a', 1); mark_unset('b');
-
-    load("abcde\n");
-    vi_curs_char = vi_file_mem; assert(vi_mark_set('a'));
-    vi_curs_char += 2; assert(vi_mark_set('b'));
-    vi_curs_char += 2; assert(vi_mark_set('c'));
-    vi_curs_char = vi_file_mem + 2; insstr("XY");
-    expect("abXYcde\n"); mark_at('a', 0); mark_at('b', 4); mark_at('c', 6);
-    vi_curs_char = vi_file_mem + 4; delchar();
-    expect("abXYde\n"); mark_unset('b'); mark_at('c', 5);
-    vi_file_max = vi_file_end + 1;
-    inschar('!'); expect("abXYde\n"); mark_at('c', 5);
-    vi_file_max = maximum;
-
-    load("one two\n");
-    vi_curs_char = vi_file_mem + 1; assert(vi_mark_set('a'));
-    vi_curs_char = vi_file_mem + 5; assert(vi_mark_set('b'));
-    vi_curs_char = vi_file_mem; run_edit("dwu");
-    expect("one two\n"); mark_unset('a'); mark_at('b', 5);
-    load("one\ntwo\nthree\n");
-    vi_curs_char = vi_file_mem + 1; assert(vi_mark_set('a'));
-    vi_curs_char = vi_file_mem + 5; assert(vi_mark_set('b'));
-    vi_curs_char = vi_file_mem + 9; assert(vi_mark_set('c'));
-    vi_curs_char = vi_file_mem; run_edit("dd");
-    expect("two\nthree\n"); mark_unset('a'); mark_at('b', 1); mark_at('c', 5);
-    run_edit("u"); expect("one\ntwo\nthree\n");
-    mark_unset('a'); mark_at('b', 5); mark_at('c', 9);
-    load("one\ntwo\n");
-    vi_curs_char = vi_file_mem + 3; assert(vi_mark_set('a'));
-    vi_curs_char = vi_file_mem + 5; assert(vi_mark_set('b'));
-    vi_curs_char = vi_file_mem; run_edit("J");
-    mark_unset('a'); mark_at('b', 4);
-    run_edit("u"); expect("one\ntwo\n"); mark_unset('a'); mark_at('b', 5);
-
-    load("\ta\nb\n\tc");
-    vi_curs_char = vi_file_mem; assert(vi_mark_set('z'));
-    vi_curs_char++; assert(vi_mark_set('a'));
-    vi_curs_char = vi_file_mem + 3; assert(vi_mark_set('b'));
-    vi_curs_char = vi_file_mem + 6; assert(vi_mark_set('c'));
-    vi_curs_char = vi_file_mem; run_edit("3<<");
-    mark_at('a', 0); mark_at('b', 2); mark_at('c', 4); mark_unset('z');
-    run_edit("u"); expect("\ta\nb\n\tc");
-    mark_at('a', 1); mark_at('b', 3); mark_at('c', 6); mark_unset('z');
-    run_edit("3>>u"); expect("\ta\nb\n\tc");
-    mark_at('a', 1); mark_at('b', 3); mark_at('c', 6);
-    vi_curs_char = vi_file_mem + 1; input = "X"; normal('r');
-    run_edit("`aRZ\033");
-    mark_at('a', 1);
-
-    load("keep\n"); assert(yankline(1));
-    load("tail\n"); vi_curs_char++; assert(vi_mark_set('a'));
-    vi_curs_char = vi_file_mem;
-    fail_yank_load = 1; putline(1); fail_yank_load = 0;
-    expect("tail\n"); mark_at('a', 1);
-    putline(1); expect("keep\ntail\n"); mark_at('a', 6);
-    vi_file_max = vi_file_end; putline(1);
-    expect("keep\ntail\n"); mark_at('a', 6);
-    vi_file_max = maximum;
-
-    load("a\ntail\n"); seed("XY\r\n\032ignored");
-    vi_curs_char = vi_file_mem + 3; assert(vi_mark_set('a'));
-    assert(!readfile("insert.txt", vi_file_mem + 2, 1));
-    expect("a\nXY\ntail\n"); mark_at('a', 6);
-    fail_after = 2;
-    assert(readfile("insert.txt", vi_file_mem, 1) == -1);
-    fail_after = -1; read_failed = 0; mark_at('a', 6);
-    fail_close = 1;
-    assert(readfile("insert.txt", vi_file_mem, 1) == -1);
-    fail_close = 0; mark_at('a', 6);
-    vi_file_max = vi_file_end + 1;
-    assert(readfile("insert.txt", vi_file_mem, 1) == -1);
-    vi_file_max = maximum; mark_at('a', 6);
-    expect("a\nXY\ntail\n");
-    fail_string_alloc = 1;
-    command("e! replacement.txt\n");
-    fail_string_alloc = 0; mark_at('a', 6);
-    vi_changed = 1; command("e insert.txt\n"); mark_at('a', 6);
-    command("e! insert.txt\n"); expect("XY\n"); mark_unset('a');
-    assert(vi_mark_set('a'));
-    command("e! missing-mark-file.txt\n"); expect(""); mark_unset('a');
-
-    load("abcdefghijklmnopqrstuvwxyz\n");
-    for (i = 0; i < 26; i++) {
-        vi_curs_char = vi_file_mem + i;
-        assert(vi_mark_set('a' + i));
-    }
-    vi_curs_char = vi_file_mem; insstr("0123");
-    for (i = 0; i < 26; i++) mark_at('a' + i, i + 4);
-    vi_marks_clear();
-    for (i = 0; i < 26; i++) mark_unset('a' + i);
-    load("");
-    memset(vi_file_mem, 'K', FILELENG - 2U);
-    vi_file_end = vi_file_mem + FILELENG - 2U;
-    vi_curs_char = vi_file_end - 1; assert(vi_mark_set('z'));
-    vi_curs_char = vi_file_mem; inschar('X');
-    mark_at('z', FILELENG - 2U);
-    vi_curs_char = vi_file_mem; delchar();
-    mark_at('z', FILELENG - 3U);
-}
 static void check_quality_rejections(void) {
     int dirty, i;
     char many_lines[16385];
@@ -1143,7 +988,6 @@ int main(int argc, char **argv) {
     else if(!strcmp(argv[1], "filename-ownership")) check_filename_ownership();
     else if(!strcmp(argv[1], "quality-commands")) check_quality_commands();
     else if(!strcmp(argv[1], "quality-rejections")) check_quality_rejections();
-    else if(!strcmp(argv[1], "marks")) check_marks();
     else assert(0);
     clearlastmess();
     vi_yank_close();
@@ -1212,8 +1056,7 @@ def main():
                  'file-insert-limits', 'long-messages', 'yank-failures',
                  'yank-success', 'yank-message-failure', 'put-failures',
                  'large-binary-put', 'full-buffer', 'capacity', 'string-failures',
-                 'filename-ownership', 'quality-commands', 'quality-rejections',
-                 'marks')
+                 'filename-ownership', 'quality-commands', 'quality-rejections')
         selected = sys.argv[1:] or cases
         if any(case not in cases for case in selected):
             raise SystemExit('Unknown editor-state test case')
@@ -1225,7 +1068,6 @@ def main():
                 '-fsanitize=address,undefined', *flags, '-I', str(ROOT), str(harness),
                 str(command_source), str(ROOT / 'normal.c'),
                 str(line_source), str(ROOT / 'yankmem.c'),
-                str(ROOT / 'marks.c'),
                 str(ROOT / 'test/yankmock.c'), '-o', str(binary),
             ], check=True)
             for case in selected:

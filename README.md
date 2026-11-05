@@ -89,6 +89,26 @@ Each build embeds the current `git describe` output (or `unknown` outside a
 git checkout) as the version shown by the `:v` command; see `gitver.h`
 (generated, not checked in) and `viversion()` in `window.c`.
 
+### Complete correctness regression
+
+Run `make test-regression` for one sequential regression batch. It force-rebuilds
+all six production formats, then runs the existing host, native-runtime and
+real-kernel correctness suites, including full-buffer/heap-headroom checks,
+keyboard, editing/undo, EOF, display, navigation, I/O, save and yank coverage.
+It requires the host sanitizer compiler, Aztec toolchain, `emu2`, PCE and the
+kernel images used by the individual native tests below.
+
+Every step runs once. Independent suites continue after failures so the batch
+reports all results together; it does not modify source, retry failures, lower
+budgets or run performance benchmarks. A suite that aborts early is a failure,
+not evidence that its remaining cases passed.
+
+The command prints the retained log directory and writes `summary.json` there
+with the source revision/worktree state, each command, exit code, duration and
+log path. Any failed step makes the overall command fail. To choose a new output
+directory, run `python3 -B test/regression.py --output /path/to/new-directory`.
+This aggregates the existing probes; it is not an exhaustive interactive UI test.
+
 ### Host regression tests
 
 Run `make test-editor-state` with a host C compiler (`cc`, or `CC_HOST`)

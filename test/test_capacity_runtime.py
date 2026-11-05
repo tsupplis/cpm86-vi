@@ -122,20 +122,17 @@ def main():
     with tempfile.TemporaryDirectory(prefix='vi-capacity-') as directory:
         work = Path(directory)
         shutil.copyfile(ROOT / 'stevie.h', work / 'stevie.h')
-        shutil.copyfile(ROOT / 'marks.c', work / 'marks.c')
         (work / 'capacity.c').write_text(source + CHECKS)
         run([os.environ.get('CC_HOST', 'cc'), '-std=c99', '-g',
-             '-fsanitize=address,undefined', '-I.', 'capacity.c', 'marks.c',
+             '-fsanitize=address,undefined', '-I.', 'capacity.c',
              '-o', 'capacity-host'], work)
         result = run([str(work / 'capacity-host')], work)
         assert 'VI CAPACITY PASS: 0 failures' in result.stdout, result.stdout
         print('CAPACITY PASS: host sanitizers', flush=True)
         run(['aztec42_cc', '-I.', '+F', '+0', '-o', 'capacity.o', 'capacity.c'], work)
-        run(['aztec42_cc', '-I.', '+F', '+0', '-o', 'marks.o', 'marks.c'], work)
         for library, extension in (('c86', 'cmd'), ('d11', 'com'), ('c', 'exe')):
             program = 'capacity.' + extension
-            run(['aztec42_link', '-o', program, 'capacity.o', 'marks.o',
-                 '-l' + library], work)
+            run(['aztec42_link', '-o', program, 'capacity.o', '-l' + library], work)
             result = run([os.environ.get('EMU2', 'emu2'), program], work)
             assert 'VI CAPACITY PASS: 0 failures' in result.stdout, result.stdout
             print('CAPACITY PASS:', library, '(32000/32767/32768/40000/40064 bytes)',

@@ -266,7 +266,7 @@ def main():
     source += function((ROOT / 'cmdline.c').read_text(), 'static int writeit(char *fname)\n')
     with tempfile.TemporaryDirectory(prefix='vi-io-') as directory:
         work = Path(directory)
-        for name in ('stevie.h', 'marks.c', 'save.c', 'save.h', 'os.asm'):
+        for name in ('stevie.h', 'save.c', 'save.h', 'os.asm'):
             shutil.copyfile(ROOT / name, work / name)
         (work / 'io.c').write_text(source + CHECKS)
         headers = work / 'host-headers'
@@ -274,19 +274,17 @@ def main():
         (headers / 'dos.h').write_text('')
         run([os.environ.get('CC_HOST', 'cc'), '-std=c99', '-g',
              '-D_POSIX_C_SOURCE=200809L', '-fsanitize=address,undefined',
-             '-Ihost-headers', '-I.', 'io.c', 'save.c', 'marks.c',
-             '-o', 'io-host'], work)
+             '-Ihost-headers', '-I.', 'io.c', 'save.c', '-o', 'io-host'], work)
         verify([str(work / 'io-host')], work / 'host')
         print('IO PASS: host sanitizers', flush=True)
         run(['aztec42_as', 'os.asm'], work)
         run(['aztec42_cc', '-I.', '+F', '+0', '-o', 'io.o', 'io.c'], work)
-        run(['aztec42_cc', '-I.', '+F', '+0', '-o', 'marks.o', 'marks.c'], work)
         for library, extension in (('c86', 'cmd'), ('d11', 'com'), ('c', 'exe')):
             flags = ['-D__CPM86__'] if library == 'c86' else []
             extra = ['os.o'] if library == 'c86' else []
             run(['aztec42_cc', '-I.', '+F', '+0', *flags, '-o', 'save.o', 'save.c'], work)
             program = 'io.' + extension
-            run(['aztec42_link', '-o', program, 'io.o', 'save.o', 'marks.o',
+            run(['aztec42_link', '-o', program, 'io.o', 'save.o',
                  *extra, '-l' + library], work)
             verify([os.environ.get('EMU2', 'emu2'), str(work / program)],
                    work / library, cpm=library == 'c86')

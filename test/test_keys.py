@@ -5,7 +5,7 @@ import os
 import subprocess
 import tempfile
 
-root = Path(__file__).resolve().parent
+root = Path(__file__).resolve().parents[1]
 edit = (root / 'edit.c').read_text()
 start = edit.index('int windgetc(void)')
 end = edit.index('\n}', start) + 2

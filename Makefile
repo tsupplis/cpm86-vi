@@ -21,7 +21,6 @@ SHARED_OBJS = \
 	hexchars.o \
 	linefunc.o \
 	main.o     \
-	marks.o    \
 	misccmds.o \
 	normal.o   \
 	yankmem.o  \
@@ -286,7 +285,11 @@ main.o misccmds.o: yankmem.h
 
 .PHONY: test-keys
 test-keys:
-	python3 testkeys.py
+	python3 -B test/test_keys.py
+
+.PHONY: test-regression
+test-regression:
+	python3 -B test/regression.py
 
 .PHONY: test-scroll
 test-scroll:
