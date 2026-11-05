@@ -41,16 +41,24 @@ Checked items have completed their documented implementation and validation.
 
 ## 2. Responsiveness: measure, then optimize
 
-- [ ] **P1 - Establish a repeatable performance and memory baseline.**
+- [x] **P1 - Establish a repeatable performance and memory baseline.**
   Use fixed fixtures and a fixed 8088 emulator configuration.
   **Done when:** we can compare load/save, middle `:r`, typing near the beginning,
   scrolling, long-line movement and search, plus code/data sizes and heap
   headroom.
+  **Result:** [short baseline](docs/performance.md), one bounded DOS 1/8088/CGA
+  profile with seven checked cases, code/data image sizes and reused verified
+  heap budgets/display results. Middle import is the demonstrated next target.
 
-- [ ] **P2 - Batch middle-of-buffer imports.**
+- [x] **P2 - Batch middle-of-buffer imports.**
   Replace `readfile()` in [main.c](main.c)'s per-byte tail shifting.
   **Done when:** tail movement is substantially reduced, with byte-exact results
   and unchanged all-or-nothing failure behavior.
+  **Result:** 128-byte filtered chunks reuse the existing status buffer.
+  The short middle-import sample falls from 159 to 6 ticks; tail movement is
+  128x smaller for that fixture. Chunk-boundary, text/binary, exact-capacity and
+  rollback tests pass on host and three native runtimes; all 27 full-buffer
+  cases retain their heap budgets. See [measurements](docs/performance.md#p2-batched-imports).
 
 - [x] **P3 - Add efficient changed-run screen output.**
   Row-bounded changed runs avoid redundant BIOS cursor positioning while

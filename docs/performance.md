@@ -1,0 +1,145 @@
+# Short performance and memory baseline
+
+## Reproduce
+
+From the repository root, with the existing Aztec/PCE and DOS 1.1 fixtures:
+
+```
+make test-perf-pce
+```
+
+To keep a machine-readable result:
+
+```
+python3 -B test/test_perf_pce.py --output baseline.json
+```
+
+The runner builds only one private probe, isolates Aztec's compiler temporary
+directory, and boots one private image. It uses **PC-DOS 1.1, DOS 1 EXE,
+8088 speed 1, CGA, 256 KiB RAM**, with a **60-second emulator timeout**.
+There are no automatic timing retries, statistical repetitions or platform
+sweeps. Fixture preparation and setup are outside each timed interval.
+The existing production binaries must be present for size reporting.
+
+The JSON records source commit/dirty state, fixture/probe/config/boot-image
+hashes, executable sizes/hashes and seven measured cases. This distinguishes
+local builds without pretending a dirty worktree is a clean release.
+
+## Recorded sample
+
+Taken on 2026-11-05, based on `4045e15` plus the documentation/probe changes.
+The initial sample used the fixtures below; the reported intervals total
+383 BIOS ticks, approximately 21 seconds of emulated time.
+
+| Case | Fixed work | Total ticks |
+|---|---|---:|
+| Empty-buffer load | One 4,096-byte binary read | 21 |
+| Save | One 4,096-byte binary save, including flush/truncate/close | 13 |
+| Middle `:r` core | One 128-byte import at offset 2,048 in the 4,096-byte buffer | 159 |
+| Beginning edit core | Eight insert/delete primitive pairs at offset zero in 4,096 bytes | 29 |
+| Viewport scrolling | Two one-line downward moves past the viewport bottom, including redraw/output | 31 |
+| Long-line cursor | Eight column recalculations at offset 4,095 in an 8,192-byte line | 45 |
+| Failed search | Four wrapped misses for `aaaaab` in 8,192 `a` bytes | 85 |
+
+BIOS ticks are roughly 1/18.2 second; coarse sampling carries about a tick of
+boundary uncertainty. Compare the same cases and repeat counts, not individual
+sub-tick operations. This is a reproducible point sample, not a significance
+test or a whole-editor/real-hardware speed claim.
+
+Beginning edits deliberately isolate tail movement: they do not include parser
+or redraw cost. Cursor recalculation excludes redraw; scroll includes it.
+Load/import and failed search include their normal status output. The probe
+checks successful return values, expected cursor/viewport/length state, import
+bytes and an intact 4 KiB held-spare allocation; the host checks saved bytes.
+
+Fixtures:
+
+- `BASE.TXT`: 4,096 bytes, 64 lines of 63 repeated row-specific printable bytes
+  followed by LF. The row character is `a + (row modulo 23)`.
+  SHA-256: `e116346efe48861de64d1cfe37dccc6784ad7434f68f5c74f32dde72cd52fc96`.
+- `IMPORT.TXT`: 128 `X` bytes.
+  SHA-256: `64531077024b8fe57566a3d556ef54fd598bab2e0ca49b43185f765a6a86cb5d`.
+- CPU-only long-line fixture: 8,192 `a` bytes, generated before timing.
+
+The middle import takes more time than loading the much larger empty buffer.
+It repeatedly moves the existing tail; this motivated the P2 change below.
+Long-line cursor and search are measurable P4 candidates, not yet algorithm
+recommendations. These tiny file samples do not isolate disk service from CPU
+and buffering costs; that remains P5.
+
+## P2: batched imports
+
+The same probe, fixtures, boot/config hashes and profile were run once after
+changing `readfile()` to stage 128 filtered bytes in its existing status buffer.
+It moves the original tail once per chunk, not once per imported byte.
+No extra heap or scratch buffer is needed.
+
+| Case | P1 ticks | P2 ticks |
+|---|---:|---:|
+| Empty-buffer load | 21 | 20 |
+| Save | 13 | 13 |
+| Middle import | 159 | 6 |
+| Eight beginning edit pairs | 29 | 29 |
+| Two viewport scrolls | 31 | 32 |
+| Eight long-line cursor recalculations | 45 | 45 |
+| Four failed searches | 85 | 86 |
+
+For this middle-import fixture, tail movement falls from 262,144 to 2,048
+bytes (128 times less). Elapsed time falls from about 8.7 to 0.33 seconds:
+roughly **26x faster for this operation**, not for the whole editor.
+One-tick differences elsewhere are within the coarse timer's uncertainty.
+There was no additional timing sweep.
+
+The enlarged I/O regressions check exact/overflow capacity and read/close
+rollback across 127/128/129 and 255/256/257-byte boundaries; beginning, middle
+and EOF imports; CR filtering across chunks; and all 256 binary byte values.
+They count tail moves/bytes directly and pass under host sanitizers and all
+three native runtimes. Parser/state checks pass in all three buffer profiles.
+All 27 full-buffer native cases still pass, including the 4 KiB normal and
+2 KiB minimum-CP/M held-spare budgets.
+
+All six production variants were rebuilt. Their code/load images grew only
+80-96 bytes compared with the P1 snapshot (paragraph rounding varies):
+COM is now 30,428 file bytes; DOS 1 EXE 30,942; DOS 2 EXE 30,214.
+CMD file lengths are unchanged. These changes do not reduce buffer capacities.
+
+## Production images and memory
+
+Original P1 snapshot, retained for comparison:
+
+| Binary | File bytes | Code image bytes | Data image bytes |
+|---|---:|---:|---:|
+| `vicp52.cmd` | 34,816 | 26,752 | 7,728 |
+| `vicp100.cmd` | 34,816 | 26,736 | 7,760 |
+| `vicpbios.cmd` | 35,328 | 27,152 | 7,696 |
+| `vid1bios.com` | 30,342 | Combined code/data: 30,342 | Not separately encoded |
+| `vid1bios.exe` | 30,860 | 23,456 | 6,892 |
+| `vid2bios.exe` | 30,134 | 22,832 | 6,790 |
+
+CMD image values are paragraph-rounded group lengths, not resident allocation
+limits. EXE values exclude the MZ header; the runner verifies the current Aztec
+small-model entry stub's data-segment immediate against initial SS before
+splitting the code/data load image. COM has no segment headers and is not
+artificially split. File size includes headers/alignment, and images do not
+describe all runtime heap/stack/BSS requirements.
+
+CP/M DATA reserves 61,440-65,536 bytes; EXTRA reserves 65,536 bytes without
+payload. DOS 1 COM has a combined 64 KiB near window, a 20,480-byte editing
+buffer and 32 KiB external reservation. Other editing buffers hold 38,016 bytes
+with a 64 KiB external reservation. Two 2,000-byte external screens follow the
+matching yank region. See [design.md](design.md) for reservation mechanisms.
+
+Reuse the existing full-buffer validation budgets rather than rerunning a heap
+search: **4 KiB held spare in every normal variant**, **2 KiB with minimum CP/M
+DATA**. Real DOS 1 COM/EXE boots passed with 4 KiB held on 128/256 KiB machines.
+These are tested lower bounds with the complete editing buffer allocated, not
+maximum free-heap estimates.
+
+## Existing display results, not rerun
+
+The [README display results](../README.md#display-output) remain the reference:
+BIOS bulk diff/output improved 3.23x-3.83x; a separate DOS Plus VT52 sample
+improved 1.45x. Single-cell measurements were essentially unchanged.
+They have different fixture sizes/repeat counts from this short baseline and
+must not be added to it or compared as if they were the same workload.
+Native VT100 timing is still optional follow-up.

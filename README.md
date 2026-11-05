@@ -268,6 +268,18 @@ remain identical; the improvement removes library overhead, not terminal
 traffic. No native VT100/ANSI timing result is claimed, and these are not
 whole-editor speedups.
 
+### Short performance baseline
+
+`make test-perf-pce` runs one bounded standard-speed 8088/DOS 1/CGA profile:
+load/save, middle import, beginning edit primitives, scrolling, long-line cursor
+and failed search. It records coarse ticks, fixture hashes, all six production
+image sizes and a held-spare heap budget. No display timing sweep is rerun.
+See [performance.md](docs/performance.md) for fixtures, scope, recorded values
+and JSON output. Batched imports reduce the middle-import sample from 159 to
+6 ticks (roughly 26x faster for that operation), without extra heap or scratch
+buffers. Chunk-boundary, capacity and rollback checks pass on host and all three
+native runtimes.
+
 `make test-capacity-runtime` checks unsigned byte spans, capacity rejection,
 EOF reservation and large tail copies at 32,000, 32,767, 32,768, 40,000 and
 40,064 bytes
@@ -457,11 +469,12 @@ VT-100 cursor keys send a three-byte sequence: `ESC [` followed by a letter.
 > End and PgDn arrive as bare control codes with no ESC prefix on both
 > terminal types, as sent by the IBM-PC CP/M-86 BDOS keyboard handler.
 
-### PC BIOS (`vicpbios.cmd`, `vidosX.com`)
+### PC BIOS (`vicpbios.cmd`, `vid1bios.com`, `vid1bios.exe`, `vid2bios.exe`)
 
-There's no real terminal here — `getch()` reads `INT 16h` scan codes
+On legacy CP/M and DOS, `getch()` reads `INT 16h` scan codes
 directly and synthesizes the same lone `ESC` + letter sequences as VT-52,
-so the two builds share the same escape-parsing code in `edit.c`.
+so these builds share escape-parsing code in `edit.c`. Concurrent CP/M instead
+uses the BDOS keyboard adapter described below.
 
 | Key | BIOS scan code | Synthesized sequence | vi action |
 |-----|-----------------|----------------------|-----------|

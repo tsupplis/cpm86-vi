@@ -394,7 +394,7 @@ int readfile(char *fname, char *fromp, int nochangename) /* if 1, don't change t
     char *p, *insertp = fromp;
     const char *error = NULL;
     int c;
-    unsigned n, unprint = 0;
+    unsigned n, used, space, unprint = 0;
     long remaining;
 
     snprintf(buff, sizeof buff, "Reading %s...", fname);
@@ -415,25 +415,34 @@ int readfile(char *fname, char *fromp, int nochangename) /* if 1, don't change t
 
     /* Read file into buffer until EOF or CP/M SUB char */
     n = 0;
-    while (remaining != 0L && (c = getc(f)) != EOF && (vi_binary || c != 0x1A)) {
-        if(remaining>0L) remaining--;
-        /* Skip CR; lines are terminated by LF alone internally */
-        if (!vi_binary && c == '\r') {
-            continue;
+    do {
+        used = 0;
+        space = vi_byte_span(vi_file_end, vi_file_max);
+        while (used < sizeof buff && remaining != 0L &&
+               (c = getc(f)) != EOF && (vi_binary || c != 0x1A)) {
+            if (remaining > 0L) remaining--;
+            /* Skip CR; lines are terminated by LF alone internally. */
+            if (!vi_binary && c == '\r')
+                continue;
+            if (used >= space) {
+                error = "File too long; read cancelled!";
+                break;
+            }
+            if (!(isprint(c) || isspace(c)))
+                unprint++;
+            buff[used++] = c;
         }
-        if (vi_file_end >= vi_file_max) {
-            error = "File too long; read cancelled!";
+        if (error != NULL)
             break;
+        if (used != 0) {
+            /* Reuse the status buffer; move the tail once per filtered chunk. */
+            memmove(fromp + used, fromp, vi_byte_span(fromp, vi_file_end));
+            memcpy(fromp, buff, used);
+            fromp += used;
+            vi_file_end += used;
+            n += used;
         }
-        if (!(isprint(c) || isspace(c)))
-            unprint++;
-        /* Insert the char at the current point by shifting the tail. */
-        for (p = vi_file_end; p > fromp; p--)
-            *p = *(p - 1);
-        *fromp++ = c;
-        vi_file_end++;
-        n++;
-    }
+    } while (used == sizeof buff);
     if (ferror(f))
         error = "Read/close failed; read cancelled!";
     if (fclose(f) == EOF)

@@ -18,75 +18,20 @@ command parsing, navigation and screen diffing share the same C implementation.
 
 ### Component model
 
-Arrows show calls or access through an API; dotted links represent shared state.
-The mutually exclusive console and external-memory implementations are selected
-at build time.
+Simple component overview; source-file responsibilities are listed below.
 
-<!-- mermaid-checked: no \n, no em-dash/en-dash, no {} in labels, subgraphs are id["label"], arrows are -->|"label"|, all subgraphs closed by end, ids unique -->
 ```mermaid
-flowchart LR
-    subgraph Core["Shared editor core"]
-        Main["main.c<br/>Startup, read, renderer, replay queue"]
-        Edit["edit.c<br/>Input/state parser and viewport"]
-        Normal["normal.c<br/>Commands and undo"]
-        Cmd["cmdline.c<br/>Colon/search commands and messages"]
-        Lines["linefunc.c<br/>Navigation, search, string ownership"]
-        Misc["misccmds.c<br/>Edit primitives and yank/paste"]
-        Chars["hexchars.c / help.c<br/>Byte representations and help"]
-        State["stevie.h / main.c globals<br/>Near file buffer and editor state"]
-    end
-    subgraph Boundaries["Platform and storage APIs"]
-        Window["window.c<br/>wind* output API"]
-        Keys["keyboard.c / keyos.c / os.asm<br/>Concurrent input, OS detection/restoration"]
-        Save["save.c<br/>Save and exact-length API"]
-        Yank["yankmem.c<br/>Checked external storage API"]
-    end
-    subgraph Backends["Selected backends"]
-        VT["VT52 / VT100 console<br/>Runtime write to BDOS"]
-        BIOS["PC BIOS<br/>Included video/input assembly"]
-        Files["CP/M or DOS runtime / BDOS<br/>Files and length metadata"]
-        Adapters["yankcopy.asm + platform adapter<br/>CP/M EXTRA / DOS1-owned / DOS2-allocated"]
-        External["External segment<br/>Yank bytes + REAL/NEXT screens"]
-    end
-    Main --> Edit
-    Edit --> Normal
-    Normal --> Cmd
-    Normal --> Misc
-    Normal --> Lines
-    Normal --> Chars
-    Cmd --> Lines
-    Cmd --> Main
-    Cmd --> Save
-    Edit --> Keys
-    Edit --> BIOS
-    Edit --> Main
-    Lines --> Main
-    Misc --> Main
-    Main --> Window
-    Edit --> Window
-    Cmd --> Window
-    Chars --> Window
-    Main --> Save
-    Main --> Yank
-    Misc --> Yank
-    Window --> VT
-    Window --> BIOS
-    Window --> Keys
-    Save --> Files
-    Main --> Files
-    Yank --> Adapters
-    Adapters --> External
-    Main -.-> State
-    Edit -.-> State
-    Normal -.-> State
-    Cmd -.-> State
-    Lines -.-> State
-    Misc -.-> State
+graph TD
+    Keyboard[Keyboard input] --> Commands[Commands and undo]
+    Commands --> Buffer[File buffer]
+    Commands --> Files[Read and save]
+    Files --> Disk[Disk files]
+    Files --> Buffer
+    Buffer --> Renderer[Screen renderer]
+    Renderer --> Console[BIOS or VT console]
+    Commands --> External[External yank and screen storage]
+    Renderer --> External
 ```
-
-`Main --> Files` is the input stream in `readfile()`; saving and exact-length
-queries go through `save.c`. The `Edit --> BIOS` path is legacy keyboard input;
-concurrent CP/M input goes through `keyboard.c` instead.
 
 ## Six build variants
 
@@ -197,9 +142,11 @@ swap the modified-state snapshot on undo; no extra file snapshot is allocated.
 `putline()` moves the tail once, loads external yank bytes, and rolls the tail
 back if loading fails. Paste separates terminated/unterminated lines as needed.
 
-`readfile()` still shifts the existing tail for every imported byte:
-middle `:r` costs O(import bytes x existing tail bytes). Loading an empty
-buffer has no existing tail, so it is not quadratic for this reason.
+`readfile()` stages up to 128 filtered bytes in its existing status buffer,
+then moves the existing tail once and copies the chunk into the gap.
+Middle `:r` costs O(import bytes + ceil(import bytes / 128) x existing tail
+bytes). Loading an empty buffer has no existing tail to move. No extra heap
+or scratch buffer is allocated.
 Read/close/capacity errors remove all bytes inserted by that read and restore
 the original tail and logical end. Text reads discard CR and stop at Ctrl-Z;
 binary reads use exact length metadata where supported.
@@ -292,8 +239,8 @@ streams. Existing display timing results are in the
 [README](../README.md#display-output); do not rerun all display profiles merely
 to measure unrelated CPU work.
 
-Remaining candidates are middle-import batching (P2), repeated cursor/line
-rescans and naive O(n x pattern length) search (P4), disk buffering (P5), and
+Remaining candidates are repeated cursor/line rescans and naive
+O(n x pattern length) search (P4), disk buffering (P5), and
 character-table compaction (S1). String insertion, line deletion and paste
-already use bulk tail moves. None of these candidates requires committing to
+use bulk tail moves; file imports use bounded chunks. None requires committing to
 a gap-buffer rewrite. Measure separately before trading memory for speed.

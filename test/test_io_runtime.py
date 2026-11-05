@@ -24,6 +24,7 @@ int vi_binary, vi_changed;
 static char last_output[256];
 static long fail_after = -1L;
 static int read_failed, fail_close;
+static unsigned long tail_moves, tail_bytes;
 void message(char *s) { snprintf(last_output, sizeof last_output, "%s", s); }
 char *strsave(char *s) { return s; }
 int vi_set_filename(char *s) { vi_file_name = s; return 1; }
@@ -36,6 +37,13 @@ static int test_ferror(FILE *f) { return read_failed || ferror(f); }
 static int test_fclose(FILE *f) {
     int result = fclose(f);
     return fail_close ? EOF : result;
+}
+static void *test_memmove(void *to, const void *from, size_t length) {
+    if ((char *)to > (const char *)from && length) {
+        tail_moves++;
+        tail_bytes += length;
+    }
+    return memmove(to, from, length);
 }
 #define REQUIRE(x) if (!(x)) { \
     printf("VI IO FAIL: line %d\n", __LINE__); return 1; }
@@ -64,6 +72,77 @@ static int original(unsigned length, int dirty)
     return 1;
 }
 
+static int check_chunks(void)
+{
+    static unsigned sizes[] = {127U, 128U, 129U, 255U, 256U, 257U};
+    static long failures[] = {0L, 1L, 127L, 128L, 129L, 255L, 256L, 257L};
+    unsigned s, offset, i, length;
+    unsigned long moves;
+    int dirty;
+    char name[16];
+    for (s = 0; s < sizeof sizes / sizeof sizes[0]; s++) {
+        length = sizes[s];
+        sprintf(name, "C%u.TXT", length);
+        for (offset = 0; offset <= 8; offset += 4) {
+            for (dirty = 0; dirty <= 1; dirty++) {
+                prepare(8, dirty);
+                vi_file_max = vi_file_end + length;
+                tail_moves = tail_bytes = 0;
+                REQUIRE(readfile(name, vi_file_mem + offset, 1) == 0);
+                REQUIRE(vi_file_end == vi_file_max && vi_changed == dirty);
+                REQUIRE(vi_curs_char == vi_file_mem + 5 &&
+                        vi_top_char == vi_file_mem + 1);
+                for (i = 0; i < offset; i++)
+                    REQUIRE(vi_file_mem[i] == (i < 4 ? "HEAD"[i] : 'T'));
+                for (i = 0; i < length; i++)
+                    REQUIRE(vi_file_mem[offset + i] == 'X');
+                for (i = offset; i < 8; i++)
+                    REQUIRE(vi_file_mem[length + i] == (i < 4 ? "HEAD"[i] : 'T'));
+                moves = offset == 8 ? 0 : (length + 127U) / 128U;
+                REQUIRE(tail_moves == moves && tail_bytes == moves * (8 - offset));
+
+                prepare(8, dirty);
+                vi_file_max = vi_file_end + length - 1;
+                REQUIRE(readfile(name, vi_file_mem + offset, 1) == -1);
+                REQUIRE(original(8, dirty));
+            }
+        }
+    }
+    vi_file_max = vi_file_mem + 40064U;
+    for (dirty = 0; dirty <= 1; dirty++) {
+        for (s = 0; s < sizeof failures / sizeof failures[0]; s++) {
+            prepare(8, dirty);
+            fail_after = failures[s];
+            REQUIRE(readfile("C257.TXT", vi_file_mem + 4, 1) == -1);
+            fail_after = -1L; read_failed = 0;
+            REQUIRE(original(8, dirty));
+        }
+        prepare(8, dirty);
+        fail_close = 1;
+        REQUIRE(readfile("C129.TXT", vi_file_mem + 4, 1) == -1);
+        fail_close = 0;
+        REQUIRE(original(8, dirty));
+    }
+    prepare(8, 0);
+    REQUIRE(readfile("FILTER.TXT", vi_file_mem + 4, 1) == 0);
+    REQUIRE(vi_file_end == vi_file_mem + 265U);
+    REQUIRE(!memcmp(vi_file_mem, "HEAD", 4));
+    for (i = 0; i < 256; i++)
+        REQUIRE(vi_file_mem[4 + i] == (i < 127 ? 'A' : 'B'));
+    REQUIRE(vi_file_mem[260] == '\n');
+    REQUIRE(!memcmp(vi_file_mem + 261, "TTTT", 4));
+    prepare(8, 0);
+    vi_binary = 1;
+    REQUIRE(readfile("PACKED.IN", vi_file_mem + 4, 1) == 0);
+    REQUIRE(vi_file_end == vi_file_mem + 776U);
+    REQUIRE(!memcmp(vi_file_mem, "HEAD", 4));
+    for (i = 0; i < 768; i++)
+        REQUIRE((unsigned char)vi_file_mem[4 + i] == i % 256U);
+    REQUIRE(!memcmp(vi_file_mem + 772, "TTTT", 4));
+    vi_binary = 0;
+    return 0;
+}
+
 int main(void)
 {
     static unsigned sizes[] = {32767U, 32768U, 40000U};
@@ -74,6 +153,7 @@ int main(void)
     REQUIRE(vi_file_mem != NULL);
     vi_file_max = vi_file_mem + 40064U;
     vi_binary = 0;
+    REQUIRE(check_chunks() == 0);
     for (j = 0; j < sizeof sizes / sizeof sizes[0]; j++) {
         sprintf(name, "N%u.TXT", sizes[j]);
         vi_file_end = vi_curs_char = vi_top_char = vi_file_mem;
@@ -150,6 +230,11 @@ int main(void)
 
 def verify(program, work, cpm=False):
     work.mkdir()
+    for size in (127, 128, 129, 255, 256, 257):
+        (work / f'C{size}.TXT').write_bytes(b'X' * size + b'\x1a')
+    (work / 'FILTER.TXT').write_bytes(
+        b'A' * 127 + b'\r' * 300 + b'B' * 129 + b'\r\n\x1aignored')
+    (work / 'PACKED.IN').write_bytes(bytes(range(256)) * 3)
     for size in (32767, 32768, 40000):
         (work / f'N{size}.TXT').write_bytes(b'\x01' * size + b'\x1a')
     (work / 'OVER.TXT').write_bytes(b'\x01' * 40001 + b'\x1a')
@@ -174,9 +259,10 @@ def main():
     source += '\n#undef getc\n#define getc test_getc\n'
     source += '#undef ferror\n#define ferror test_ferror\n'
     source += '#define fclose test_fclose\n'
+    source += '#define memmove test_memmove\n'
     source += function((ROOT / 'main.c').read_text(),
                        'int readfile(char *fname, char *fromp,')
-    source += '\n#undef getc\n#undef ferror\n#undef fclose\n'
+    source += '\n#undef getc\n#undef ferror\n#undef fclose\n#undef memmove\n'
     source += function((ROOT / 'cmdline.c').read_text(), 'static int writeit(char *fname)\n')
     with tempfile.TemporaryDirectory(prefix='vi-io-') as directory:
         work = Path(directory)

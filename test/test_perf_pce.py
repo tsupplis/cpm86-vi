@@ -47,7 +47,16 @@ def build_sizes():
         elif name.endswith('.exe'):
             header = struct.unpack_from('<14H', data)
             assert header[0] == 0x5a4d, name
-            entry['mz_load_image_bytes'] = len(data) - header[4] * 16
+            image_start = header[4] * 16
+            entrypoint = image_start + header[11] * 16 + header[10]
+            # These Aztec small-model stubs start with MOV BP,dataseg.
+            assert data[entrypoint] == 0xbd, name
+            data_segment = struct.unpack_from('<H', data, entrypoint + 1)[0]
+            assert data_segment == header[7] and header[11] == 0, name
+            entry['mz_load_image_bytes'] = len(data) - image_start
+            entry['code_image_bytes'] = data_segment * 16
+            entry['data_image_bytes'] = len(data) - image_start - data_segment * 16
+            assert entry['data_image_bytes'] >= 0, name
             entry['mz_initial_ss_bytes'] = header[7] * 16
             entry['mz_initial_sp'] = header[8]
         else:
@@ -106,6 +115,12 @@ def main():
         'fixtures': {name: {'bytes': len(data),
                             'sha256': hashlib.sha256(data).hexdigest()}
                      for name, data in payloads.items()},
+        'probe_sha256': hashlib.sha256(
+            (ROOT / 'test/perfprobe.c').read_bytes()).hexdigest(),
+        'machine_fixture_sha256': {
+            name: hashlib.sha256(path.read_bytes()).hexdigest()
+            for name, path in (('boot_image', dos / 'pcdos_base.img'),
+                               ('source_config', dos / 'pcdos.cfg'))},
         'results': results,
         'held_spare_heap_bytes': 4096,
         'production_builds': sizes,
