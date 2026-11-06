@@ -1,17 +1,15 @@
-CC     = aztec42_cc
-STRIP  = aztec42_sqz
-AS     = aztec42_as
-LD     = aztec42_link
+CC     = aztec42_acc
+LD     = aztec42_acc
 CMDMOD = pcdev_cmdmod
-CPM86_LDFLAGS = -lc86
-DOS11_LDFLAGS = -ld11
-DOS20_LDFLAGS = -lc
+CPM86_LDFLAGS = -target=cpm86
+DOS11_LDFLAGS = -target=dos1
+DOS20_LDFLAGS = -target=dos2
 RM=rm -f
 
 # Flags common to both CP/M-86 builds
-CFLAGS = -I. +F +0
-DOS_CFLAGS = -I. +F +0 -D__PCBIOS__
-PCBIOS_CFLAGS = -I. +F +0 -D__PCBIOS__
+CFLAGS = -I. -squeeze
+DOS_CFLAGS = -I. -squeeze -D__PCBIOS__
+PCBIOS_CFLAGS = -I. -squeeze -D__PCBIOS__
 
 GIT_VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo unknown)
 
@@ -40,42 +38,30 @@ all: vicp52.cmd vicp100.cmd vicpbios.cmd \
 # Link targets
 # --------------------------------------------------------------------
 vicp52.cmd: $(SHARED_OBJS) yankcp.o cmdline.o savecp.o edtcp52.o wincp52.o keycp.o keyos.o os.o
-	printf '%s\n' '-o $@ $(filter %.o,$^)' > $(basename $@).lnk
-	$(LD) -f $(basename $@).lnk $(CPM86_LDFLAGS)
+	$(LD) $(CPM86_LDFLAGS) -o $@ $(filter %.o,$^)
 	$(CMDMOD) -t DATA -n f000 -m 10000 $@ 1
 	$(CMDMOD) -t EXTRA -n 10000 -m 10000 $@ 2
-	$(RM) $(basename $@).lnk
 
 vicp100.cmd: $(SHARED_OBJS) yankcp.o cmdline.o savecp.o edtcp100.o wincp100.o keycp.o keyos.o os.o
-	printf '%s\n' '-o $@ $(filter %.o,$^)' > $(basename $@).lnk
-	$(LD) -f $(basename $@).lnk $(CPM86_LDFLAGS)
+	$(LD) $(CPM86_LDFLAGS) -o $@ $(filter %.o,$^)
 	$(CMDMOD) -t DATA -n f000 -m 10000 $@ 1
 	$(CMDMOD) -t EXTRA -n 10000 -m 10000 $@ 2
-	$(RM) $(basename $@).lnk
 
 vid1bios.com: $(TINY_OBJS) yankcopy.o yankd1c.o
-	printf '%s\n' '-o $@ $^' > $(basename $@).lnk
-	$(LD) -f $(basename $@).lnk $(DOS11_LDFLAGS)
-	$(RM) $(basename $@).lnk
+	$(LD) $(DOS11_LDFLAGS) -o $@ $^
 
 vid1bios.exe: $(SHARED_OBJS) yankd11.o cmddos.o savedos.o edtd1bio.o wind1bio.o keydos.o
-	printf '%s\n' '-o $@ $^' > $(basename $@).lnk
-	$(LD) -f $(basename $@).lnk $(DOS11_LDFLAGS)
-	$(RM) $(basename $@).lnk
+	$(LD) $(DOS11_LDFLAGS) -o $@ $^
 
 vid2bios.exe: $(SHARED_OBJS) yankd20.o cmddos.o savedos.o edtd2bio.o wind2bio.o keydos.o
-	printf '%s\n' '-o $@ $^' > $(basename $@).lnk
-	$(LD) -f $(basename $@).lnk $(DOS20_LDFLAGS)
-	$(RM) $(basename $@).lnk
+	$(LD) $(DOS20_LDFLAGS) -o $@ $^
 
 # CP/M-86 binary using the PC BIOS window/keyboard implementation (no VT
 # escape codes, no BDOS console I/O) instead of the DOS API.
 vicpbios.cmd: $(SHARED_OBJS) yankcp.o cmdline.o savecp.o edtcpbio.o wincpbio.o keycp.o keyos.o os.o
-	printf '%s\n' '-o $@ $(filter %.o,$^)' > $(basename $@).lnk
-	$(LD) -f $(basename $@).lnk $(CPM86_LDFLAGS)
+	$(LD) $(CPM86_LDFLAGS) -o $@ $(filter %.o,$^)
 	$(CMDMOD) -t DATA -n f000 -m 10000 $@ 1
 	$(CMDMOD) -t EXTRA -n 10000 -m 10000 $@ 2
-	$(RM) $(basename $@).lnk
 
 vicp52.cmd vicp100.cmd vicpbios.cmd: Makefile
 
@@ -85,23 +71,17 @@ vicp52.cmd vicp100.cmd vicpbios.cmd: Makefile
 # --------------------------------------------------------------------
 
 curstest.cmd: curstest.o wincpbio.o keycp.o keyos.o os.o
-	printf '%s\n' '-o $@ $(filter %.o,$^)' > $(basename $@).lnk
-	$(LD) -f $(basename $@).lnk $(CPM86_LDFLAGS)
-	$(RM) $(basename $@).lnk
+	$(LD) $(CPM86_LDFLAGS) -o $@ $(filter %.o,$^)
 
 curstest.o: curstest.c
-	$(CC) $(CFLAGS) -o $@ curstest.c
-	$(STRIP) $@
+	$(CC) $(CFLAGS) -c -o $@ curstest.c
 
 # Same diagnostic, linked for plain DOS, for direct comparison.
 curstest.com: curstestdos.o wind1bio.o keydos.o
-	printf '%s\n' '-o $@ $^' > $(basename $@).lnk
-	$(LD) -f $(basename $@).lnk $(DOS11_LDFLAGS)
-	$(RM) $(basename $@).lnk
+	$(LD) $(DOS11_LDFLAGS) -o $@ $^
 
 curstestdos.o: curstest.c
-	$(CC) $(CFLAGS) -D__PCBIOS__ -D__PCDOS__==11 -o $@ $^
-	$(STRIP) $@
+	$(CC) $(CFLAGS) -D__PCBIOS__ -D__PCDOS__==11 -c -o $@ $^
 
 # --------------------------------------------------------------------
 # edit.c and window.c – two variants each
@@ -109,43 +89,33 @@ curstestdos.o: curstest.c
 
 edtcp52.o: edit.c
 	$(CC) $(CFLAGS) -D__CPM86__ -D__VTCMD__ -D__VT52__ -c -o $@ $<
-	$(STRIP) $@
 
 wincp52.o: window.c gitver.h
 	$(CC) $(CFLAGS) -D__CPM86__ -D__VTCMD__ -D__VT52__ -c -o $@ $<
-	$(STRIP) $@
 
 edtcp100.o: edit.c
 	$(CC) $(CFLAGS) -D__CPM86__ -D__VTCMD__ -D__VT100__ -c -o $@ $<
-	$(STRIP) $@
 
 wincp100.o: window.c gitver.h
 	$(CC) $(CFLAGS) -D__CPM86__ -D__VTCMD__ -D__VT100__ -c -o $@ $<
-	$(STRIP) $@
 
 edtd1bio.o: edit.c
 	$(CC) $(DOS_CFLAGS) -D__PCDOS__=11 -D__PCBIOS__ -c -o $@ $<
-	$(STRIP) $@
 
 wind1bio.o: window.c gitver.h
 	$(CC) $(CFLAGS) -D__PCDOS__=11 -D__PCBIOS__ -c -o $@ $<
-	$(STRIP) $@
 
 edtd2bio.o: edit.c
 	$(CC) $(CFLAGS) -D__PCDOS__=20 -D__PCBIOS__ -c -o $@ $<
-	$(STRIP) $@
 
 wind2bio.o: window.c gitver.h
 	$(CC) $(CFLAGS) -D__PCDOS__=20 -D__PCBIOS__ -c -o $@ $<
-	$(STRIP) $@
 
 edtcpbio.o: edit.c
 	$(CC) $(CFLAGS) -D__CPM86__ -D__PCBIOS__ -c -o $@ $<
-	$(STRIP) $@
 
 wincpbio.o: window.c gitver.h
 	$(CC) $(CFLAGS) -D__CPM86__ -D__PCBIOS__ -c -o $@ $<
-	$(STRIP) $@
 
 # Checked against the current git state on every build, but only actually
 # rewritten (touching its mtime) if the version string changed -- otherwise
@@ -161,24 +131,19 @@ FORCE:
 # Shared object rules
 # --------------------------------------------------------------------
 cmdline.o: cmdline.c
-	$(CC) $(CFLAGS) -D__CPM86__ -o $@ cmdline.c
-	$(STRIP) $@
+	$(CC) $(CFLAGS) -D__CPM86__ -c -o $@ cmdline.c
 
 help.o: help.c
-	$(CC) $(CFLAGS) -o $@ help.c
-	$(STRIP) $@
+	$(CC) $(CFLAGS) -c -o $@ help.c
 
 hexchars.o: hexchars.c
-	$(CC) $(CFLAGS) -o $@ hexchars.c
-	$(STRIP) $@
+	$(CC) $(CFLAGS) -c -o $@ hexchars.c
 
 linefunc.o: linefunc.c
-	$(CC) $(CFLAGS) -o $@ linefunc.c
-	$(STRIP) $@
+	$(CC) $(CFLAGS) -c -o $@ linefunc.c
 
 main.o: main.c
-	$(CC) $(CFLAGS) -o $@ main.c
-	$(STRIP) $@
+	$(CC) $(CFLAGS) -c -o $@ main.c
 
 helpd1.o: help.c
 hexd1.o: hexchars.c
@@ -195,18 +160,15 @@ keytiny.o: keyboard.c
 
 # Tiny C objects never share compilation with the full-featured formats.
 $(TINY_OBJS): stevie.h keyboard.h yankmem.h save.h Makefile
-	$(CC) $(CFLAGS) -DVI_TINY -DVI_DOS1_COM -D__PCDOS__=11 -D__PCBIOS__ -o $@ $(filter %.c,$^)
-	$(STRIP) $@
+	$(CC) $(CFLAGS) -DVI_TINY -DVI_DOS1_COM -D__PCDOS__=11 -D__PCBIOS__ -c -o $@ $(filter %.c,$^)
 
 wintiny.o: gitver.h windrun.asm
 
 misccmds.o: misccmds.c
-	$(CC) $(CFLAGS) -o $@ misccmds.c
-	$(STRIP) $@
+	$(CC) $(CFLAGS) -c -o $@ misccmds.c
 
 normal.o: normal.c
-	$(CC) $(CFLAGS) -o $@ normal.c
-	$(STRIP) $@
+	$(CC) $(CFLAGS) -c -o $@ normal.c
 
 cpmtest.img: vicp52.cmd vicp100.cmd vicpbios.cmd cpmbase.img test.txt \
     vid1bios.com vid2bios.exe
@@ -273,32 +235,25 @@ wincp52.o wincp100.o wincpbio.o: keyos.h
 wincpbio.o wind1bio.o wind2bio.o: windrun.asm
 
 keycp.o: keyboard.c keyboard.h keyos.h
-	$(CC) $(CFLAGS) -D__CPM86__ -o $@ keyboard.c
-	$(STRIP) $@
+	$(CC) $(CFLAGS) -D__CPM86__ -c -o $@ keyboard.c
 
 keydos.o: keyboard.c keyboard.h
-	$(CC) $(CFLAGS) -o $@ keyboard.c
-	$(STRIP) $@
+	$(CC) $(CFLAGS) -c -o $@ keyboard.c
 
 keyos.o: keyos.c keyos.h
-	$(CC) $(CFLAGS) -o $@ keyos.c
-	$(STRIP) $@
+	$(CC) $(CFLAGS) -c -o $@ keyos.c
 
 os.o: os.asm
-	$(AS) $<
-	$(STRIP) $@
+	$(CC) $(CFLAGS) -c -o $@ $<
 
 yankmem.o: yankmem.c yankmem.h
-	$(CC) $(CFLAGS) -o $@ yankmem.c
-	$(STRIP) $@
+	$(CC) $(CFLAGS) -c -o $@ yankmem.c
 
 yankcopy.o yankcp.o yankd11.o yankd20.o: %.o: %.asm
-	$(AS) $<
-	$(STRIP) $@
+	$(CC) $(CFLAGS) -c -o $@ $<
 
 yankd1c.o: yankd1c.asm yankd11.asm
-	$(AS) yankd1c.asm
-	$(STRIP) $@
+	$(CC) $(CFLAGS) -c -o $@ yankd1c.asm
 
 main.o misccmds.o: yankmem.h
 
@@ -316,14 +271,11 @@ test-scroll:
 
 # Save policy must match the linked runtime; never share the CP/M command object.
 cmddos.o: cmdline.c save.h
-	$(CC) $(CFLAGS) -o $@ cmdline.c
-	$(STRIP) $@
+	$(CC) $(CFLAGS) -c -o $@ cmdline.c
 savecp.o: save.c save.h
-	$(CC) $(CFLAGS) -D__CPM86__ -o $@ save.c
-	$(STRIP) $@
+	$(CC) $(CFLAGS) -D__CPM86__ -c -o $@ save.c
 savedos.o: save.c save.h
-	$(CC) $(CFLAGS) -o $@ save.c
-	$(STRIP) $@
+	$(CC) $(CFLAGS) -c -o $@ save.c
 cmdline.o: save.h
 
 .PHONY: test-save test-save-runtime test-save-pce
