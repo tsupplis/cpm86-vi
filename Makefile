@@ -1,5 +1,5 @@
-CC     = aztec42_acc
-LD     = aztec42_acc
+CC     = aztec43_acc
+LD     = aztec43_acc
 CMDMOD = pcdev_cmdmod
 CPM86_LDFLAGS = -target=cpm86
 DOS11_LDFLAGS = -target=dos1
