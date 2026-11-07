@@ -320,10 +320,10 @@ def main():
         result = run([str(work / 'nav-host')], work)
         assert 'VI NAVIGATION PASS: 0 failures' in result.stdout, result.stdout
         print('NAVIGATION PASS: host sanitizers', flush=True)
-        run(['aztec42_cc', '-I.', '+F', '+0', '-o', 'nav.o', 'nav.c'], work)
-        for library, extension in (('c86', 'cmd'), ('d11', 'com'), ('c', 'exe')):
+        run(['aztec43_acc', '-I.', '-squeeze', '-c', '-o', 'nav.o', 'nav.c'], work)
+        for target_flag, extension, library in (('-target=cpm86', 'cmd', 'c86'), ('-target=dos1', 'com', 'd11'), ('-target=dos2', 'exe', 'c')):
             program = 'nav.' + extension
-            run(['aztec42_link', '-o', program, 'nav.o', '-l' + library], work)
+            run(['aztec43_acc', target_flag, '-o', program, 'nav.o'], work)
             result = run([os.environ.get('EMU2', 'emu2'), program], work)
             assert 'VI NAVIGATION PASS: 0 failures' in result.stdout, result.stdout
             print('NAVIGATION PASS:', library, '(large search, lines, columns, counts)',

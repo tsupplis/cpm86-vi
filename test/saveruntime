@@ -16,17 +16,16 @@ if [ -z "${SAVE_EMULATOR:-}" ]; then
     SAVE_EMULATOR="$work/emulator/emu2"
 fi
 cd "$work"
-"$bin/aztec42_as" os.asm
+"$bin/aztec43_acc" -c -o os.o os.asm
 for target in c d11 c86; do
-    flags=
     case $target in
-        c) output=save.exe; extra=;;
-        d11) output=save.com; extra=;;
-        c86) output=save.cmd; flags=-D__CPM86__; extra=os.o;;
+        c) output=save.exe; target_flag=-target=dos2; extra=;;
+        d11) output=save.com; target_flag=-target=dos1; extra=;;
+        c86) output=save.cmd; target_flag=-target=cpm86; extra=os.o;;
     esac
-    "$bin/aztec42_cc" -I. +F +0 $flags -o save.o save.c
-    "$bin/aztec42_cc" -I. +F +0 $flags -o probe.o saveprobe.c
-    "$bin/aztec42_link" -o "$output" probe.o save.o $extra -l"$target"
+    "$bin/aztec43_acc" $target_flag -I. -squeeze -c -o save.o save.c
+    "$bin/aztec43_acc" $target_flag -I. -squeeze -c -o probe.o saveprobe.c
+    "$bin/aztec43_acc" $target_flag -o "$output" probe.o save.o $extra
     output_text=$(EMU2_CPM_VER=2.2 "$SAVE_EMULATOR" "$output")
     printf '%s\n' "$output_text"
     printf '%s\n' "$output_text" | tr -d '\r' | grep -qx 'VI SAVE PASS: 0 failures'

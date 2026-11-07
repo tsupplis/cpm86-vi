@@ -17,7 +17,7 @@ static void filealloc(void);
 static void screenalloc(void);
 static void screenerror(void);
 
-#ifdef VI_DOS1_COM
+#if defined(VI_TINY) && defined(__MSDOS__) && __MSDOS__==1
 #define FILELENG 20480U
 #else
 #define FILELENG 42112U

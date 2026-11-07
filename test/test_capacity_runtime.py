@@ -131,10 +131,10 @@ def main():
         result = run([str(work / 'capacity-host')], work)
         assert 'VI CAPACITY PASS: 0 failures' in result.stdout, result.stdout
         print('CAPACITY PASS: host sanitizers', flush=True)
-        run(['aztec42_cc', '-I.', '+F', '+0', '-o', 'capacity.o', 'capacity.c'], work)
-        for library, extension in (('c86', 'cmd'), ('d11', 'com'), ('c', 'exe')):
+        run(['aztec43_acc', '-I.', '-squeeze', '-c', '-o', 'capacity.o', 'capacity.c'], work)
+        for target_flag, extension, library in (('-target=cpm86', 'cmd', 'c86'), ('-target=dos1', 'com', 'd11'), ('-target=dos2', 'exe', 'c')):
             program = 'capacity.' + extension
-            run(['aztec42_link', '-o', program, 'capacity.o', '-l' + library], work)
+            run(['aztec43_acc', target_flag, '-o', program, 'capacity.o'], work)
             result = run([os.environ.get('EMU2', 'emu2'), program], work)
             assert 'VI CAPACITY PASS: 0 failures' in result.stdout, result.stdout
             print('CAPACITY PASS:', library, '(32000/32767/32768/40000/40064/42112 bytes)',

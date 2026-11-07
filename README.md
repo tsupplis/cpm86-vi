@@ -55,7 +55,7 @@ emulator, no ANSI.SYS required.
 ## Building
 
 Requires the Aztec C 86 cross-development toolchain
-(`aztec42_cc`, `aztec42_link`, `aztec42_sqz`) on the PATH, available from
+(`aztec43_acc`) on the PATH, available from
 [tsupplis/cpm86-crossdev](https://github.com/tsupplis/cpm86-crossdev),
 plus `pcdev_cmdmod` for the CP/M EXTRA-group reservation,
 and **cpmtools** (`cpmcp`, `cpmrm`, `cpmls`) for CP/M-86 disk image
@@ -562,7 +562,7 @@ uses the BDOS keyboard adapter described below.
 
 ## Requirements
 
-- **Aztec C 86 v4.2** cross-compiler (`aztec42_cc`, `aztec42_link`, `aztec42_sqz`) —
+- **Aztec C 86 v4.3** compiler driver (`aztec43_acc`) —
   from [tsupplis/cpm86-crossdev](https://github.com/tsupplis/cpm86-crossdev)
 - **cpmtools** (`cpmcp`, `cpmrm`, `cpmls`) to manage CP/M-86 disk images
 - **mtools** (`mcopy`, `mdir`) to manage the DOS 1.1 disk image (`dostest.img`)

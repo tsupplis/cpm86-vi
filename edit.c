@@ -7,6 +7,10 @@
 #include "stevie.h"
 #include "keyboard.h"
 
+#if defined(__MSDOS__)
+#define __PCBIOS__
+#endif
+
 static void donormal(int c);
 static void insertchar(int c);
 static int insertroom(int n, int reserve_eof);

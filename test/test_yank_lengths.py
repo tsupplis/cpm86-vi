@@ -274,15 +274,16 @@ def main():
         result = run([str(work / 'length-host')], work)
         assert 'VI YANK LENGTH PASS: 0 failures' in result.stdout, result.stdout
         print('YANK LENGTH PASS: host sanitizers', flush=True)
-        run(['aztec42_cc', '-I.', '+F', '+0', '-o', 'length.o', 'length.c'], work)
-        run(['aztec42_as', 'yankcopy.asm'], work)
-        for library, adapter, extension in (
-                ('c86', 'yankcp', 'cmd'), ('d11', 'yankd11', 'exe'),
-                ('c', 'yankd20', 'exe')):
-            run(['aztec42_as', adapter + '.asm'], work)
+        run(['aztec43_acc', '-I.', '-squeeze', '-c', '-o', 'length.o', 'length.c'], work)
+        run(['aztec43_acc', '-c', '-o', 'yankcopy.o', 'yankcopy.asm'], work)
+        for target_flag, adapter, extension, library in (
+                ('-target=cpm86', 'yankcp', 'cmd', 'c86'),
+                ('-target=dos1', 'yankd11', 'exe', 'd11'),
+                ('-target=dos2', 'yankd20', 'exe', 'c')):
+            run(['aztec43_acc', '-c', '-o', adapter + '.o', adapter + '.asm'], work)
             program = 'length.' + extension
-            run(['aztec42_link', '-o', program, 'length.o', 'yankcopy.o',
-                 adapter + '.o', '-l' + library], work)
+            run(['aztec43_acc', target_flag, '-o', program, 'length.o', 'yankcopy.o',
+                 adapter + '.o'], work)
             if extension == 'cmd':
                 run(['pcdev_cmdmod', '-t', 'EXTRA', '-n', '10000',
                      '-m', '10000', program, '2'], work)

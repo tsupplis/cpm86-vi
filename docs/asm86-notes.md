@@ -1,6 +1,6 @@
 # Aztec C86 v4.10d inline assembly rules (verified empirically via asmtest.c)
 
-Toolchain: aztec42_cc/aztec42_link (cpm86-crossdev), run under emu2.
+Toolchain: aztec43_acc (cpm86-crossdev), run under emu2.
 
 - Syntax: `#asm` / `#endasm` blocks (not `asm(...)`).
 - Function return value: leave result in AX before `#endasm` (or `return var;`

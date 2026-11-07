@@ -12,9 +12,13 @@
 #include "gitver.h"
 #include "keyboard.h"
 
+#ifdef __MSDOS__
+#define __PCBIOS__
+#endif
+
 /* Build-variant version string for the ":v" command; lives here since
  * window.c is already compiled once per variant with the right macros.
- * Hierarchical: OS first (__CPM86__ / __PCDOS__=11 / __PCDOS__=20), then
+ * Hierarchical: OS first (__CPM86__ / __MSDOS__=1 / __MSDOS__=2), then
  * screen/keyboard technique within it. */
 char *viversion(void)
 {
@@ -30,13 +34,13 @@ char *viversion(void)
 #else
 	sprintf(buf, "VI for CP/M-86 %s (unknown mode)", GIT_VERSION);
 #endif
-#elif defined(__PCDOS__) && __PCDOS__==11
+#elif defined(__MSDOS__) && __MSDOS__==1
 #if defined(__PCBIOS__)
 	sprintf(buf, "VI for PC-DOS 1.1 %s (bios mode)", GIT_VERSION);
 #else
 	sprintf(buf, "VI for PC-DOS 1.1 %s (unknown mode)", GIT_VERSION);
 #endif
-#elif defined(__PCDOS__) && __PCDOS__==20
+#elif defined(__MSDOS__) && __MSDOS__==2
 #if defined(__PCBIOS__)
 	sprintf(buf, "VI for PC-DOS 2.0 %s (bios mode)", GIT_VERSION);
 #else

@@ -279,15 +279,13 @@ def main():
              '-Ihost-headers', '-I.', 'io.c', 'save.c', '-o', 'io-host'], work)
         verify([str(work / 'io-host')], work / 'host')
         print('IO PASS: host sanitizers', flush=True)
-        run(['aztec42_as', 'os.asm'], work)
-        run(['aztec42_cc', '-I.', '+F', '+0', '-o', 'io.o', 'io.c'], work)
-        for library, extension in (('c86', 'cmd'), ('d11', 'com'), ('c', 'exe')):
-            flags = ['-D__CPM86__'] if library == 'c86' else []
+        run(['aztec43_acc', '-c', '-o', 'os.o', 'os.asm'], work)
+        run(['aztec43_acc', '-I.', '-squeeze', '-c', '-o', 'io.o', 'io.c'], work)
+        for target_flag, extension, library in (('-target=cpm86', 'cmd', 'c86'), ('-target=dos1', 'com', 'd11'), ('-target=dos2', 'exe', 'c')):
             extra = ['os.o'] if library == 'c86' else []
-            run(['aztec42_cc', '-I.', '+F', '+0', *flags, '-o', 'save.o', 'save.c'], work)
+            run(['aztec43_acc', target_flag, '-I.', '-squeeze', '-c', '-o', 'save.o', 'save.c'], work)
             program = 'io.' + extension
-            run(['aztec42_link', '-o', program, 'io.o', 'save.o',
-                 *extra, '-l' + library], work)
+            run(['aztec43_acc', target_flag, '-o', program, 'io.o', 'save.o', *extra], work)
             verify([os.environ.get('EMU2', 'emu2'), str(work / program)],
                    work / library, cpm=library == 'c86')
             print('IO PASS:', library, '(large counts, rollback, 80000-byte text save)',

@@ -8,8 +8,6 @@ RM=rm -f
 
 # Flags common to both CP/M-86 builds
 CFLAGS = -I. -squeeze
-DOS_CFLAGS = -I. -squeeze -D__PCBIOS__
-PCBIOS_CFLAGS = -I. -squeeze -D__PCBIOS__
 
 GIT_VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo unknown)
 
@@ -81,41 +79,41 @@ curstest.com: curstestdos.o wind1bio.o keydos.o
 	$(LD) $(DOS11_LDFLAGS) -o $@ $^
 
 curstestdos.o: curstest.c
-	$(CC) $(CFLAGS) -D__PCBIOS__ -D__PCDOS__==11 -c -o $@ $^
+	$(CC) $(CFLAGS) -target=dos1 -c -o $@ $^
 
 # --------------------------------------------------------------------
 # edit.c and window.c – two variants each
 # --------------------------------------------------------------------
 
 edtcp52.o: edit.c
-	$(CC) $(CFLAGS) -D__CPM86__ -D__VTCMD__ -D__VT52__ -c -o $@ $<
+	$(CC) $(CFLAGS) -target=cpm86 -D__VTCMD__ -D__VT52__ -c -o $@ $<
 
 wincp52.o: window.c gitver.h
-	$(CC) $(CFLAGS) -D__CPM86__ -D__VTCMD__ -D__VT52__ -c -o $@ $<
+	$(CC) $(CFLAGS) -target=cpm86 -D__VTCMD__ -D__VT52__ -c -o $@ $<
 
 edtcp100.o: edit.c
-	$(CC) $(CFLAGS) -D__CPM86__ -D__VTCMD__ -D__VT100__ -c -o $@ $<
+	$(CC) $(CFLAGS) -target=cpm86 -D__VTCMD__ -D__VT100__ -c -o $@ $<
 
 wincp100.o: window.c gitver.h
-	$(CC) $(CFLAGS) -D__CPM86__ -D__VTCMD__ -D__VT100__ -c -o $@ $<
+	$(CC) $(CFLAGS) -target=cpm86 -D__VTCMD__ -D__VT100__ -c -o $@ $<
 
 edtd1bio.o: edit.c
-	$(CC) $(DOS_CFLAGS) -D__PCDOS__=11 -D__PCBIOS__ -c -o $@ $<
+	$(CC) $(CFLAGS) -target=dos1 -c -o $@ $<
 
 wind1bio.o: window.c gitver.h
-	$(CC) $(CFLAGS) -D__PCDOS__=11 -D__PCBIOS__ -c -o $@ $<
+	$(CC) $(CFLAGS) -target=dos1 -c -o $@ $<
 
 edtd2bio.o: edit.c
-	$(CC) $(CFLAGS) -D__PCDOS__=20 -D__PCBIOS__ -c -o $@ $<
+	$(CC) $(CFLAGS) -target=dos2 -c -o $@ $<
 
 wind2bio.o: window.c gitver.h
-	$(CC) $(CFLAGS) -D__PCDOS__=20 -D__PCBIOS__ -c -o $@ $<
+	$(CC) $(CFLAGS) -target=dos2 -c -o $@ $<
 
 edtcpbio.o: edit.c
-	$(CC) $(CFLAGS) -D__CPM86__ -D__PCBIOS__ -c -o $@ $<
+	$(CC) $(CFLAGS) -target=cpm86 -D__PCBIOS__ -c -o $@ $<
 
 wincpbio.o: window.c gitver.h
-	$(CC) $(CFLAGS) -D__CPM86__ -D__PCBIOS__ -c -o $@ $<
+	$(CC) $(CFLAGS) -target=cpm86 -D__PCBIOS__ -c -o $@ $<
 
 # Checked against the current git state on every build, but only actually
 # rewritten (touching its mtime) if the version string changed -- otherwise
@@ -131,7 +129,7 @@ FORCE:
 # Shared object rules
 # --------------------------------------------------------------------
 cmdline.o: cmdline.c
-	$(CC) $(CFLAGS) -D__CPM86__ -c -o $@ cmdline.c
+	$(CC) $(CFLAGS) -target=cpm86 -c -o $@ cmdline.c
 
 help.o: help.c
 	$(CC) $(CFLAGS) -c -o $@ help.c
@@ -160,7 +158,7 @@ keytiny.o: keyboard.c
 
 # Tiny C objects never share compilation with the full-featured formats.
 $(TINY_OBJS): stevie.h keyboard.h yankmem.h save.h Makefile
-	$(CC) $(CFLAGS) -DVI_TINY -DVI_DOS1_COM -D__PCDOS__=11 -D__PCBIOS__ -c -o $@ $(filter %.c,$^)
+	$(CC) $(CFLAGS) -DVI_TINY -target=dos1 -c -o $@ $(filter %.c,$^)
 
 wintiny.o: gitver.h windrun.asm
 
@@ -230,12 +228,14 @@ dosplustest: cpmtest.img
 	./dosplus
 
 main.o edtcp52.o edtcp100.o edtcpbio.o edtd1bio.o edtd2bio.o wincp52.o wincp100.o wincpbio.o wind1bio.o wind2bio.o: keyboard.h
+main.o: save.h
+
 $(SHARED_OBJS) cmdline.o cmddos.o edtcp52.o edtcp100.o edtcpbio.o edtd1bio.o edtd2bio.o wincp52.o wincp100.o wincpbio.o wind1bio.o wind2bio.o: stevie.h
 wincp52.o wincp100.o wincpbio.o: keyos.h
 wincpbio.o wind1bio.o wind2bio.o: windrun.asm
 
 keycp.o: keyboard.c keyboard.h keyos.h
-	$(CC) $(CFLAGS) -D__CPM86__ -c -o $@ keyboard.c
+	$(CC) $(CFLAGS) -target=cpm86 -c -o $@ keyboard.c
 
 keydos.o: keyboard.c keyboard.h
 	$(CC) $(CFLAGS) -c -o $@ keyboard.c
@@ -273,7 +273,7 @@ test-scroll:
 cmddos.o: cmdline.c save.h
 	$(CC) $(CFLAGS) -c -o $@ cmdline.c
 savecp.o: save.c save.h
-	$(CC) $(CFLAGS) -D__CPM86__ -c -o $@ save.c
+	$(CC) $(CFLAGS) -target=cpm86 -c -o $@ save.c
 savedos.o: save.c save.h
 	$(CC) $(CFLAGS) -c -o $@ save.c
 cmdline.o: save.h
@@ -285,7 +285,6 @@ test-save-runtime:
 	sh test/saveruntime
 test-save-pce:
 	python3 test/test_save_pce.py
-main.o: save.h
 
 .PHONY: test-editor-state
 test-editor-state:

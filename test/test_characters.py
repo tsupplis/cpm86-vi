@@ -193,12 +193,11 @@ def main():
             os.environ['TMPDIR'] = compiler
             try:
                 for source in ('check', 'hexchars'):
-                    run(['aztec42_cc', '-I.', '+F', '+0', '-o', source + '.o',
+                    run(['aztec43_acc', '-I.', '-squeeze', '-c', '-o', source + '.o',
                          source + '.c'], work)
-                for library, extension in (('c86', 'cmd'), ('d11', 'com'), ('c', 'exe')):
+                for target_flag, extension, library in (('-target=cpm86', 'cmd', 'c86'), ('-target=dos1', 'com', 'd11'), ('-target=dos2', 'exe', 'c')):
                     program = 'check.' + extension
-                    run(['aztec42_link', '-o', program, 'check.o', 'hexchars.o',
-                         '-l' + library], work)
+                    run(['aztec43_acc', target_flag, '-o', program, 'check.o', 'hexchars.o'], work)
                     result = run([os.environ.get('EMU2', 'emu2'), program], work)
                     assert 'VI CHARACTERS PASS' in result.stdout, result.stdout
                     print('CHARACTERS PASS:', library, flush=True)

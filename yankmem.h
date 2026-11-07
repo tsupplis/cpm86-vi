@@ -1,7 +1,7 @@
 #ifndef VI_YANKMEM_H
 #define VI_YANKMEM_H
 
-#ifdef VI_DOS1_COM
+#if defined(VI_TINY) && defined(__MSDOS__) && __MSDOS__==1
 #define VI_YANK_CAPACITY 20480U
 #else
 #define VI_YANK_CAPACITY 42112U

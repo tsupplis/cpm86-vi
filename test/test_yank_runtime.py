@@ -28,20 +28,20 @@ def main():
         shutil.copyfile(ROOT / 'test/yankprobe.c', work / 'yankprobe.c')
         try:
             for source in ('yankcopy', 'yankcp', 'yankd11', 'yankd1c', 'yankd20'):
-                run(['aztec42_as', source + '.asm'], work)
+                run(['aztec43_acc', '-c', '-o', source + '.o', source + '.asm'], work)
             for source in ('yankmem', 'yankprobe'):
-                run(['aztec42_cc', '-I.', '+F', '+0', '-o', source + '.o',
+                run(['aztec43_acc', '-I.', '-squeeze', '-c', '-o', source + '.o',
                      source + '.c'], work)
-            run(['aztec42_cc', '-I.', '+F', '+0', '-DVI_DOS1_COM',
-                 '-o', 'yankpc.o', 'yankprobe.c'], work)
-            for library, adapter, output, capacity in (
-                    ('c86', 'yankcp', 'yank.cmd', 42112),
-                    ('d11', 'yankd11', 'yank11.exe', 42112),
-                    ('d11', 'yankd1c', 'yank11.com', 20480),
-                    ('c', 'yankd20', 'yank.exe', 42112)):
+            run(['aztec43_acc', '-I.', '-squeeze', '-DVI_DOS1_COM',
+                 '-c', '-o', 'yankpc.o', 'yankprobe.c'], work)
+            for target_flag, adapter, output, capacity in (
+                    ('-target=cpm86', 'yankcp', 'yank.cmd', 42112),
+                    ('-target=dos1', 'yankd11', 'yank11.exe', 42112),
+                    ('-target=dos1', 'yankd1c', 'yank11.com', 20480),
+                    ('-target=dos2', 'yankd20', 'yank.exe', 42112)):
                 probe = 'yankpc.o' if output.endswith('.com') else 'yankprobe.o'
-                run(['aztec42_link', '-o', output, probe, 'yankmem.o',
-                     'yankcopy.o', adapter + '.o', '-l' + library], work)
+                run(['aztec43_acc', target_flag, '-o', output, probe, 'yankmem.o',
+                     'yankcopy.o', adapter + '.o'], work)
                 if output.endswith('.cmd'):
                     rejected = run(['emu2', output, 'REJECT'], work)
                     assert 'VI YANK INIT REJECTED' in rejected.stdout
