@@ -94,7 +94,7 @@ int main(int argc, char **argv) {
         else
             REQUIRE(0);
     }
-#ifdef VI_DOS1_COM
+#if defined(VI_TINY) && defined(__MSDOS__) && __MSDOS__==1
     spare_size = 4096;
     REQUIRE(FILELENG == 20480U);
 #else
