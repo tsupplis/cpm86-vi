@@ -1230,7 +1230,7 @@ int main(int argc, char **argv) {
 
 def main():
     source = (ROOT / 'main.c').read_text()
-    globals_ = source[source.index('#ifdef VI_DOS1_COM'):source.index('int main(')]
+    globals_ = source[source.index('#if defined(VI_TINY)'):source.index('int main(')]
     readfile = function(source, 'int readfile(char *fname, char *fromp,')
     misc = (ROOT / 'misccmds.c').read_text()
     primitives = ('static int canincrease(unsigned n);\n'
@@ -1303,8 +1303,10 @@ static void *edit_memmove(void *to, const void *from, size_t length) {
             raise SystemExit('Unknown editor-state test case')
         for profile, flags in (
                 ('42112', []), ('DOS1-EXE-42112', ['-D__PCDOS__=11']),
-                ('COM-capacity-full-20480', ['-D__PCDOS__=11', '-DVI_DOS1_COM']),
-                ('DOS1-COM-TINY-20480', ['-D__PCDOS__=11', '-DVI_DOS1_COM', '-DVI_TINY'])):
+                ('COM-capacity-full-20480',
+                 ['-D__PCDOS__=11', '-D__MSDOS__=1', '-DVI_DOS1_COM']),
+                ('DOS1-COM-TINY-20480',
+                 ['-D__PCDOS__=11', '-D__MSDOS__=1', '-DVI_DOS1_COM', '-DVI_TINY'])):
             subprocess.run([
                 os.environ.get('CC_HOST', 'cc'), '-std=c99', '-g',
                 '-fsanitize=address,undefined', *flags, '-I', str(ROOT), str(harness),

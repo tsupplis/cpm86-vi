@@ -685,13 +685,13 @@ Validation:
 
 ```
 make test-save          # host files, mocked BDOS, injected I/O/rename failures
-make test-save-runtime  # actual Aztec DOS 1.1, DOS 2 and classic CP/M libraries
+make test-save-runtime  # DOS 2 and classic CP/M probes under emu2; builds the DOS 1.1 probe
 make test-save-pce      # private DOS 1.1, DOS Plus, CCP/M 3.1 and CDOS 4.1 images
 ```
 
-`CROSSDEV` selects the crossdev checkout; `SAVE_EMULATOR` can select a corrected
-emu2. Otherwise the runtime test builds the crossdev DOS 1.1 emulator fixture
-in a temporary directory. PCE testing needs the DOS 1.1 checkout at
+The save runtime test uses `aztec43_acc` and `emu2` from `PATH`. Stock `emu2`
+does not model the DOS 1.1 truncate behavior, so the DOS 1.1 probe is built for
+the PCE test but not run under `emu2`. PCE testing needs the DOS 1.1 checkout at
 `~/Projects/DOS/pcdos11-hacking` (override `DOS11_SOURCE`) and this checkout's
 DOS Plus, CCP/M and CDOS image/ROM files, plus the sibling ref checkout's
 `diskdefs` and `scripts/cpm86twist`. Original images are never modified.

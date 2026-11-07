@@ -25,21 +25,22 @@ def main():
         for name in ('yankmem.c', 'yankmem.h', 'yankcopy.asm', 'yankcp.asm',
                      'yankd11.asm', 'yankd1c.asm', 'yankd20.asm'):
             shutil.copyfile(ROOT / name, work / name)
-        shutil.copyfile(ROOT / 'test/yankprobe.c', work / 'yankprobe.c')
+        shutil.copyfile(ROOT / 'test/yankprobe.c', work / 'yankprb.c')
         try:
             for source in ('yankcopy', 'yankcp', 'yankd11', 'yankd1c', 'yankd20'):
                 run(['aztec43_acc', '-c', '-o', source + '.o', source + '.asm'], work)
-            for source in ('yankmem', 'yankprobe'):
+            for source in ('yankmem', 'yankprb'):
                 run(['aztec43_acc', '-I.', '-squeeze', '-c', '-o', source + '.o',
                      source + '.c'], work)
-            run(['aztec43_acc', '-I.', '-squeeze', '-DVI_DOS1_COM',
-                 '-c', '-o', 'yankpc.o', 'yankprobe.c'], work)
+            run(['aztec43_acc', '-target=dos1', '-I.', '-squeeze',
+                 '-DVI_TINY', '-DVI_DOS1_COM',
+                 '-c', '-o', 'yankpc.o', 'yankprb.c'], work)
             for target_flag, adapter, output, capacity in (
                     ('-target=cpm86', 'yankcp', 'yank.cmd', 42112),
                     ('-target=dos1', 'yankd11', 'yank11.exe', 42112),
                     ('-target=dos1', 'yankd1c', 'yank11.com', 20480),
                     ('-target=dos2', 'yankd20', 'yank.exe', 42112)):
-                probe = 'yankpc.o' if output.endswith('.com') else 'yankprobe.o'
+                probe = 'yankpc.o' if output.endswith('.com') else 'yankprb.o'
                 run(['aztec43_acc', target_flag, '-o', output, probe, 'yankmem.o',
                      'yankcopy.o', adapter + '.o'], work)
                 if output.endswith('.cmd'):

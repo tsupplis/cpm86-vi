@@ -6,8 +6,8 @@
 /* Most of the code is machine-independent.  Most of the machine- */
 /* dependent stuff is in window.c */
 
-/*#define ATARI		1	/* For the Atari 520 ST */
-/*#define UNIXPC	1	/* The AT&T UNIX PC (console) */
+/*#define ATARI		1 * For the Atari 520 ST */
+/*#define UNIXPC	1 * The AT&T UNIX PC (console) */
 #define TCAP 1 /* For termcap-based terminals */
 
 #define CMDSIZE 1024

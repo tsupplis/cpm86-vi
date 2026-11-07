@@ -6,11 +6,15 @@
 static int failures;
 static char chunk[257];
 
-static void check(int ok)
+static void check_at(int ok, int line)
 {
-    if (!ok)
+    if (!ok) {
+        fprintf(stderr, "VI YANK CHECK FAILED: line %d\n", line);
         failures++;
+    }
 }
+
+#define check(ok) check_at((ok), __LINE__)
 
 static unsigned char pattern(unsigned i)
 {

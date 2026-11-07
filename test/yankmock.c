@@ -2,7 +2,7 @@
 #include <string.h>
 #include "yankmem.h"
 
-#ifdef VI_DOS1_COM
+#if defined(VI_TINY) && defined(__MSDOS__) && __MSDOS__==1
 unsigned char test_yank_memory[32768U];
 #else
 unsigned char test_yank_memory[65536UL];
