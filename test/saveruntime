@@ -4,7 +4,7 @@ root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
 work=$(mktemp -d "${TMPDIR:-/tmp}/visave.XXXXXX")
 trap 'rm -rf "$work"' EXIT HUP INT TERM
 cp "$root/save.c" "$root/save.h" "$root/os.asm" "$work/"
-cp "$root/test/saveprobe.c" "$work/saveprb.c"
+cp "$root/test/saveprb.c" "$work/saveprb.c"
 cd "$work"
 aztec43_acc -c -o os.o os.asm
 for target in c d11 c86; do

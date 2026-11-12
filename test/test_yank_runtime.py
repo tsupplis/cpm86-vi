@@ -25,7 +25,7 @@ def main():
         for name in ('yankmem.c', 'yankmem.h', 'yankcopy.asm', 'yankcp.asm',
                      'yankd11.asm', 'yankd1c.asm', 'yankd20.asm'):
             shutil.copyfile(ROOT / name, work / name)
-        shutil.copyfile(ROOT / 'test/yankprobe.c', work / 'yankprb.c')
+        shutil.copyfile(ROOT / 'test/yankprb.c', work / 'yankprb.c')
         try:
             for source in ('yankcopy', 'yankcp', 'yankd11', 'yankd1c', 'yankd20'):
                 run(['aztec43_acc', '-c', '-o', source + '.o', source + '.asm'], work)

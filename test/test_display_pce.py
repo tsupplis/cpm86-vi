@@ -114,7 +114,7 @@ def main():
     with tempfile.TemporaryDirectory(prefix='vi-display-') as directory:
         work = Path(directory)
         build(work, ('vid1bios.com', 'vid1bios.exe', 'vicpbios.cmd', 'vid2bios.exe'),
-              (ROOT / 'test/displayprobe.c').read_text())
+              (ROOT / 'test/dispprb.c').read_text())
         results = []
         for extension, ram in (('com', 128), ('exe', 256)):
             for video in ('cga', 'mda'):

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run saveprobe against real DOS and Concurrent CP/M kernels, on private images."""
+"""Run saveprb against real DOS and Concurrent CP/M kernels, on private images."""
 from pathlib import Path
 import os
 import re

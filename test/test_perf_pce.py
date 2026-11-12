@@ -84,7 +84,7 @@ def main():
             previous = os.environ.get('TMPDIR')
             os.environ['TMPDIR'] = compiler
             try:
-                build(work, ('vid1bios.exe',), (ROOT / 'test/perfprobe.c').read_text())
+                build(work, ('vid1bios.exe',), (ROOT / 'test/perfprb.c').read_text())
             finally:
                 if previous is None:
                     del os.environ['TMPDIR']
@@ -116,7 +116,7 @@ def main():
                             'sha256': hashlib.sha256(data).hexdigest()}
                      for name, data in payloads.items()},
         'probe_sha256': hashlib.sha256(
-            (ROOT / 'test/perfprobe.c').read_bytes()).hexdigest(),
+            (ROOT / 'test/perfprb.c').read_bytes()).hexdigest(),
         'machine_fixture_sha256': {
             name: hashlib.sha256(path.read_bytes()).hexdigest()
             for name, path in (('boot_image', dos / 'pcdos_base.img'),
