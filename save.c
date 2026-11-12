@@ -14,6 +14,24 @@ extern int bdosver(void);
 #endif
 int open(const char *, int, ...);
 
+static int newname(const char *name, char *out, const char *ext)
+{
+    const char *p;
+    int prefix, i, fd;
+    prefix=0;
+    for(p=name;*p;p++)
+        if(*p==':' || *p=='/' || *p=='\\') prefix=(int)(p-name)+1;
+    if(prefix>127) { errno=EINVAL; return -1; }
+    memcpy(out,name,prefix);
+    for(i=0;i<100;i++) {
+        sprintf(out+prefix,"VI%06d.%s",i,ext);
+        fd=open(out,O_RDWR|O_CREAT|O_EXCL,0666);
+        if(fd>=0) return fd;
+        if(errno!=EEXIST) return -1;
+    }
+    return -1;
+}
+
 #ifdef __CPM86__
 /* Decode BDOS 12: AH high nibble is CPU, low nibble is OS family;
  * AL is the packed BDOS version. Concurrent variants include networking. */
@@ -30,48 +48,22 @@ static int capabilities(int identity)
     return 0;
 }
 
-static int newname(const char *name, char *out, const char *ext)
-{
-    const char *p;
-    int prefix, i, fd;
-    p=strchr(name, ':');
-    prefix=p ? (int)(p-name)+1 : 0;
-    if(prefix>2) { errno=EINVAL; return -1; }
-    memcpy(out,name,prefix);
-    for(i=0;i<100;i++) {
-        sprintf(out+prefix,"VI%06d.%s",i,ext);
-        fd=open(out,O_RDWR|O_CREAT|O_EXCL,0666);
-        if(fd>=0) return fd;
-        if(errno!=EEXIST) return -1;
-    }
-    return -1;
-}
-
-static int finish_cpm(const char *name, long bytes, long previous, int caps)
+static int finish_cpm(const char *name, long bytes, int caps, int attrs)
 {
     unsigned char fcb[36];
-    long records;
-    int rc;
-    records=(bytes+127L)/128L;
     memset(fcb,0,sizeof fcb);
     if(fcbinit((char *)name,fcb)<0) return -1;
-    if((caps&1) && records<(previous+127L)/128L) {
-        /* F_TRUNCATE names the last retained record (zero-based). */
-        records--;
-        fcb[33]=(unsigned char)records;
-        fcb[34]=(unsigned char)(records>>8);
-        fcb[35]=(unsigned char)(records>>16);
-        rc=bdos(99,(int)fcb)&255;
-        if(rc>3) return -1;
-    }
-    if(caps&2) {
-        /* Reload attributes before F_ATTRIB; never clear R/O/system/archive. */
-        memset(fcb,0,sizeof fcb);
-        fcbinit((char *)name,fcb);
+    if((caps&2) || attrs) {
+        /* Reload the replacement's directory state before F_ATTRIB. */
         if((bdos(15,(int)fcb)&255)>3) return -1;
         if((bdos(16,(int)fcb)&255)>3) return -1;
-        fcb[6]|=0x80;
-        fcb[32]=(unsigned char)(bytes%128L);
+        fcb[9]|=attrs&128;
+        fcb[10]|=(attrs>>1)&128;
+        fcb[11]|=(attrs>>2)&128;
+        if(caps&2) {
+            fcb[6]|=0x80;
+            fcb[32]=(unsigned char)(bytes%128L);
+        }
         if((bdos(30,(int)fcb)&255)>3) return -1;
     }
     return 0;
@@ -82,16 +74,15 @@ const char *vi_save_file(const char *name, const char *start,
                          const char *end, int binary)
 {
     FILE *f;
-    int fd, existing, failed;
+    int fd, existing, failed, reserve;
+    char temp[144], backup[144];
+    static char recovery[400];
     long bytes;
     const char *p, *error;
 #ifdef __CPM86__
-    char temp[16], backup[16];
     unsigned char fcb[36];
-    int caps, olduser, user, reserve, replacement;
-    long previous;
-    static char recovery[100];
-    temp[0]=backup[0]=0;
+    int caps, olduser, user, attrs;
+    attrs=0;
     memset(fcb,0,sizeof fcb);
     if(strchr(name,'*') || strchr(name,'?')) return "Ambiguous file name!";
     user=fcbinit((char *)name,fcb);
@@ -102,8 +93,8 @@ const char *vi_save_file(const char *name, const char *start,
     p=strchr(name,'/');
     if(p) name=p+1;
     caps=capabilities(bdosver());
-    replacement=0;
 #endif
+    temp[0]=backup[0]=0;
     error=NULL;
     existing=1;
     fd=open(name,O_RDWR);
@@ -115,23 +106,23 @@ const char *vi_save_file(const char *name, const char *start,
     }
     if(fd<0) { error="Unable to create file!"; goto done; }
 #ifdef __CPM86__
-    previous=0L;
-    if(existing && (caps&1)) {
+    if(existing) {
         memset(fcb,0,sizeof fcb);
         fcbinit((char *)name,fcb);
-        if((bdos(35,(int)fcb)&255)==255) {
-            close(fd); error="Unable to query original size!"; goto done;
+        if((bdos(15,(int)fcb)&255)>3) {
+            close(fd); error="Unable to query original attributes!"; goto done;
         }
-        previous=((long)fcb[33] | ((long)fcb[34]<<8) |
-                  ((long)fcb[35]<<16))*128L;
-    }
-    if(existing && (!(caps&1) || (binary && start==end))) {
-        if(close(fd)<0) { error="Unable to close original!"; goto done; }
-        fd=newname(name,temp,"TMP");
-        if(fd<0) { error="Unable to create temporary file!"; goto done; }
-        replacement=1;
+        attrs=(fcb[9]&128)|((fcb[10]&128)<<1)|((fcb[11]&128)<<2);
+        if((bdos(16,(int)fcb)&255)>3) {
+            close(fd); error="Unable to close original attributes!"; goto done;
+        }
     }
 #endif
+    if(existing) {
+        if(close(fd)<0) { error="Unable to close original!"; goto done; }
+        fd=newname(name,temp,"TMP");
+        if(fd<0) { temp[0]=0; error="Unable to create temporary file!"; goto done; }
+    }
     f=fdopen(fd,"w");
     if(!f) { close(fd); error="Unable to buffer file!"; goto done; }
     bytes=0L;
@@ -163,10 +154,12 @@ const char *vi_save_file(const char *name, const char *start,
     if(fclose(f)==EOF) failed=1;
     if(failed) { error="Write/resize/close failed; buffer not saved!"; goto done; }
 #ifdef __CPM86__
-    if(!replacement) {
-        if(finish_cpm(name,bytes,previous,caps)<0)
-            error="File written but size update failed!";
-    } else {
+    /* Finalize the replacement before touching the original name. */
+    if(finish_cpm(existing?temp:name,bytes,caps,attrs)<0) {
+        error="Unable to finalize saved file!"; goto done;
+    }
+#endif
+    if(existing) {
         /* Reserve a unique backup name. CP/M rename cannot replace a file. */
         reserve=newname(name,backup,"BAK");
         if(reserve<0) { backup[0]=0; error="Unable to reserve backup!"; goto done; }
@@ -186,14 +179,16 @@ const char *vi_save_file(const char *name, const char *start,
         }
         backup[0]=0;
     }
-#endif
  done:
-#ifdef __CPM86__
     if(error && (temp[0] || backup[0])) {
-        sprintf(recovery,"Save failed; retain %s%s%s (user %d)",temp,
-                temp[0] && backup[0]?" and ":"",backup, user==255?olduser:user);
+        sprintf(recovery,"%s Retain %s%s%s",error,temp,
+                temp[0] && backup[0]?" and ":"",backup);
+#ifdef __CPM86__
+        sprintf(recovery+strlen(recovery)," (user %d)",user==255?olduser:user);
+#endif
         error=recovery;
     }
+#ifdef __CPM86__
     bdos(32,olduser);
 #endif
     return error;

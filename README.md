@@ -649,37 +649,39 @@ The whole repository is as public domain. [License](LICENSE.md) unless specified
 ## Saving files
 
 The command-line and save objects are built separately for DOS and CP/M.
-DOS 1.1 and DOS 2 use the Aztec runtime's `ftruncate` after flushing output,
-with the number of physical bytes actually written (including inserted CRs).
-DOS text does not need a trailing Ctrl-Z. Binary reads preserve embedded 1Ah.
-A failed write, flush, size update, or close leaves the editor marked modified.
-An in-place save is not crash-atomic and may already have overwritten data
-when an error is reported.
+All existing-file saves use a temporary file and backup, on DOS and CP/M.
+Writes, flushing, closing, and exact-length metadata updates complete before
+VI renames the original. A failure before installation leaves the original
+bytes intact. Failed installation attempts restore the original name; if
+restoration also fails, both recovery files remain and the diagnostic reports
+their names. A failed save leaves the editor marked modified.
 
-CP/M save policy uses the complete AX returned by BDOS function 12:
+DOS 1.1 and DOS 2 use the Aztec runtime's `ftruncate` on the temporary file,
+counting physical bytes including inserted CRs. DOS text does not need a
+trailing Ctrl-Z. Binary reads preserve embedded 1Ah.
 
-| Identity | Save policy |
+CP/M exact-length policy uses the complete AX returned by BDOS function 12:
+
+| Identity | Length policy |
 | --- | --- |
-| 1031h: CP/M-86 Plus | BDOS 99 record truncation after closing |
-| 8086 Concurrent family 4 or 6, BDOS >= 3.1 | Record truncation plus used-byte LRBC metadata |
-| 1041h: DOS Plus | Record truncation plus used-byte LRBC metadata |
-| Classic CP/M-86 and other identities | Temporary-file replacement |
+| 8086 Concurrent family 4 or 6, BDOS >= 3.1 | Used-byte LRBC metadata |
+| 1041h: DOS Plus | Used-byte LRBC metadata |
+| CP/M-86 Plus, classic CP/M-86 and other identities | 128-byte records |
 
 The version threshold applies only to Concurrent families, including networking.
-Other unknown identities use replacement. BDOS 99 identifies the last retained record, not a byte count.
-Empty binary saves use replacement even on native-truncate systems.
-Text output has a Ctrl-Z terminator and deliberate record padding; binary
-padding is zero. Concurrent BDOS 3.1+ and DOS Plus binary reads honor exact LRBC metadata.
-Other CP/M binary files remain rounded to 128-byte records.
+Fresh replacement files need no record truncation. Text output has a Ctrl-Z
+terminator and deliberate record padding; binary padding is zero. Concurrent
+BDOS 3.1+ and DOS Plus binary reads honor exact LRBC metadata.
 
 Replacement files (`VI000000.TMP` onward) and backup names (`VI000000.BAK`
-onward) are created exclusively in the target drive/user area. The completed
-temporary file is closed before the original is renamed. Failed installation
-attempts restore the original name; if restoration also fails, both recovery
-files remain and the error reports their names. Original read-only files are
-rejected. Replacement does not promise preservation of timestamps or other
-extended file metadata. No failed open is followed by a destructive create.
-The original user area is restored on every returning path.
+onward) are created exclusively beside the target (same DOS directory or
+CP/M drive/user area). Saving needs enough free space for the complete new
+file while the original still exists. Original read-only files are rejected.
+CP/M read-only/system/archive attributes are carried to the replacement;
+replacement does not promise preservation of timestamps or other extended
+file metadata. No failed open is followed by a destructive create. The original
+CP/M user area is restored on every returning path. The rename sequence is
+recoverable, but is not an atomic transaction across a power loss.
 
 Validation:
 

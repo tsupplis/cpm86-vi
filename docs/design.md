@@ -172,12 +172,13 @@ binary reads use exact length metadata where supported.
 A subsequent read failure does not restore that old file. This differs from
 `:r`'s all-or-nothing insertion contract.
 
-`vi_save_file()` returns an error string or NULL. DOS flushes and then uses the
-runtime's `ftruncate()`, counting physical CRLF expansion. CP/M pads records
-and uses identity-gated truncation/LRBC metadata; classic/unknown identities
-use temporary-file replacement. Empty binary saves also use replacement.
-Errors retain the modified flag and report retained recovery filenames where
-applicable. In-place saving is not crash-atomic.
+`vi_save_file()` returns an error string or NULL. Existing files are replaced
+through an exclusively created temporary file and a backup on every OS.
+DOS flushes and uses the runtime's `ftruncate()`, counting physical CRLF
+expansion. CP/M pads records, carries file attributes, and applies identity-gated
+LRBC metadata to the replacement before renaming the original. Failed installs
+restore the original name, or retain both recovery files if restoration fails.
+Errors retain the modified flag and report retained recovery filenames.
 See the [save policy](../README.md#saving-files) for exact identities.
 
 ## Rendering and console rules

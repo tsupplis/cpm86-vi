@@ -54,6 +54,11 @@ def main():
                     run('cpmcp','-f','cpm86-320','logical.img','startup1.bat','0:',cwd=dest)
                 run(twist,'twist',str(dest/'logical.img'),image)
             else:
+                if target=='dosplus':
+                    # The stock image has only 15 KiB free. Leave room for the
+                    # larger probe, old/new save files and the result report.
+                    # This removes an unused editor from the private copy only.
+                    run('mdel','-i',image,'::DOSPLUS/ED.CMD')
                 (dest/'autoexec.bat').write_bytes(command+b'\r\nPCEEXIT\r\n')
                 for p in (work/'programs'/program,exitprog,dest/'autoexec.bat'):
                     run('mcopy','-o','-i',image,str(p),'::'+p.name.upper())

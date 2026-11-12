@@ -18,6 +18,7 @@ HARNESS = r'''
 #include <sys/stat.h>
 static int identity=0x1022, user=3, fail_flush, fail_close, fail_resize;
 static int rename_count, fail_rename, deny_open, truncate_calls, attr_calls;
+static int fail_restore, file_attrs, seen_attrs, fail_put, put_count;
 int bdosver(void) { return identity; }
 static void filename(unsigned char *f, char *name) {
  int i,n=0;
@@ -39,7 +40,7 @@ int bdos(int fn,long arg) {
  unsigned char *f=(unsigned char *)arg; char name[16]; struct stat st;long n;
  if(fn==32) { if(arg!=255) user=(int)arg; return user; }
  filename(f,name);
- if(fn==15) { if(f[32]==255) { if(stat(name,&st))return 255; f[32]=st.st_size%128; } return 0; }
+ if(fn==15) { if(!strcmp(name,"FILE.TST")) { f[10]|=file_attrs&128; f[11]|=(file_attrs>>1)&128; } if(f[32]==255) { if(stat(name,&st))return 255; f[32]=st.st_size%128; } return 0; }
  if(fn==16) return 0;
  if(fn==35) {
   if(stat(name,&st))return 255;
@@ -51,7 +52,8 @@ int bdos(int fn,long arg) {
   return truncate(name,(n+1)*128)?255:0;
  }
  if(fn==30) {
-  attr_calls++;assert(f[6]&128);if(fail_resize)return 255;
+  attr_calls++;seen_attrs=(f[10]&128)|((f[11]&128)<<1);if(fail_resize)return 255;
+  if(!(f[6]&128)) return 0;
   if(stat(name,&st))return 255;
   n=st.st_size;if(n && f[32])n=((n-1)/128)*128+f[32];
   return truncate(name,n)?255:0;
@@ -62,19 +64,26 @@ static int test_open(const char *name,int flags,...) {
  if(deny_open && !strcmp(name,"FILE.TST")) { errno=EACCES;return -1; }
  return open(name,flags,0600);
 }
+static int test_put(int c, FILE *f) {
+ if(fail_put && ++put_count==2) return EOF;
+ return putc(c,f);
+}
 static int test_flush(FILE *f) { int r=fflush(f);return fail_flush?EOF:r; }
 static int test_close(FILE *f) { int r=fclose(f);return fail_close?EOF:r; }
 static int test_resize(int fd,long size) {return fail_resize?-1:ftruncate(fd,size);}
 static int test_rename(const char *a,const char *b) {
- rename_count++;if(fail_rename && rename_count>=fail_rename){errno=EACCES;return -1;}
+ rename_count++;if(fail_rename && (rename_count==fail_rename || (fail_restore && rename_count>fail_rename))){errno=EACCES;return -1;}
  return rename(a,b);
 }
+#undef putc
+#define putc test_put
 #define open test_open
 #define fflush test_flush
 #define fclose test_close
 #define ftruncate test_resize
 #define rename test_rename
 #include "subject.c"
+#undef putc
 #undef open
 #undef fflush
 #undef fclose
@@ -93,6 +102,7 @@ static void expect(const char *data,int n,long total,int pad) {
  assert(getc(f)==EOF);fclose(f);assert(size()==total);
 }
 int main(void) {
+ int i,j; int identities[]={0x1022,0x1031,0x1431,0x1441,0x1631,0x1041};
  const char *error; char text[]="a\nb", binary[]={'a',26,0,'b'};
  seed();error=vi_save_file("FILE.TST",text,text+3,0);assert(!error);
 #ifdef __CPM86__
@@ -118,12 +128,20 @@ int main(void) {
  assert(capabilities(0x1441)==3 && capabilities(0x1450)==3);
  assert(capabilities(0x1631)==3 && capabilities(0x1641)==3);
  assert(capabilities(0x1131)==0 && capabilities(0x1531)==0);
- seed();rename_count=0;fail_rename=2;
- assert(vi_save_file("FILE.TST",text,text+3,0));fail_rename=0;
+ seed();rename_count=0;fail_rename=2;fail_restore=1;
+ assert(vi_save_file("FILE.TST",text,text+3,0));fail_rename=0;fail_restore=0;
  /* Both failed install and failed restoration retain the original backup. */
  assert(access("FILE.TST",F_OK)!=0);
+ {
+  char bytes[513]; FILE *f;
+  /* Find the preserved original by its unique backup name. */
+  f=fopen("VI000000.BAK","rb");assert(f);
+  assert(fread(bytes,1,sizeof bytes,f)==sizeof bytes);
+  assert(!memcmp(bytes,original,sizeof bytes));fclose(f);
+ }
+
  seed();identity=0x1031;truncate_calls=0;
- assert(!vi_save_file("FILE.TST",text,text+3,0));assert(truncate_calls==1);assert(size()==128);
+ assert(!vi_save_file("FILE.TST",text,text+3,0));assert(truncate_calls==0);assert(size()==128);
  seed();identity=0x1431;attr_calls=0;
  assert(!vi_save_file("FILE.TST",text,text+3,0));assert(attr_calls==1);
  assert(vi_file_length("FILE.TST")==5 && size()==5);
@@ -139,6 +157,38 @@ int main(void) {
  assert(vi_save_file("*.TST",text,text+3,0));assert(user==3);
 #else
  seed();fail_resize=1;assert(vi_save_file("FILE.TST",text,text+3,0));fail_resize=0;
+#endif
+ /* Every supported policy preserves the original bytes on failure. */
+ for(i=0;i<6;i++) {
+  identity=identities[i];
+  for(j=0;j<4;j++) {
+#ifndef __CPM86__
+   if(i) continue;
+#else
+   if(j==2 && !(capabilities(identity)&2)) continue;
+#endif
+   seed();fail_flush=j==0;fail_close=j==1;fail_resize=j==2;
+   fail_put=j==3;put_count=0;
+   assert(vi_save_file("FILE.TST",text,text+3,0));
+   fail_flush=fail_close=fail_resize=fail_put=0;
+   expect(original,sizeof original,sizeof original,0);
+  }
+  seed();rename_count=0;fail_rename=2;
+  assert(vi_save_file("FILE.TST",text,text+3,0));fail_rename=0;
+  expect(original,sizeof original,sizeof original,0);
+ }
+#ifdef __CPM86__
+ seed();identity=0x1431;file_attrs=384;seen_attrs=0;
+ assert(!vi_save_file("FILE.TST",text,text+3,0));assert(seen_attrs==file_attrs);
+ file_attrs=0;
+#else
+ /* Temporary and backup files must stay beside a DOS path target. */
+ assert(!mkdir("subdir",0700));
+ assert(!rename("FILE.TST","subdir/FILE.TST"));
+ assert(!vi_save_file("subdir/FILE.TST",text,text+3,0));
+ assert(!rename("subdir/FILE.TST","FILE.TST"));
+ expect("a\r\nb",4,4,0);
+ assert(!rmdir("subdir"));
 #endif
  puts("SAVE HOST PASS");return 0;
 }
