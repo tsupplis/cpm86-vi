@@ -19,7 +19,7 @@ HARNESS = r'''
 static int identity=0x1022, user=3, fail_flush, fail_close, fail_resize;
 static int rename_count, fail_rename, deny_open, truncate_calls, attr_calls;
 static int fail_restore, file_attrs, seen_attrs, fail_put, put_count;
-int bdosver(void) { return identity; }
+unsigned vi_cpm_os_identity(void) { return identity; }
 static void filename(unsigned char *f, char *name) {
  int i,n=0;
  for(i=1;i<9 && (f[i]&127)!=' ';i++) name[n++]=f[i]&127;
@@ -198,6 +198,7 @@ def main():
     with tempfile.TemporaryDirectory(prefix='vi-save-') as directory:
         work=Path(directory)
         (work/'save.h').write_text((ROOT/'save.h').read_text())
+        (work/'oscpm.h').write_text((ROOT/'oscpm.h').read_text())
         (work/'subject.c').write_text((ROOT/'save.c').read_text().replace('(int)fcb','(long)fcb'))
         (work/'dos.h').write_text('')
         (work/'cpm.h').write_text('int bdos(int,long); int fcbinit(char *,void *);\n')

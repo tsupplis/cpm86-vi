@@ -38,9 +38,7 @@ static int take_key(void) {
     return key;
 }
 static void on_wait(void) { waits++; queue('z'); }
-int osver(void) { return version & 255; }
-int ostype(void) { return version >> 8; }
-int dosplus_crtreset(void) { resets++; return 0; }
+unsigned vi_cpm_os_identity(void) { return version; }
 int ioctl(int fd, int request, struct sgttyb *s) {
     assert(fd == 0 && request == TIOCSETP && s->sg_flags == (CRMOD|CBREAK));
     modes++; return 0;
@@ -61,7 +59,6 @@ int bdos(int fn, int arg) {
     if (offset == count) count = offset = 0;
     return key;
 }
-#include "keyos.c"
 int vi_bios_key_read(void) { return take_key(); }
 int vi_bios_key_ready(void) { return count != 0; }
 #include "keys.c"
@@ -190,6 +187,7 @@ with tempfile.TemporaryDirectory(prefix='vi-keyboard-') as directory:
         subprocess.run([os.environ.get('CC_HOST', 'cc'), '-std=gnu89',
                         '-fsanitize=address,undefined', *flags,
                         '-I'+str(work), '-I'+str(ROOT), str(work/'probe.c'),
+                        *([str(ROOT/'keycpm.c')] if name.startswith('cpm') else []),
                         '-o', str(work/'probe')], check=True)
         subprocess.run([str(work/'probe')], check=True, timeout=10)
         print(name, 'PASS', flush=True)

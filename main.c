@@ -2,14 +2,14 @@
  * STEVIE - ST Editor for VI Enthusiasts   ...Tim Thompson...twitch!tjt...
  */
 
+#include "keyboard.h"
+#include "save.h"
+#include "stevie.h"
+#include "yankmem.h"
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "stevie.h"
-#include "save.h"
-#include "keyboard.h"
-#include "yankmem.h"
 
 static void filetonext(void);
 static void nexttoscreen(void);
@@ -17,7 +17,7 @@ static void filealloc(void);
 static void screenalloc(void);
 static void screenerror(void);
 
-#if defined(VI_TINY) && defined(__MSDOS__) && __MSDOS__==1
+#if defined(VI_TINY) && defined(__MSDOS__) && __MSDOS__ == 1
 #define FILELENG 20480U
 #else
 #define FILELENG 42112U
@@ -34,67 +34,67 @@ char *vi_file_name = NULL; /* Current file name */
 char *vi_file_mem; /* The contents of the file, as a single array. */
 
 char *vi_file_max; /* Pointer to the end of allocated space for */
-               /* Filemem. (It points to the first byte AFTER */
-               /* the allocated space.) */
+                   /* Filemem. (It points to the first byte AFTER */
+                   /* the allocated space.) */
 
 char *vi_file_end; /* Pointer to the end of the file in Filemem. */
-               /* (It points to the byte AFTER the last byte.) */
+                   /* (It points to the byte AFTER the last byte.) */
 
 char *vi_top_char; /* Pointer to the byte in Filemem which is */
-               /* in the upper left corner of the screen. */
+                   /* in the upper left corner of the screen. */
 
 char *vi_bot_char; /* Pointer to the byte in Filemem which is */
-               /* just off the bottom of the screen. */
+                   /* just off the bottom of the screen. */
 
 char *vi_curs_char; /* Pointer to byte in Filemem at which the */
-                /* cursor is currently placed. */
+                    /* cursor is currently placed. */
 
 unsigned long vi_curs_row;
 int vi_curs_col; /* Current position of cursor */
 
 unsigned long vi_curs_vcol; /* Current virtual column, the column number of */
-              /* the file's actual line, as opposed to the */
-              /* column number we're at on the screen.  This */
-              /* makes a difference on lines that span more */
-              /* than one screen line. */
+                            /* the file's actual line, as opposed to the */
+                            /* column number we're at on the screen.  This */
+                            /* makes a difference on lines that span more */
+                            /* than one screen line. */
 
 int vi_state = NORMAL; /* This is the current state of the command */
-                    /* interpreter. */
+                       /* interpreter. */
 
 unsigned long vi_renum = 0; /* VI_COUNT_MAX + 1 marks an overflowing prefix. */
 
 char *vi_ins_start; /* This is where the latest insert/append */
-                /* mode started. */
+                    /* mode started. */
 
 int vi_changed = 0; /* Set to 1 if something in the file has been */
-                 /* changed and not written out. */
+                    /* changed and not written out. */
 
-int vi_undo_changed = 0; /* Modified state before the current undoable change. */
+int vi_undo_changed =
+    0; /* Modified state before the current undoable change. */
 
 int vi_debug = 0;
 
 int vi_binary = 0; /* Set to 1 if the file should be read and written */
-                /* in binary mode (no cr-lf translation). */
+                   /* in binary mode (no cr-lf translation). */
 
 char vi_redo_buff[CMDSIZE]; /* Each command should stuff characters into this */
-                     /* buffer that will re-execute itself. */
+                            /* buffer that will re-execute itself. */
 
 char vi_undo_buff[CMDSIZE]; /* Each command should stuff characters into this */
-                     /* buffer that will undo its effects. */
+                            /* buffer that will undo its effects. */
 
 char vi_ins_buff[CMDSIZE]; /* Each insertion gets stuffed into this buffer. */
 
 char *vi_uncurs_char = NULL; /* Curschar is restored to this before undoing. */
 
-int vi_ninsert = 0;    /* Number of characters in the current insertion. */
+int vi_ninsert = 0;     /* Number of characters in the current insertion. */
 int vi_undel_chars = 0; /* Number of characters to delete, when undoing. */
 char *vi_ins_ptr = NULL;
 
 char vi_repl_buf[CMDSIZE]; /* Original chars saved during Replace mode. */
-int vi_unrpl_chars = 0; /* Number of chars to restore on undo. */
+int vi_unrpl_chars = 0;    /* Number of chars to restore on undo. */
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
     int mode = 16;
 
     while (argc > 1 && argv[1][0] == '-') {
@@ -142,8 +142,8 @@ int main(int argc, char **argv)
      * vi_file_name so every subsequent fopen() sees a clean path. */
     {
         char *p = argv[1];
-        int  unum = 0;
-        int  has_user = 0;
+        int unum = 0;
+        int has_user = 0;
         while (*p >= '0' && *p <= '9') {
             unum = unum * 10 + (*p - '0');
             p++;
@@ -166,7 +166,8 @@ int main(int argc, char **argv)
 
     /* Make sure Rows/Columns are big enough */
     if (vi_rows < 3 || vi_columns < 16) {
-        fprintf(stderr, "Rows=%d Columns=%d not big enough!\n", vi_rows, vi_columns);
+        fprintf(stderr, "Rows=%d Columns=%d not big enough!\n", vi_rows,
+                vi_columns);
         windexit(0);
     }
 
@@ -319,7 +320,7 @@ static void nexttoscreen(void) {
             !vi_screen_load(VI_SCREEN_REAL, row, screen_previous))
             screenerror();
         changed = 0;
-        for (col = 0; col < vi_columns; ) {
+        for (col = 0; col < vi_columns;) {
             if ((nc = screen_line[col]) != screen_previous[col]) {
                 changed = 1;
                 if (!(gorow == row && gocol == col))
@@ -397,7 +398,8 @@ static void screenerror(void) {
 }
 
 /* Return 1 for an open failure, -1 for a rolled-back read, or 0 on success. */
-int readfile(char *fname, char *fromp, int nochangename) /* if 1, don't change the Filename */
+int readfile(char *fname, char *fromp,
+             int nochangename) /* if 1, don't change the Filename */
 {
     FILE *f;
     char buff[128];
@@ -416,7 +418,7 @@ int readfile(char *fname, char *fromp, int nochangename) /* if 1, don't change t
         fname = vi_file_name;
     }
 
-    remaining=vi_binary ? vi_file_length(fname) : -1L;
+    remaining = vi_binary ? vi_file_length(fname) : -1L;
     if ((f = fopen(fname, "r")) == NULL) {
         if (nochangename)
             message("Unable to open file for reading!");
@@ -428,9 +430,10 @@ int readfile(char *fname, char *fromp, int nochangename) /* if 1, don't change t
     do {
         used = 0;
         space = vi_byte_span(vi_file_end, vi_file_max);
-        while (used < sizeof buff && remaining != 0L &&
-               (c = getc(f)) != EOF && (vi_binary || c != 0x1A)) {
-            if (remaining > 0L) remaining--;
+        while (used < sizeof buff && remaining != 0L && (c = getc(f)) != EOF &&
+               (vi_binary || c != 0x1A)) {
+            if (remaining > 0L)
+                remaining--;
             /* Skip CR; lines are terminated by LF alone internally. */
             if (!vi_binary && c == '\r')
                 continue;
@@ -445,7 +448,8 @@ int readfile(char *fname, char *fromp, int nochangename) /* if 1, don't change t
         if (error)
             break;
         if (used != 0) {
-            /* Reuse the status buffer; move the tail once per filtered chunk. */
+            /* Reuse the status buffer; move the tail once per filtered chunk.
+             */
             memmove(fromp + used, fromp, vi_byte_span(fromp, vi_file_end));
             memcpy(fromp, buff, used);
             fromp += used;
@@ -492,8 +496,7 @@ static char getcbuff[CMDSIZE];
 static char *getcnext = NULL;
 static int getc_stuffed;
 
-int stuffin(char *s)
-{
+int stuffin(char *s) {
     unsigned pending = getcnext == NULL ? 0 : strlen(getcnext);
     unsigned length = strlen(s);
 
@@ -510,8 +513,7 @@ int stuffin(char *s)
     return 1;
 }
 
-void addtobuff(char *s, int c1, int c2, int c3, int c4, int c5, int c6)
-{
+void addtobuff(char *s, int c1, int c2, int c3, int c4, int c5, int c6) {
     char *p = s;
     if ((*p++ = c1) == '\0')
         return;
@@ -541,9 +543,7 @@ int vgetc(void) {
     return (vi_key_read());
 }
 
-int vstuffed(void) {
-    return getc_stuffed;
-}
+int vstuffed(void) { return getc_stuffed; }
 
 int vpeekc(void) {
     if (getcnext != NULL)

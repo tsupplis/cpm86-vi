@@ -2,12 +2,12 @@
  * STevie - ST editor for VI enthusiasts.    ...Tim Thompson...twitch!tjt...
  */
 
+#include "stevie.h"
+#include "yankmem.h"
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "stevie.h"
-#include "yankmem.h"
 
 static void appchar(int c);
 static int canincrease(unsigned n);
@@ -29,15 +29,13 @@ void opencmd(void) {
     appchar('\n');
 }
 
-int issepchar(int c)
-{
+int issepchar(int c) {
     if (strchr(WORDSEP, c) != NULL)
         return (1);
     return (0);
 }
 
-unsigned long cntlines(char *pbegin, char *pend)
-{
+unsigned long cntlines(char *pbegin, char *pend) {
     unsigned long lnum = 1;
     char *p;
 
@@ -52,13 +50,13 @@ void fileinfo(void) {
     char buff[128];
 
     snprintf(buff, sizeof buff, "\"%s\"%s line %lu of %lu", vi_file_name,
-            vi_changed ? " [Modified]" : "", cntlines(vi_file_mem, vi_curs_char),
-            cntlines(vi_file_mem, vi_file_end) - 1);
+             vi_changed ? " [Modified]" : "",
+             cntlines(vi_file_mem, vi_curs_char),
+             cntlines(vi_file_mem, vi_file_end) - 1);
     message(buff);
 }
 
-void gotoline(unsigned n)
-{
+void gotoline(unsigned n) {
     char *p;
 
     /* Zero descends to EOF, including an unterminated final line. */
@@ -99,7 +97,7 @@ int yankline(unsigned n) {
     beginline();
     start = vi_curs_char;
     /* The last line may end at logical EOF, without a newline. */
-    for (p = vi_curs_char; p < vi_file_end; ) {
+    for (p = vi_curs_char; p < vi_file_end;) {
         if (*p++ == '\n') {
             count++;
             if (--n == 0)
@@ -127,8 +125,7 @@ int yankline(unsigned n) {
  * If k==1, 'P'ut the line (i.e. above instead of below.
  */
 
-void putline(int k)
-{
+void putline(int k) {
     char *insertp, *first;
     int prefix, suffix;
     unsigned total, tail, available, extra;
@@ -184,8 +181,7 @@ void putline(int k)
     updatescreen();
 }
 
-void inschar(int c)
-{
+void inschar(int c) {
     /* Move everything in the file over to make */
     /* room for the new char. */
     if (!canincrease(1))
@@ -199,8 +195,7 @@ void inschar(int c)
     CHANGED;
 }
 
-void insstr(char *s)
-{
+void insstr(char *s) {
     unsigned k, n;
 
     /* The native runtime's strlen stops below 32 KiB. */
@@ -221,8 +216,7 @@ void insstr(char *s)
     CHANGED;
 }
 
-static void appchar(int c)
-{
+static void appchar(int c) {
     char *endp;
 
     /* Move everything in the file over to make */
@@ -238,8 +232,7 @@ static void appchar(int c)
     CHANGED;
 }
 
-static int canincrease(unsigned n)
-{
+static int canincrease(unsigned n) {
     if (n >= vi_byte_span(vi_file_end, vi_file_max)) {
         message("Can't add anything, file is too big!");
         return (0);
@@ -261,7 +254,8 @@ void delchar(void) {
         memmove(vi_curs_char, p, vi_byte_span(p, vi_file_end));
     /* If we just took off the last character of a non-blank line, */
     /* we don't want to end up positioned at the newline. */
-    if (*vi_curs_char == '\n' && vi_curs_char > vi_file_mem && *(vi_curs_char - 1) != '\n')
+    if (*vi_curs_char == '\n' && vi_curs_char > vi_file_mem &&
+        *(vi_curs_char - 1) != '\n')
         vi_curs_char--;
     vi_file_end--;
     CHANGED;
@@ -327,7 +321,8 @@ int delword(int deltrailing) /* 1 if trailing white space should be removed */
             scan++;
     }
     if (deltrailing)
-        while (scan < vi_file_end && isspace((unsigned char)*scan) && *scan != '\n')
+        while (scan < vi_file_end && isspace((unsigned char)*scan) &&
+               *scan != '\n')
             scan++;
     n = vi_byte_span(start, scan);
     if (n > UNDO_LIMIT) {

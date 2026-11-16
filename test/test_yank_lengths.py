@@ -264,7 +264,7 @@ def main():
     with tempfile.TemporaryDirectory(prefix='vi-yank-length-') as directory:
         work = Path(directory)
         for name in ('stevie.h', 'yankmem.h', 'yankmem.c', 'yankcopy.asm',
-                     'yankcp.asm', 'yankd11.asm', 'yankd20.asm'):
+                     'yankcpm.asm', 'yankd11.asm', 'yankd20.asm'):
             shutil.copyfile(ROOT / name, work / name)
         (work / 'length.c').write_text(source + CHECKS)
         shutil.copyfile(ROOT / 'test/yankmock.c', work / 'mock.c')
@@ -277,7 +277,7 @@ def main():
         run(['aztec43_acc', '-I.', '-squeeze', '-c', '-o', 'length.o', 'length.c'], work)
         run(['aztec43_acc', '-c', '-o', 'yankcopy.o', 'yankcopy.asm'], work)
         for target_flag, adapter, extension, library in (
-                ('-target=cpm86', 'yankcp', 'cmd', 'c86'),
+                ('-target=cpm86', 'yankcpm', 'cmd', 'c86'),
                 ('-target=dos1', 'yankd11', 'exe', 'd11'),
                 ('-target=dos2', 'yankd20', 'exe', 'c')):
             run(['aztec43_acc', '-c', '-o', adapter + '.o', adapter + '.asm'], work)

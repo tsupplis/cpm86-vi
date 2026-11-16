@@ -223,33 +223,42 @@ Flush/short-write/write errors diagnose failure and restore keyboard state.
 Only native tests wait for asynchronous XIOS hardware-cursor updates;
 production adds no delay.
 
-Aztec inline assembly uses suffixed symbols (`cur_row_`, etc.) and stack
-arguments at `[bp+4]`/`[bp+6]`. A local `int dummy;` forces the required BP
-frame. Changing C statics or signatures requires checking their included
-assembly, not just C callers.
+BIOS assembly is separately assembled and linked. `keybios.asm` and
+`vidbios.asm` establish their own stack frames, preserve the C calling
+convention and accept explicit arguments. C code includes declaration headers,
+not assembly fragments; no dummy locals or access to C-private globals are used.
 
 ## Modules and platform boundaries
 
 | Module | Responsibility |
 |---|---|
 | `main.c` | Startup/globals, file allocation/read, screen construction/diff, replay queue |
-| `edit.c` | Real keyboard/state parser, insertion/replacement, cursor/viewport movement |
+| `edit.c` | Generic editing state machine, insertion/replacement, cursor/viewport movement |
 | `normal.c` | Normal commands, indentation/join literal undo, undo reset |
 | `cmdline.c` | `:`/search line parsing, bounded command input, optional message cache |
 | `linefunc.c` | Line/column helpers, checked string ownership, search history/scan |
 | `misccmds.c` | Editing primitives, line yank/paste, file information |
 | `hexchars.c` / `help.c` | Character representations and built-in help |
 | `save.c` / `save.h` | OS-specific save, truncation/replacement, exact-length query |
-| `window.c` / included assembly | VT/BIOS output and initialization/restoration |
-| `keyboard.c` / `keyos.c` / `os.asm` | Concurrent console keyboard mapping, OS identity/restoration |
+| `window.c` | VT/BIOS display policy and display lifecycle |
+| `vidbios.asm` / `vidbios.h` | PC BIOS display operations |
+| `vidcpm.asm` / `vidcpm.h` | OS-gated DOS Plus display restoration |
+| `keyboard.c` / `keyboard.h` | Public input API, backend selection, command decoding and lookahead |
+| `keybios.asm` / `keybios.h` | PC BIOS keyboard operations |
+| `keycpm.c` / `keycpm.h` | CP/M console setup, input buffering and Concurrent key mapping |
+| `oscpm.asm` / `oscpm.h` | Shared CP/M BDOS identity query; no keyboard/display operations |
 | `yankmem.c` / `yankmem.h` | Checked external yank/screen APIs |
-| `yankcopy.asm` / `yankcp.asm` / `yankd*.asm` | Segment copies and platform reservation/release |
-| `stevie.h` / `keyboard.h` / `keyos.h` | Shared types, state and public prototypes |
+| `yankcopy.asm` / `yankcpm.asm` / `yankd*.asm` | Segment copies and platform reservation/release |
+| `stevie.h` | Shared editor types, state and prototypes |
 
-Concurrent BDOS consoles use `vi_key_read()` instead of BIOS keyboard input,
-temporarily disabling function-key expansion and restoring it on exit.
-Legacy CP/M/DOS input paths remain. DOS Plus text-mode restoration is gated by
-its OS identity and never invoked on concurrent systems.
+All editor input goes through `vi_key_read()`/`vi_key_peek()`. The keyboard
+module selects the appropriate backend internally. Concurrent BDOS input uses
+function 6 with `DL=FDh`. The CP/M keyboard backend disables function-key
+expansion during initialization and restores it on exit.
+Legacy CP/M/DOS input paths remain. `main.c` owns keyboard initialization
+and registers cleanup with `atexit`, injecting display maintenance as a callback.
+`window.c` calls only the display backends and OS query; DOS Plus restoration
+is gated inside `vidcpm.asm` and never invoked on concurrent systems.
 
 ## Verification and remaining costs
 

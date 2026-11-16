@@ -627,7 +627,10 @@ insert/literal input and replayed commands keep their existing behaviour.
 keyboard once and registers its cleanup with `atexit`. It supplies the
 optional cursor-maintenance callback; the keyboard has no direct display
 module dependency. `window.c` owns display operations and does not initialize
-or close the keyboard. The low-level OS helpers remain in `keyos.c`/`os.asm`.
+or close the keyboard. CP/M console handling is in `keycpm.c`; CP/M OS identity is in
+`oscpm.asm`; DOS Plus display restoration is in `vidcpm.asm`.
+Each backend has its matching declaration header. Display code never calls
+a keyboard backend.
 BIOS instructions live in separately linked `keybios.asm` and `vidbios.asm`,
 with declarations in their matching private headers. They own their stack
 frames and take explicit arguments; no assembly fragments are included in C.

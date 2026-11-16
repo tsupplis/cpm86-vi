@@ -20,20 +20,21 @@ static int change_remove, change_char;
  * Execute a command in normal mode.
  */
 
-void normal(int c)
-{
+void normal(int c) {
     char *p, *q;
     int nchar;
     unsigned n;
 
     if (vi_renum > VI_COUNT_MAX) {
         /* Discard the rest of this command, not the next valid command. */
-        if (c == 'd' || c == 'c' || c == 'y' || c == '<' || c == '>' || c == 'r')
+        if (c == 'd' || c == 'c' || c == 'y' || c == '<' || c == '>' ||
+            c == 'r')
             vgetc();
         else if (c == ':' || c == '/' || c == '?') {
             do {
                 nchar = vgetc();
-            } while (nchar != '\n' && nchar != '\r' && nchar != '\033' && nchar != EOF);
+            } while (nchar != '\n' && nchar != '\r' && nchar != '\033' &&
+                     nchar != EOF);
         }
         message("Command count too large; command cancelled!");
         return;
@@ -78,9 +79,11 @@ void normal(int c)
             message("No character to mark!");
         break;
     case '\'':
-        if (vi_mark != NULL && vi_mark >= vi_file_mem && vi_mark < vi_file_end) {
+        if (vi_mark != NULL && vi_mark >= vi_file_mem &&
+            vi_mark < vi_file_end) {
             vi_curs_char = vi_mark;
-            if (vi_bot_char == NULL || vi_mark < vi_top_char || vi_mark >= vi_bot_char)
+            if (vi_bot_char == NULL || vi_mark < vi_top_char ||
+                vi_mark >= vi_bot_char)
                 vi_top_char = vi_mark;
             cursupdate();
             updatescreen();
@@ -466,8 +469,9 @@ void normal(int c)
             resetundo();
             vi_uncurs_char = vi_curs_char;
             sprintf(vi_redo_buff, "%u~", n);
-            sprintf(vi_undo_buff, "%u~", n);  /* ~~ is its own inverse */
-            while (n > 0 && vi_curs_char < vi_file_end && *vi_curs_char != '\n') {
+            sprintf(vi_undo_buff, "%u~", n); /* ~~ is its own inverse */
+            while (n > 0 && vi_curs_char < vi_file_end &&
+                   *vi_curs_char != '\n') {
                 n--;
                 if (islower(*vi_curs_char))
                     *vi_curs_char = toupper(*vi_curs_char);
@@ -545,8 +549,7 @@ static void tabinout(int inout, unsigned num) {
 }
 
 /* One bit per visited line selects literal single-byte edits, including J. */
-static void applychange(int remove)
-{
+static void applychange(int remove) {
     char *p = vi_uncurs_char;
     unsigned i;
     for (i = 0; i < change_lines; i++) {
@@ -571,13 +574,13 @@ static void applychange(int remove)
         vi_curs_char--;
 }
 
-static void undochange(void)
-{
+static void undochange(void) {
     char *p = vi_uncurs_char;
     unsigned i;
     int dirty = vi_changed;
 
-    if (!change_remove && change_count > vi_byte_span(vi_file_end, vi_file_max)) {
+    if (!change_remove &&
+        change_count > vi_byte_span(vi_file_end, vi_file_max)) {
         message("Can't add anything, file is too big!");
         return;
     }
@@ -601,8 +604,7 @@ static void undochange(void)
     updatescreen();
 }
 
-static void startinsert(char *initstr)
-{
+static void startinsert(char *initstr) {
     char *p, c;
 
     vi_ins_start = vi_curs_char;

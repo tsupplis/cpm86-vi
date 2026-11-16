@@ -2,12 +2,12 @@
  * STevie - ST editor for VI enthusiasts.   ...Tim Thompson...twitch!tjt...
  */
 
+#include "save.h"
+#include "stevie.h"
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "stevie.h"
-#include "save.h"
 
 static char *last_message = NULL;
 
@@ -199,7 +199,8 @@ void readcmdline(int firstc) /* either ':', '/', or '?' */
     case '.':
         if (strcmp(cmd, ".=") == 0) {
             char messbuff[80];
-            sprintf(messbuff, "line %lu   character %u", cntlines(vi_file_mem, vi_curs_char),
+            sprintf(messbuff, "line %lu   character %u",
+                    cntlines(vi_file_mem, vi_curs_char),
                     1U + vi_byte_span(vi_file_mem, vi_curs_char));
             message(messbuff);
             return;
@@ -306,8 +307,7 @@ static void gotocmd(int clr, int fresh, int firstc) {
     }
 }
 
-void message(char *s)
-{
+void message(char *s) {
     char *p;
 
     if (last_message != NULL) {
@@ -339,14 +339,13 @@ void clearlastmess(void) {
     last_message = NULL;
 }
 
-static int writeit(char *fname)
-{
+static int writeit(char *fname) {
     char buff[128];
     const char *error;
     snprintf(buff, sizeof buff, "Writing %s...", fname);
     message(buff);
-    error=vi_save_file(fname,vi_file_mem,vi_file_end,vi_binary);
-    if(error) {
+    error = vi_save_file(fname, vi_file_mem, vi_file_end, vi_binary);
+    if (error) {
         message((char *)error);
         return 0;
     }
@@ -357,8 +356,7 @@ static int writeit(char *fname)
     return 1;
 }
 
-void filemess(char *s)
-{
+void filemess(char *s) {
     char buff[128];
     snprintf(buff, sizeof buff, "\"%s\" %s", vi_file_name, s);
     message(buff);

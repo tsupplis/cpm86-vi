@@ -268,7 +268,7 @@ def main():
     source += function((ROOT / 'cmdline.c').read_text(), 'static int writeit(char *fname)\n')
     with tempfile.TemporaryDirectory(prefix='vi-io-') as directory:
         work = Path(directory)
-        for name in ('stevie.h', 'save.c', 'save.h', 'os.asm'):
+        for name in ('stevie.h', 'save.c', 'save.h', 'oscpm.asm', 'oscpm.h'):
             shutil.copyfile(ROOT / name, work / name)
         (work / 'io.c').write_text(source + CHECKS)
         headers = work / 'host-headers'
@@ -279,10 +279,10 @@ def main():
              '-Ihost-headers', '-I.', 'io.c', 'save.c', '-o', 'io-host'], work)
         verify([str(work / 'io-host')], work / 'host')
         print('IO PASS: host sanitizers', flush=True)
-        run(['aztec43_acc', '-c', '-o', 'os.o', 'os.asm'], work)
+        run(['aztec43_acc', '-c', '-o', 'oscpm.o', 'oscpm.asm'], work)
         run(['aztec43_acc', '-I.', '-squeeze', '-c', '-o', 'io.o', 'io.c'], work)
         for target_flag, extension, library in (('-target=cpm86', 'cmd', 'c86'), ('-target=dos1', 'com', 'd11'), ('-target=dos2', 'exe', 'c')):
-            extra = ['os.o'] if library == 'c86' else []
+            extra = ['oscpm.o'] if library == 'c86' else []
             run(['aztec43_acc', target_flag, '-I.', '-squeeze', '-c', '-o', 'save.o', 'save.c'], work)
             program = 'io.' + extension
             run(['aztec43_acc', target_flag, '-o', program, 'io.o', 'save.o', *extra], work)

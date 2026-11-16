@@ -2,10 +2,10 @@
  * STevie - ST editor for VI enthusiasts.    ...Tim Thompson...twitch!tjt...
  */
 
+#include "stevie.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "stevie.h"
 
 static char *alloc(unsigned size);
 static char *ssearch(int dir, char *str);
@@ -14,15 +14,14 @@ static char *bcksearch(char *str);
 
 char *vi_mark = NULL;
 
-/* Ordered endpoints in one near segment; subtract addresses, not signed ptrdiffs. */
-unsigned vi_byte_span(const char *first, const char *last)
-{
+/* Ordered endpoints in one near segment; subtract addresses, not signed
+ * ptrdiffs. */
+unsigned vi_byte_span(const char *first, const char *last) {
     return (unsigned)((unsigned long)last - (unsigned long)first);
 }
 
 /* Keep the mark on its original character; deletion is not undone. */
-void vi_mark_adjust(char *at, unsigned length, int remove)
-{
+void vi_mark_adjust(char *at, unsigned length, int remove) {
     if (vi_mark == NULL || vi_mark < at)
         return;
     if (!remove)
@@ -33,8 +32,7 @@ void vi_mark_adjust(char *at, unsigned length, int remove)
         vi_mark -= length;
 }
 
-unsigned long vi_count_digit(unsigned long count, unsigned digit)
-{
+unsigned long vi_count_digit(unsigned long count, unsigned digit) {
     if (count > (VI_COUNT_MAX - digit) / 10U)
         return VI_COUNT_MAX + 1UL;
     return count * 10UL + digit;
@@ -47,8 +45,7 @@ unsigned long vi_count_digit(unsigned long count, unsigned digit)
  * 'curr' char.  Return NULL if there is no next line.
  */
 
-char *nextline(char *curr)
-{
+char *nextline(char *curr) {
     while (curr < vi_file_end) {
         if (*curr++ == '\n')
             break;
@@ -65,8 +62,7 @@ char *nextline(char *curr)
  * 'curr' char.  Return NULL if there is no previous line.
  */
 
-char *prevline(char *curr)
-{
+char *prevline(char *curr) {
     int nnl = 0;
 
     /* If we are currently positioned on a '\n', */
@@ -99,8 +95,7 @@ char *prevline(char *curr)
  * Try to advance to the specified column, starting at p.
  */
 
-char *coladvance(char *p, unsigned long col)
-{
+char *coladvance(char *p, unsigned long col) {
     char *start = p;
     unsigned width;
 
@@ -116,8 +111,7 @@ char *coladvance(char *p, unsigned long col)
     return (p);
 }
 
-static char *alloc(unsigned size)
-{
+static char *alloc(unsigned size) {
     char *p; /* pointer to new storage space */
 
     p = malloc(size);
@@ -127,14 +121,12 @@ static char *alloc(unsigned size)
     return (p);
 }
 
-char *strsave(char *string)
-{
+char *strsave(char *string) {
     char *saved = alloc((unsigned)(strlen(string) + 1));
     return saved == NULL ? NULL : strcpy(saved, string);
 }
 
-int vi_set_filename(char *name)
-{
+int vi_set_filename(char *name) {
     char *saved;
 
     if (name == vi_file_name)
@@ -159,8 +151,7 @@ static char *ssearch(int dir, char *str) /* dir: FORWARD or BACKWARD */
         return (fwdsearch(str));
 }
 
-void dosearch(int dir, char *str)
-{
+void dosearch(int dir, char *str) {
     char *p;
 
     if (str != laststr) {
@@ -199,8 +190,7 @@ void repsearch(void) {
     }
 }
 
-static char *fwdsearch(char *str)
-{
+static char *fwdsearch(char *str) {
     unsigned leng = strlen(str), probe;
     char *p, *last;
     char first, selected;
@@ -209,8 +199,10 @@ static char *fwdsearch(char *str)
         return NULL;
     /* Reject repeated-prefix near misses before calling memcmp(). */
     probe = 1;
-    while (probe < leng && str[probe] == *str) probe++;
-    if (probe == leng) probe = 0;
+    while (probe < leng && str[probe] == *str)
+        probe++;
+    if (probe == leng)
+        probe = 0;
     first = *str;
     selected = str[probe];
     last = vi_file_end - leng;
@@ -226,8 +218,7 @@ static char *fwdsearch(char *str)
     return NULL;
 }
 
-static char *bcksearch(char *str)
-{
+static char *bcksearch(char *str) {
     unsigned leng = strlen(str), probe;
     char *p, *last;
     char first, selected;
@@ -235,8 +226,10 @@ static char *bcksearch(char *str)
     if (leng == 0 || leng > vi_byte_span(vi_file_mem, vi_file_end))
         return NULL;
     probe = 1;
-    while (probe < leng && str[probe] == *str) probe++;
-    if (probe == leng) probe = 0;
+    while (probe < leng && str[probe] == *str)
+        probe++;
+    if (probe == leng)
+        probe = 0;
     first = *str;
     selected = str[probe];
     last = vi_file_end - leng;

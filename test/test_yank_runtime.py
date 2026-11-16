@@ -22,12 +22,12 @@ def run(args, work):
 def main():
     with tempfile.TemporaryDirectory(prefix='vi-yank-runtime-') as directory:
         work = Path(directory)
-        for name in ('yankmem.c', 'yankmem.h', 'yankcopy.asm', 'yankcp.asm',
+        for name in ('yankmem.c', 'yankmem.h', 'yankcopy.asm', 'yankcpm.asm',
                      'yankd11.asm', 'yankd1c.asm', 'yankd20.asm'):
             shutil.copyfile(ROOT / name, work / name)
         shutil.copyfile(ROOT / 'test/yankprb.c', work / 'yankprb.c')
         try:
-            for source in ('yankcopy', 'yankcp', 'yankd11', 'yankd1c', 'yankd20'):
+            for source in ('yankcopy', 'yankcpm', 'yankd11', 'yankd1c', 'yankd20'):
                 run(['aztec43_acc', '-c', '-o', source + '.o', source + '.asm'], work)
             for source in ('yankmem', 'yankprb'):
                 run(['aztec43_acc', '-I.', '-squeeze', '-c', '-o', source + '.o',
@@ -36,7 +36,7 @@ def main():
                  '-DVI_TINY', '-DVI_DOS1_COM',
                  '-c', '-o', 'yankpc.o', 'yankprb.c'], work)
             for target_flag, adapter, output, capacity in (
-                    ('-target=cpm86', 'yankcp', 'yank.cmd', 42112),
+                    ('-target=cpm86', 'yankcpm', 'yank.cmd', 42112),
                     ('-target=dos1', 'yankd11', 'yank11.exe', 42112),
                     ('-target=dos1', 'yankd1c', 'yank11.com', 20480),
                     ('-target=dos2', 'yankd20', 'yank.exe', 42112)):

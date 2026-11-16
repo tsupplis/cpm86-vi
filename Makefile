@@ -52,18 +52,18 @@ all: vicp52.cmd vicp100.cmd vicpbios.cmd \
 # --------------------------------------------------------------------
 # Binary Link Targets
 # --------------------------------------------------------------------
-vicp52.cmd: $(SHARED_OBJS) yankcp.o cmdline.o savecp.o edit.o wincp52.o keycp52.o keyos.o os.o
+vicp52.cmd: $(SHARED_OBJS) yankcpm.o cmdline.o savecp.o edit.o wincp52.o keycp52.o keycpm.o vidcpm.o oscpm.o
 	$(LD) $(CPM86_LDFLAGS) -o $@ $(filter %.o,$^)
 	$(CMDMOD) -t DATA -n f000 -m 10000 $@ 1
 	$(CMDMOD) -t EXTRA -n 10000 -m 10000 $@ 2
 
-vicp100.cmd: $(SHARED_OBJS) yankcp.o cmdline.o savecp.o edit.o wincp100.o keycp100.o keyos.o os.o
+vicp100.cmd: $(SHARED_OBJS) yankcpm.o cmdline.o savecp.o edit.o wincp100.o keycp100.o keycpm.o vidcpm.o oscpm.o
 	$(LD) $(CPM86_LDFLAGS) -o $@ $(filter %.o,$^)
 	$(CMDMOD) -t DATA -n f000 -m 10000 $@ 1
 	$(CMDMOD) -t EXTRA -n 10000 -m 10000 $@ 2
 
 # CP/M-86 binary using the PC BIOS window/keyboard implementation
-vicpbios.cmd: $(SHARED_OBJS) yankcp.o cmdline.o savecp.o edit.o wincpbio.o keycpbio.o keybios.o vidbios.o keyos.o os.o
+vicpbios.cmd: $(SHARED_OBJS) yankcpm.o cmdline.o savecp.o edit.o wincpbio.o keycpbio.o keybios.o vidbios.o keycpm.o vidcpm.o oscpm.o
 	$(LD) $(CPM86_LDFLAGS) -o $@ $(filter %.o,$^)
 	$(CMDMOD) -t DATA -n f000 -m 10000 $@ 1
 	$(CMDMOD) -t EXTRA -n 10000 -m 10000 $@ 2
@@ -80,7 +80,7 @@ vid2bios.exe: $(SHARED_OBJS) yankd20.o cmddos.o savedos.o edit.o wind2bio.o keyd
 	$(LD) $(DOS20_LDFLAGS) -o $@ $^
 
 # Scratch diagnostics for BIOS cursor positioning
-curstest.cmd: curstest.o wincpbio.o keycpbio.o keybios.o vidbios.o keyos.o os.o
+curstest.cmd: curstest.o wincpbio.o keycpbio.o keybios.o vidbios.o keycpm.o vidcpm.o oscpm.o
 	$(LD) $(CPM86_LDFLAGS) -o $@ $(filter %.o,$^)
 
 curstest.com: curstestdos.o wind1bio.o keydos.o keybios.o vidbios.o
@@ -173,20 +173,20 @@ wind2bio.o: window.c gitver.h
 # --------------------------------------------------------------------
 # Compilation Rules: Keyboard, OS & I/O Adapters
 # --------------------------------------------------------------------
-keycp52.o: keyboard.c keyboard.h keyos.h
+keycp52.o: keyboard.c keyboard.h keycpm.h
 	$(CC) $(CFLAGS) -target=cpm86 -D__VTCMD__ -D__VT52__ -c -o $@ keyboard.c
 
-keycp100.o: keyboard.c keyboard.h keyos.h
+keycp100.o: keyboard.c keyboard.h keycpm.h
 	$(CC) $(CFLAGS) -target=cpm86 -D__VTCMD__ -D__VT100__ -c -o $@ keyboard.c
 
-keycpbio.o: keyboard.c keyboard.h keyos.h keybios.h
+keycpbio.o: keyboard.c keyboard.h keycpm.h keybios.h
 	$(CC) $(CFLAGS) -target=cpm86 -D__PCBIOS__ -c -o $@ keyboard.c
 
 keydos.o: keyboard.c keyboard.h keybios.h
 	$(CC) $(CFLAGS) -target=dos2 -c -o $@ keyboard.c
 
-keyos.o: keyos.c keyos.h
-	$(CC) $(CFLAGS) -c -o $@ keyos.c
+keycpm.o: keycpm.c keycpm.h oscpm.h
+	$(CC) $(CFLAGS) -target=cpm86 -c -o $@ keycpm.c
 
 keybios.o: keybios.asm
 	$(CC) $(CFLAGS) -c -o $@ $<
@@ -194,7 +194,10 @@ keybios.o: keybios.asm
 vidbios.o: vidbios.asm
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-os.o: os.asm
+oscpm.o: oscpm.asm
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+vidcpm.o: vidcpm.asm
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 # Save policy must match the linked runtime; never share the CP/M command object.
@@ -204,7 +207,7 @@ cmdline.o: cmdline.c save.h
 cmddos.o: cmdline.c save.h
 	$(CC) $(CFLAGS) -c -o $@ cmdline.c
 
-savecp.o: save.c save.h
+savecp.o: save.c save.h oscpm.h
 	$(CC) $(CFLAGS) -target=cpm86 -c -o $@ save.c
 
 savedos.o: save.c save.h
@@ -216,7 +219,7 @@ savedos.o: save.c save.h
 yankmem.o: yankmem.c yankmem.h
 	$(CC) $(CFLAGS) -c -o $@ yankmem.c
 
-yankcopy.o yankcp.o yankd11.o yankd20.o: %.o: %.asm
+yankcopy.o yankcpm.o yankd11.o yankd20.o: %.o: %.asm
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 yankd1c.o: yankd1c.asm yankd11.asm
@@ -263,7 +266,7 @@ main.o: save.h
 $(SHARED_OBJS) cmdline.o cmddos.o edit.o \
 wincp52.o wincp100.o wincpbio.o wind1bio.o wind2bio.o: stevie.h
 
-wincp52.o wincp100.o wincpbio.o: keyos.h
+wincp52.o wincp100.o wincpbio.o: vidcpm.h oscpm.h
 wincpbio.o wind1bio.o wind2bio.o: vidbios.h
 main.o misccmds.o: yankmem.h
 
