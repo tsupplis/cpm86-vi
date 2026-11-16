@@ -13,14 +13,7 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def function(source, signature):
-    start = source.index(signature)
-    pos = source.index('{', start) + 1
-    depth = 1
-    while depth:
-        depth += (source[pos] == '{') - (source[pos] == '}')
-        pos += 1
-    return source[start:pos]
+from test_editor_state import function
 
 
 def main():

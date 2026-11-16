@@ -92,8 +92,10 @@ git checkout) as the version shown by the `:v` command; see `gitver.h`
 ### Complete correctness regression
 
 Run `make test-regression` for one sequential regression batch. It force-rebuilds
-all six production formats in a private build directory, then runs the existing host, native-runtime and
-real-kernel correctness suites, including full-buffer/heap-headroom checks,
+all six production formats in a private build directory, then runs 27 steps:
+the original 21 build/host/native-runtime/kernel checks and six interactive
+acceptance tests, one for each production binary. It includes
+full-buffer/heap-headroom checks,
 keyboard, editing/undo, EOF, display, navigation, I/O, save and yank coverage.
 It requires the host sanitizer compiler, Aztec toolchain, `emu2`, PCE and the
 kernel images used by the individual native tests below.
@@ -109,7 +111,15 @@ log path. Any failed step makes the overall command fail. To choose a new output
 directory, run `python3 -B test/regression.py --output /path/to/new-directory`.
 The rebuilt binaries remain in the log directory's `build/` subdirectory;
 regression builds do not share or overwrite the working tree's objects or binaries.
-This aggregates the existing probes; it is not an exhaustive interactive UI test.
+The six interactive tests run those freshly rebuilt binaries in PCE, with
+timeouts, and check startup, typing, navigation, editing, save, reopen and exit.
+Saved bytes must match exactly after normalizing CRLF and CP/M record padding.
+The CP/M binaries run on CP/M-86, CCP/M-86, DOS Plus and Concurrent DOS;
+DOS 1 COM/EXE run on PC-DOS 1.1, and DOS 2 EXE runs on DOS Plus and Concurrent DOS.
+ANSI display layout is not asserted on the native VT52 fixtures; `vicp100` uses
+the standard `0` navigation command there instead of a VT52 Home sequence.
+Binary hashes and failed-case artifacts are retained with the logs.
+These are bounded acceptance scenarios, not exhaustive interactive UI coverage.
 
 Document redraws, status-line repainting and help hide the cursor while writing,
 then restore it before waiting for input. Ordinary command-line Backspace erases

@@ -2,6 +2,7 @@
 """Host regressions for editor state, EOF deletion and file/string insertion."""
 from pathlib import Path
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -10,8 +11,14 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def function(source, signature):
-    start = source.index(signature)
-    pos = source.index('{', start) + 1
+    name = re.search(r"([A-Za-z_]\w*)\s*\(", signature).group(1)
+    definition = re.search(
+        r"(?m)^[A-Za-z_][^;{}\n]*\b" + re.escape(name) +
+        r"\s*\([^;{}]*\)\s*(?:/\*[\s\S]*?\*/\s*)?\{", source)
+    if definition is None:
+        raise ValueError("Function definition not found: " + name)
+    start = definition.start()
+    pos = definition.end()
     depth = 1
     while depth:
         depth += (source[pos] == '{') - (source[pos] == '}')

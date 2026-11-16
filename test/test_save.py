@@ -5,6 +5,7 @@ Only BDOS pointer-width casts are adapted for the 64-bit host harness.
 from pathlib import Path
 import subprocess
 import tempfile
+from test_editor_state import function
 ROOT = Path(__file__).resolve().parents[1]
 HARNESS = r'''
 #define _POSIX_C_SOURCE 200809L
@@ -210,12 +211,9 @@ def main():
             subprocess.run([str(run/'test')],cwd=run,check=True)
 def editor_state():
     source=(ROOT/'cmdline.c').read_text()
-    a=source.index('static int writeit(char *fname)\n{')
-    b=source.index('\nvoid filemess',a)
-    body=source[a:b]
+    body=function(source, 'static int writeit(char *fname)')
     lines=(ROOT/'linefunc.c').read_text()
-    a=lines.index('unsigned vi_byte_span(')
-    span=lines[a:lines.index('\n}',a)+2]
+    span=function(lines, 'unsigned vi_byte_span(')
     harness=r'''#include <stdio.h>
 #include <assert.h>
 static char text[]="test";
