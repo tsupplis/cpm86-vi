@@ -37,11 +37,11 @@ SUITES = (
     ('display-compat', 'test_display_pce.py', '--compat-only'),
     ('vt-compat', 'test_vt_pce.py', '--compat-only'),
     ('interactive-vicp52.cmd', 'test_interactive.py', 'vicp52.cmd'),
-    ('interactive-vicp100.cmd', 'test_interactive.py', 'vicp100.cmd'),
     ('interactive-vicpbios.cmd', 'test_interactive.py', 'vicpbios.cmd'),
     ('interactive-vid1bios.com', 'test_interactive.py', 'vid1bios.com'),
     ('interactive-vid1bios.exe', 'test_interactive.py', 'vid1bios.exe'),
     ('interactive-vid2bios.exe', 'test_interactive.py', 'vid2bios.exe'),
+    ('interactive-vicp100.cmd', 'test_interactive.py', 'vicp100.cmd'),
 
 )
 

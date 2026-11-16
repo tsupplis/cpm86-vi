@@ -13,6 +13,7 @@ STUB = r'''
 struct sgttyb { int sg_flags; };
 #define CRMOD 16
 #define CBREAK 2
+#define RAW 32
 #define TIOCSETP 1
 int ioctl(int, int, struct sgttyb *);
 #endif
@@ -40,7 +41,8 @@ static int take_key(void) {
 static void on_wait(void) { waits++; queue('z'); }
 unsigned vi_cpm_os_identity(void) { return version; }
 int ioctl(int fd, int request, struct sgttyb *s) {
-    assert(fd == 0 && request == TIOCSETP && s->sg_flags == (CRMOD|CBREAK));
+    assert(fd == 0 && request == TIOCSETP);
+    assert(s->sg_flags == (CRMOD | (is_concurrent() ? CBREAK : RAW)));
     modes++; return 0;
 }
 int bdos(int fn, int arg) {

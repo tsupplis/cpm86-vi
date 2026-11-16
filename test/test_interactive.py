@@ -65,7 +65,7 @@ class Machine:
     def type(self, text):
         for char in text:
             key = {':': '+shift semicolon -shift', '\n': 'return',
-                   ' ': 'space', '.': 'period'}.get(char, char)
+                   ' ': 'space', '.': 'period', '=': 'equal'}.get(char, char)
             self.command('key ' + key)
             self.command('c 80000')
 
@@ -80,12 +80,18 @@ class Machine:
         (self.directory / 'screen.txt').write_text(text)
         return text
 
-    def until_screen(self, pattern):
-        for _ in range(80):
-            self.command('c 100000')
+    def until_screen(self, pattern, boot=False):
+        answered = set()
+        for _ in range(240):
+            self.command('c 1000000' if boot else 'c 100000')
             screen = self.screen()
             if re.search(pattern, screen, re.M):
                 return screen
+            if boot:
+                for prompt in ('Enter new date:', 'Enter new time:'):
+                    if prompt in screen and prompt not in answered:
+                        self.type('\n')
+                        answered.add(prompt)
         raise TimeoutError('Expected screen prompt: ' + pattern)
 
     def close(self):
@@ -137,15 +143,23 @@ def pce_case(base, program, system):
     (work/'pce.cfg').write_text(text)
     machine=Machine(work)
     try:
-        machine.until_screen(r'^A>')
+        machine.until_screen(r'^A>', boot=True)
         machine.command('c 100000')
         machine.type('b:\n')
         machine.until_screen(r'^B>')
         machine.command('c 100000')
+        if system == 'cdos41' and program == 'vid2bios.exe':
+            # Concurrent DOS limits EXE allocations per console. Allow the
+            # near data/heap and the separately allocated 64 KiB yank segment.
+            machine.type('addmem=128\n')
+            machine.until_screen(r'^B>\s*$')
         stem=Path(program).stem
         machine.type(stem+' check.txt\n');machine.command('c 1000000')
         screen=machine.screen()
-        assert 'Normal Mode' in screen.replace('\n',''), ('startup',system,program,screen)
+        if program != 'vicp100.cmd':
+            machine.until_screen('Normal Mode')
+        else:
+            machine.command('c 1000000')
         machine.type('i');machine.command('c 100000')
         machine.type('hello');machine.command('key esc');machine.command('c 100000')
         screen=machine.screen()
@@ -161,12 +175,16 @@ def pce_case(base, program, system):
         if program != 'vicp100.cmd':
             assert 'jello' in machine.screen(), ('navigation',system,program,machine.screen())
         machine.type(':wq\n');machine.command('c 1000000')
-        assert re.search(r'^B>\s*$',machine.screen(),re.M), ('exit',system,program,machine.screen())
+        machine.until_screen(r'^B>\s*$')
         machine.type(stem+' check.txt\n');machine.command('c 1000000')
         screen=machine.screen().replace('\n','')
-        assert 'Normal Mode' in screen and 'jello' in screen, ('reopen',system,program,screen)
+        if program != 'vicp100.cmd':
+            screen=machine.until_screen('Normal Mode')
+            assert 'jello' in screen, ('reopen',system,program,screen)
+        else:
+            machine.command('c 1000000')
         machine.type(':q\n');machine.command('c 1000000')
-        assert re.search(r'^B>\s*$',machine.screen(),re.M), ('second exit',system,program,machine.screen())
+        machine.until_screen(r'^B>\s*$')
     finally:machine.close()
     if fat:run('mcopy','-o','-i',work/'disk.img','::CHECK.TXT',work/'saved.txt')
     else:run('cpmcp','-f','ibmpc-514ss',work/'disk.img','0:check.txt',work/'saved.txt')

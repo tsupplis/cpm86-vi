@@ -82,10 +82,13 @@ static int concurrent_read(void) {
 int vi_cpm_key_init(int ansi) {
     unsigned identity;
     struct sgttyb stty;
-    stty.sg_flags = CRMOD | CBREAK;
-    ioctl(0, TIOCSETP, &stty);
     identity = vi_cpm_os_identity();
     concurrent_keys = (identity & 255) >= 0x30 && ((identity >> 8) & 5) != 0;
+    /* Classic BDOS 2 buffers typeahead that BDOS 6 cannot retrieve.
+     * RAW keeps normal C output on the same direct console interface
+     * as our input. CRMOD retains the runtime's LF-to-CRLF mapping. */
+    stty.sg_flags = CRMOD | (concurrent_keys ? CBREAK : RAW);
+    ioctl(0, TIOCSETP, &stty);
     ansi_keys = ansi;
     pending_bracket = pending_key = getch_size = getch_offset = 0;
     if (concurrent_keys) {
