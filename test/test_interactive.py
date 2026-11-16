@@ -137,7 +137,11 @@ def pce_case(base, program, system):
     (work/'pce.cfg').write_text(text)
     machine=Machine(work)
     try:
-        machine.command('c 3000000');machine.type('b:\n')
+        machine.until_screen(r'^A>')
+        machine.command('c 100000')
+        machine.type('b:\n')
+        machine.until_screen(r'^B>')
+        machine.command('c 100000')
         stem=Path(program).stem
         machine.type(stem+' check.txt\n');machine.command('c 1000000')
         screen=machine.screen()
