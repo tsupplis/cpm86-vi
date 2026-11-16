@@ -86,7 +86,13 @@ vt_count dw 0
 vt_interrupt:
     pushf
     cmp cx,2
+    je vt_record
+    cmp cx,6
     jne vt_chain
+    ; Direct console output; FD/FE/FF are input and status operations.
+    cmp dl,0fdh
+    jae vt_chain
+vt_record:
     push ax
     push di
     push es

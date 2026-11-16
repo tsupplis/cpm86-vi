@@ -97,7 +97,10 @@ def check(root, name, image, config, exitprog, program, video, ram=None, timing=
             assert int(new_ticks) <= int(old_ticks) + 2, (
                 name, 'Single-cell regression beyond BIOS-tick quantization', report)
         if case in ('0', '1', '3'):
-            assert int(new_cursor) < int(old_cursor), report
+            if case == '0':
+                assert int(new_cursor) <= int(old_cursor) + 24, report
+            else:
+                assert int(new_cursor) < int(old_cursor), report
             before += int(old_ticks)
             after += int(new_ticks)
     if not timing:

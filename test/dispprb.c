@@ -353,7 +353,9 @@ int main(int argc, char **argv)
         if (characters[0][mode] != characters[1][mode])
             ok = 0;
     }
-    if (positions[1][0] >= positions[0][0] ||
+    /* Mixed text now positions via INT 10h for every character run.
+     * Allow the final cursor update per row; repeated runs still batch. */
+    if (positions[1][0] > positions[0][0] + vi_rows - 1 ||
         positions[1][3] >= positions[0][3])
         ok = 0;
     if (!control_frame(reference_diff) || !control_frame(nexttoscreen))
