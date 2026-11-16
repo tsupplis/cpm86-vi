@@ -3,8 +3,10 @@
 #include "oscpm.h"
 #include "sgtty.h"
 extern int bdos(int fn, int argument);
+extern void vi_key_idle(void);
 
 static int concurrent_keys, ansi_keys;
+static int classic_idle;
 static int pending_bracket, pending_key;
 
 #define GETCH_BUFLEN 64
@@ -19,9 +21,12 @@ static int legacy_read(int wait) {
         getch_offset = (getch_offset + 1) % GETCH_BUFLEN;
         return c;
     }
-    while (!(c = bdos(6, 0xFF)))
+    while (!(c = bdos(6, 0xFF))) {
         if (!wait)
             return -1;
+        if (classic_idle)
+            vi_key_idle();
+    }
     while (getch_size < GETCH_BUFLEN && (d = bdos(6, 0xFF))) {
         getch_buffer[(getch_offset + getch_size) % GETCH_BUFLEN] = d;
         getch_size++;
@@ -83,6 +88,7 @@ int vi_cpm_key_init(int ansi) {
     unsigned identity;
     struct sgttyb stty;
     identity = vi_cpm_os_identity();
+    classic_idle = (identity & 255) < 0x30;
     concurrent_keys = (identity & 255) >= 0x30 && ((identity >> 8) & 5) != 0;
     /* Classic BDOS 2 buffers typeahead that BDOS 6 cannot retrieve.
      * RAW keeps normal C output on the same direct console interface
@@ -104,6 +110,7 @@ void vi_cpm_key_close(void) {
         bdos(2, '7');
     }
     concurrent_keys = 0;
+    classic_idle = 0;
     pending_bracket = pending_key = getch_size = getch_offset = 0;
 }
 

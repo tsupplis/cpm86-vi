@@ -26,11 +26,15 @@ PROBE = r'''
 #include "keyboard.h"
 #include "sgtty.h"
 static int version, keys[128], count, offset, reads, bios_reads, waits;
-static int expansions, resets, modes;
+static int expansions, resets, modes, idle_calls;
 static int is_concurrent(void) {
     return (version & 255) >= 0x30 && ((version >> 8) & 5);
 }
 static void queue(int key) { assert(count < 128); keys[count++] = key; }
+void vi_key_idle(void) {
+    assert((version & 255) < 0x30);
+    idle_calls++; queue('z');
+}
 static int take_key(void) {
     int key;
     assert(offset < count); key = keys[offset++];
@@ -99,6 +103,15 @@ int main(void) {
 #endif
         assert(expansions == (is_concurrent() ? 2 : 0));
         assert(vi_key_peek() == -1 && waits == 0);
+#ifdef __VTCMD__
+        before = idle_calls;
+        if ((version & 255) < 0x30) {
+            assert(vi_key_read() == 'z');
+            assert(idle_calls == before + 1);
+        }
+        before = idle_calls;
+        assert(vi_key_peek() == -1 && idle_calls == before);
+#endif
         queue('a'); queue('b'); queue(233);
         expect('a'); expect('b'); expect(233);
         assert(vi_key_peek() == -1 && waits == 0);

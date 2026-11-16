@@ -85,6 +85,9 @@ DOS 1 is also installed there as `VI.COM` and `VI.EXE`. DOS chooses `.COM`
 first when an extension is omitted: use `VI.EXE` or `VID1BIOS.EXE` explicitly
 for the larger buffer.
 
+`make dist` also produces `disks.zip`, containing `dos.img` and `cpm86.img`.
+These are byte-for-byte copies of `dostest.img` and `cpmtest.img`, respectively.
+
 Each build embeds the current `git describe` output (or `unknown` outside a
 git checkout) as the version shown by the `:v` command; see `gitver.h`
 (generated, not checked in) and `viversion()` in `window.c`.
@@ -623,6 +626,11 @@ Concurrent CP/M waits for input through BDOS 6 with `DL=FDh`, allowing the
 scheduler to suspend the waiting task. Nonblocking checks and pending
 extended-key bytes return immediately. CP/M-86 1.x VT52 uses ESC m/n for
 cursor visibility; later consoles retain ESC e/f.
+
+On classic CP/M-86 (BDOS below 3.0), VT builds execute `HLT` after an empty
+blocking input poll. Keyboard or timer interrupts wake the CPU; a key arriving
+between the poll and halt can wait one timer tick. Nonblocking polls, DOS Plus,
+Concurrent-family waits, and the BIOS keyboard path are unchanged.
 
 ### Keyboard ownership
 

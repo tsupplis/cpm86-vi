@@ -52,18 +52,18 @@ all: vicp52.cmd vicp100.cmd vicpbios.cmd \
 # --------------------------------------------------------------------
 # Binary Link Targets
 # --------------------------------------------------------------------
-vicp52.cmd: $(SHARED_OBJS) yankcpm.o cmdline.o savecp.o edit.o wincp52.o keycp52.o keycpm.o vidcpm.o oscpm.o
+vicp52.cmd: $(SHARED_OBJS) yankcpm.o cmdline.o savecp.o edit.o wincp52.o keycp52.o keycpm.o keywait.o vidcpm.o oscpm.o
 	$(LD) $(CPM86_LDFLAGS) -o $@ $(filter %.o,$^)
 	$(CMDMOD) -t DATA -n f000 -m 10000 $@ 1
 	$(CMDMOD) -t EXTRA -n 10000 -m 10000 $@ 2
 
-vicp100.cmd: $(SHARED_OBJS) yankcpm.o cmdline.o savecp.o edit.o wincp100.o keycp100.o keycpm.o vidcpm.o oscpm.o
+vicp100.cmd: $(SHARED_OBJS) yankcpm.o cmdline.o savecp.o edit.o wincp100.o keycp100.o keycpm.o keywait.o vidcpm.o oscpm.o
 	$(LD) $(CPM86_LDFLAGS) -o $@ $(filter %.o,$^)
 	$(CMDMOD) -t DATA -n f000 -m 10000 $@ 1
 	$(CMDMOD) -t EXTRA -n 10000 -m 10000 $@ 2
 
 # CP/M-86 binary using the PC BIOS window/keyboard implementation
-vicpbios.cmd: $(SHARED_OBJS) yankcpm.o cmdline.o savecp.o edit.o wincpbio.o keycpbio.o keybios.o vidbios.o keycpm.o vidcpm.o oscpm.o
+vicpbios.cmd: $(SHARED_OBJS) yankcpm.o cmdline.o savecp.o edit.o wincpbio.o keycpbio.o keybios.o vidbios.o keycpm.o keywait.o vidcpm.o oscpm.o
 	$(LD) $(CPM86_LDFLAGS) -o $@ $(filter %.o,$^)
 	$(CMDMOD) -t DATA -n f000 -m 10000 $@ 1
 	$(CMDMOD) -t EXTRA -n 10000 -m 10000 $@ 2
@@ -80,7 +80,7 @@ vid2bios.exe: $(SHARED_OBJS) yankd20.o cmddos.o savedos.o edit.o wind2bio.o keyd
 	$(LD) $(DOS20_LDFLAGS) -o $@ $^
 
 # Scratch diagnostics for BIOS cursor positioning
-curstest.cmd: curstest.o wincpbio.o keycpbio.o keybios.o vidbios.o keycpm.o vidcpm.o oscpm.o
+curstest.cmd: curstest.o wincpbio.o keycpbio.o keybios.o vidbios.o keycpm.o keywait.o vidcpm.o oscpm.o
 	$(LD) $(CPM86_LDFLAGS) -o $@ $(filter %.o,$^)
 
 curstest.com: curstestdos.o wind1bio.o keydos.o keybios.o vidbios.o
@@ -111,13 +111,21 @@ dostest.img: vid1bios.com vid1bios.exe vid2bios.exe dosbase.img test.txt
 	mcopy -i dostest.img test.txt  ::TEST.TXT
 	mdir -i dostest.img ::
 
-dist: vi.zip
+dist: vi.zip disks.zip
+
+disks.zip: dostest.img cpmtest.img
+	@set -e; stage=$$(mktemp -d); \
+	trap 'rm -rf "$$stage"' EXIT HUP INT TERM; \
+	cp dostest.img "$$stage/dos.img"; \
+	cp cpmtest.img "$$stage/cpm86.img"; \
+	zip -j "$$stage/disks.zip" "$$stage/dos.img" "$$stage/cpm86.img"; \
+	mv "$$stage/disks.zip" $@
 
 vi.zip: vicp52.cmd vicp100.cmd vicpbios.cmd vid1bios.com vid1bios.exe vid2bios.exe
 	rm -f vi.zip
 	zip vi.zip vicp52.cmd vicp100.cmd vicpbios.cmd vid1bios.com vid1bios.exe vid2bios.exe
 
-cpmtest.img dostest.img vi.zip: Makefile
+cpmtest.img dostest.img vi.zip disks.zip: Makefile
 
 # --------------------------------------------------------------------
 # Git Version Header
@@ -184,6 +192,9 @@ keycpbio.o: keyboard.c keyboard.h keycpm.h keybios.h
 
 keydos.o: keyboard.c keyboard.h keybios.h
 	$(CC) $(CFLAGS) -target=dos2 -c -o $@ keyboard.c
+
+keywait.o: keywait.asm
+	$(CC) -c -o $@ $<
 
 keycpm.o: keycpm.c keycpm.h oscpm.h
 	$(CC) $(CFLAGS) -target=cpm86 -c -o $@ keycpm.c
@@ -278,7 +289,7 @@ clean:
 	vicp52.cmd vicp100.cmd vicpbios.cmd \
 	vid1bios.com vid1bios.exe vid2bios.exe \
 	curstest.cmd curstest.com \
-	vi.zip
+	vi.zip disks.zip
 
 # --------------------------------------------------------------------
 # Emulator Execution Targets
