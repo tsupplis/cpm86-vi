@@ -6,4 +6,6 @@ int vi_cpm_key_init(int ansi);
 void vi_cpm_key_close(void);
 /* wait=0 polls and returns -1 when empty; wait=1 blocks. Consumes a byte. */
 int vi_cpm_key_read(int wait);
+/* Idle after an empty blocking poll; a no-op outside classic CP/M-86. */
+void vi_cpm_key_idle(void);
 #endif

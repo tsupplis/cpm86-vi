@@ -24,8 +24,7 @@ static int legacy_read(int wait) {
     while (!(c = bdos(6, 0xFF))) {
         if (!wait)
             return -1;
-        if (classic_idle)
-            vi_key_idle();
+        vi_cpm_key_idle();
     }
     while (getch_size < GETCH_BUFLEN && (d = bdos(6, 0xFF))) {
         getch_buffer[(getch_offset + getch_size) % GETCH_BUFLEN] = d;
@@ -120,4 +119,9 @@ int vi_cpm_key_read(int wait) {
     if (!wait && !pending_bracket && !pending_key && !(bdos(11, 0) & 255))
         return -1;
     return concurrent_read();
+}
+
+void vi_cpm_key_idle(void) {
+    if (classic_idle)
+        vi_key_idle();
 }

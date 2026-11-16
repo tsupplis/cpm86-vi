@@ -627,10 +627,11 @@ scheduler to suspend the waiting task. Nonblocking checks and pending
 extended-key bytes return immediately. CP/M-86 1.x VT52 uses ESC m/n for
 cursor visibility; later consoles retain ESC e/f.
 
-On classic CP/M-86 (BDOS below 3.0), VT builds execute `HLT` after an empty
+On classic CP/M-86 (BDOS below 3.0), VT and BIOS builds execute `HLT` after an empty
 blocking input poll. Keyboard or timer interrupts wake the CPU; a key arriving
 between the poll and halt can wait one timer tick. Nonblocking polls, DOS Plus,
-Concurrent-family waits, and the BIOS keyboard path are unchanged.
+and Concurrent-family waits are unchanged. The BIOS path refreshes the cursor
+on each wait-loop iteration before idling.
 
 ### Keyboard ownership
 

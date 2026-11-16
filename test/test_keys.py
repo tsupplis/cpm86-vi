@@ -42,7 +42,14 @@ static int take_key(void) {
     bios_reads++;
     return key;
 }
-static void on_wait(void) { waits++; queue('z'); }
+static void on_wait(void) {
+    waits++;
+#ifdef __CPM86__
+    /* Classic CP/M receives the simulated key during the idle interrupt. */
+    if ((version & 255) < 0x30) return;
+#endif
+    queue('z');
+}
 unsigned vi_cpm_os_identity(void) { return version; }
 int ioctl(int fd, int request, struct sgttyb *s) {
     assert(fd == 0 && request == TIOCSETP);
@@ -144,8 +151,15 @@ int main(void) {
         if (is_concurrent()) assert(bios_reads == 0);
 #if defined(__PCBIOS__) || defined(__MSDOS__)
         if(!is_concurrent()) {
+            before = idle_calls;
             queue(0x3b00); assert(vi_key_peek() == -1 && waits == 0);
+            assert(idle_calls == before);
             assert(vi_key_read() == 'z' && waits == 1);
+#ifdef __CPM86__
+            assert(idle_calls == before + ((version & 255) < 0x30));
+#else
+            assert(idle_calls == before);
+#endif
         }
 #endif
         decode('x','x',0);

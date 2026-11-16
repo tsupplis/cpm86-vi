@@ -35,14 +35,16 @@ static int getch(int wait) {
         /* Don't block in INT 16h: CP/M-86's background clock/status
          * update can reposition the BIOS cursor while we're blocked,
          * with no chance for us to correct it until a key arrives.
-         * Poll instead, re-asserting our cursor position every time
-         * around, so any interference is fought at high frequency
-         * instead of just once, best-effort, after the fact. */
+         * Poll instead, refreshing the cursor on each iteration. Classic
+         * CP/M-86 idles until a keyboard/timer interrupt between polls. */
         while (!vi_bios_key_ready()) {
             if (!wait)
                 return -1;
             if (wait_hook)
                 (*wait_hook)();
+#ifdef __CPM86__
+            vi_cpm_key_idle();
+#endif
         }
         c = vi_bios_key_read();
         al = c & 0xff;
