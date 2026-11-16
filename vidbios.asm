@@ -149,8 +149,6 @@ vi_bios_run_ proc near
     push es
     mov si,[bp+4]
     mov di,[bp+6]
-    mov ax,40h
-    mov es,ax
     mov dh,byte ptr [bp+8]
     mov dl,byte ptr [bp+10]
 vb_next:
@@ -168,7 +166,18 @@ vb_repeat:
     inc cx
     jmp vb_repeat
 vb_write:
-    mov word ptr es:[50h],dx
+    ; Use the cursor API so virtualized BIOS consoles see the position too.
+    push ax
+    push cx
+    push dx
+    push bp
+    mov ah,2
+    xor bh,bh
+    int 10h
+    pop bp
+    pop dx
+    pop cx
+    pop ax
     mov ah,0Ah
     xor bh,bh
     push cx

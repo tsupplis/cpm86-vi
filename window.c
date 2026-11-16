@@ -302,10 +302,10 @@ void windstr(char *s) {
         windputc(*s++);
 }
 
-/* Runs stay within one row. Set the BIOS data-area cursor before each BIOS
- * write so background console updates cannot redirect the rest of the run.
- * AH=0Ah preserves cell attributes; the hardware cursor is updated once at the
- * end. */
+/* Runs stay within one row. Position through the BIOS API before each run
+ * so virtualized consoles also receive the cursor coordinates.
+ * AH=0Ah preserves cell attributes; windgoto leaves the cursor after the text
+ * when the complete row span has been written. */
 void windputrun(const char *text, unsigned length) {
     vi_bios_run(text, length, cur_row, cur_col, vi_columns);
     cur_col += length;
