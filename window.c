@@ -6,11 +6,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #ifdef __CPM86__
-#include "sgtty.h"
 #include "keyos.h"
 #endif
 #include "gitver.h"
-#include "keyboard.h"
 
 #ifdef __MSDOS__
 #define __PCBIOS__
@@ -96,7 +94,6 @@ int cpm_version_31(void)
 static void winderror(void)
 {
 	fputs("Unable to write terminal output!\n", stderr);
-	vi_key_exit();
 	exit(1);
 }
 
@@ -110,19 +107,13 @@ static void windout(const char *text, unsigned length)
 
 void windinit(void)
 {
-	struct sgttyb stty;
-	stty.sg_flags = CRMOD|CBREAK;
-	ioctl(0, TIOCSETP, &stty);
-
-#if defined(__VT100__)
-    vi_key_init(1);
-#else
-    vi_key_init(0);
-#endif
 	vi_columns=80;
 	vi_rows=24;
-	/* Here we want no echo, disable line buffering / erase kill
-	   and no newline - curses noecho(), cbreak(), nonl() */
+}
+
+void windrefreshcursor(void)
+{
+    /* Terminal consoles retain their own cursor position while waiting. */
 }
 
 void windgoto(int r, int c)
@@ -144,7 +135,6 @@ void windgoto(int r, int c)
 
 void windexit(int r)
 {
-    vi_key_exit();
     windclear();
     windgoto(0,0);
     windcursor(1);
@@ -168,8 +158,12 @@ static void windclreol(void)
 void windcursor(int on)
 {
 #if defined(__VT52__)
-	/* ESC f = cursor off, ESC e = cursor on (CP/M-86 >= 2.2) */
-	printf(on ? "\033e" : "\033f");
+	/* CP/M-86 1.x reports BDOS 2.2 and uses ESC m/n.
+	 * Later consoles use ESC e/f. */
+	if (cpm_version_below(3, 0))
+		printf(on ? "\033m" : "\033n");
+	else
+		printf(on ? "\033e" : "\033f");
 #elif defined(__VT100__)
 	printf(on ? "\033[?25h" : "\033[?25l");
 #endif
@@ -238,32 +232,19 @@ void beep(void)
 /* ------------------------------------------------------------------ */
 #if defined(__PCBIOS__)
 
+#include "vidbios.h"
+
 static int curattr = 7;	/* current text attribute (white on black) */
 static int wp_row, wp_col;	/* scratch cursor position for windclreol */
 static int wp_count;
-static int clearbottom;		/* Rows-1, for windclear()'s scroll region */
 static int cur_row, cur_col;	/* our own idea of where the cursor is */
 
 void windinit(void)
 {
-#if defined(__CPM86__)
-	struct sgttyb stty;
-
-	/* Same raw/no-echo console mode as the VTCMD build: without this,
-	 * BDOS's own console driver stays in line-buffered/cooked mode and
-	 * fights with our direct BIOS reads and writes over the cursor. */
-	stty.sg_flags = CRMOD|CBREAK;
-	ioctl(0, TIOCSETP, &stty);
-#endif
 	/* No video mode or page select here: querying/forcing the mode
 	 * (AH=0Fh/AH=0) hung or exited immediately on CGA/MDA adapters.
 	 * CP/M-86 and DOS both already leave the display in a valid 80x25
 	 * text mode (mono on MDA, colour on CGA/EGA/VGA) before we start. */
-#if defined(__VT100__)
-    vi_key_init(1);
-#else
-    vi_key_init(0);
-#endif
 	vi_columns=80;
 	/* Match the 24-line convention of the vivt52/vivt100 CP/M-86 builds;
 	 * plain DOS gets the full 25-line BIOS text mode. */
@@ -280,12 +261,10 @@ void windinit(void)
 
 void windgoto(int r, int c)
 {
-	int dummy;	/* forces a bp frame so [bp+N] addresses the args */
-
 	cur_row = r;
 	cur_col = c;
 	/* AH=2: set cursor position, BH=page, DH=row, DL=column */
-#include "windgoto.asm"
+	vi_bios_goto(r, c);
 }
 
 /* Re-issue our last known cursor position, without changing it. Used by
@@ -299,7 +278,6 @@ void windrefreshcursor(void)
 
 void windexit(int r)
 {
-    vi_key_exit();
     windclear();
     windgoto(0,0);
     windcursor(1);
@@ -329,10 +307,8 @@ static void windclreol(void)
 
 void windcursor(int on)
 {
-	int dummy;	/* forces a bp frame so [bp+N] addresses the arg */
-
 	/* AH=1: set cursor shape; a start-scanline past the end hides it */
-#include "windcurs.asm"
+	vi_bios_cursor(on);
 }
 
 void windcolor(int fg)
@@ -347,25 +323,17 @@ void windcolorreset(void)
 
 void windclear(void)
 {
-	clearbottom = vi_rows - 1;
-	/* AH=6: scroll up window. AL=0 ("clear") is a documented shortcut
-	 * that some non-genuine BIOS clones don't implement correctly;
-	 * AL=25 (>= window height) forces the real scroll path instead,
-	 * which has the same visual effect (nothing left to scroll into
-	 * view) but is far more widely compatible. */
-#include "windclr.asm"
+	vi_bios_clear(vi_rows - 1);
 }
 
 void windputc(int c)
 {
-	int dummy;	/* forces a bp frame so [bp+N] addresses the arg */
-
 	/* Re-assert our own tracked position before writing: CP/M-86 runs a
 	 * background clock/status update on its own that can silently move
 	 * the BIOS cursor while we're blocked waiting for a keystroke, so we
 	 * can't trust "wherever the cursor already is" to still be ours.
 	 * AH=2 sets it, then AH=0eh writes the char and auto-advances. */
-#include "windputc.asm"
+	vi_bios_putc(cur_row, cur_col, c);
 	cur_col++;
 	if ( cur_col >= vi_columns ) {
 		cur_col = 0;
@@ -384,9 +352,7 @@ void windstr(char *s)
  * preserves cell attributes; the hardware cursor is updated once at the end. */
 void windputrun(const char *text, unsigned length)
 {
-	int dummy;
-
-#include "windrun.asm"
+	vi_bios_run(text, length, cur_row, cur_col, vi_columns);
 	cur_col += length;
 	if (cur_col >= vi_columns) {
 		cur_col -= vi_columns;

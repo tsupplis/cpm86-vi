@@ -118,7 +118,6 @@ int main(int argc, char **argv)
 
     if (argc <= 1) {
         windusage();
-        vi_key_exit();
         exit(1);
     }
 
@@ -158,6 +157,11 @@ int main(int argc, char **argv)
     }
 #endif
 
+    if (atexit(vi_key_close) != 0) {
+        fputs("Unable to register keyboard cleanup!\n", stderr);
+        return 1;
+    }
+    vi_key_init(windrefreshcursor);
     windinit();
 
     /* Make sure Rows/Columns are big enough */
@@ -168,7 +172,6 @@ int main(int argc, char **argv)
 
     if (!vi_set_filename(argv[1])) {
         fputs("Unable to allocate initial filename!\n", stderr);
-        vi_key_exit();
         return 1;
     }
 
@@ -378,7 +381,6 @@ static void filealloc(void) {
     if ((vi_file_mem = malloc((unsigned)FILELENG)) == NULL) {
         fprintf(stderr, "Unable to allocate %u bytes for file memory!\n",
                 (unsigned)FILELENG);
-        vi_key_exit();
         exit(1);
     }
     vi_file_max = vi_file_mem + FILELENG;
@@ -391,7 +393,6 @@ static void screenalloc(void) {
 
 static void screenerror(void) {
     fputs("Unable to access external screen memory!\n", stderr);
-    vi_key_exit();
     exit(1);
 }
 
@@ -537,7 +538,7 @@ int vgetc(void) {
         return (nextc);
     }
     getc_stuffed = 0;
-    return (windgetc());
+    return (vi_key_read());
 }
 
 int vstuffed(void) {

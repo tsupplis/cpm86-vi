@@ -1,161 +1,195 @@
 #!/usr/bin/env python3
-"""Host tests of the real concurrent adapter and windgetc dispatch."""
+"""Test the keyboard module through its public API; mock only hardware calls."""
 from pathlib import Path
 import os
 import subprocess
 import tempfile
-from test_editor_state import function
 
-root = Path(__file__).resolve().parents[1]
-edit = (root / 'edit.c').read_text()
-start = edit.index('int windgetc(void)')
-end = edit.index('\n}', start) + 2
-wrapper = edit[start:end]
-source = r'''
+ROOT = Path(__file__).resolve().parents[1]
+source = (ROOT / 'keyboard.c').read_text()
+STUB = r'''
+#ifndef TEST_SGTTY_H
+#define TEST_SGTTY_H
+struct sgttyb { int sg_flags; };
+#define CRMOD 16
+#define CBREAK 2
+#define TIOCSETP 1
+int ioctl(int, int, struct sgttyb *);
+#endif
+'''
+PROBE = r'''
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-static int version, inputs, nout, legacy_calls;
-static unsigned char output[32];
-static int input, crt_resets;
-static int peeked = -1;
-int dosplus_crtreset(void) { crt_resets++; return 0; }
-static void check(int ok) { if (!ok) { fputs("keyboard check failed\n", stderr); exit(1); } }
+#include "keyboard.h"
+#include "sgtty.h"
+static int version, keys[128], count, offset, reads, bios_reads, waits;
+static int expansions, resets, modes;
+static int is_concurrent(void) {
+    return (version & 255) >= 0x30 && ((version >> 8) & 5);
+}
+static void queue(int key) { assert(count < 128); keys[count++] = key; }
+static int take_key(void) {
+    int key;
+    assert(offset < count); key = keys[offset++];
+    if (offset == count) count = offset = 0;
+    bios_reads++;
+    return key;
+}
+static void on_wait(void) { waits++; queue('z'); }
 int osver(void) { return version & 255; }
 int ostype(void) { return version >> 8; }
-int bdos(int fn, int arg) {
-    if (fn == 2) { check(nout < 32); output[nout++] = arg; return 0; }
-    check(fn == 6 && arg == 255); inputs++; return input;
+int dosplus_crtreset(void) { resets++; return 0; }
+int ioctl(int fd, int request, struct sgttyb *s) {
+    assert(fd == 0 && request == TIOCSETP && s->sg_flags == (CRMOD|CBREAK));
+    modes++; return 0;
 }
-static int getch(int wait) { legacy_calls++; return 'x'; }
+int bdos(int fn, int arg) {
+    int key;
+    if (fn == 2) {
+        assert(is_concurrent());
+        assert(arg == 27 || arg == '6' || arg == '7');
+        expansions++; return 0;
+    }
+    if (fn == 11) { assert(is_concurrent()); return count ? 255 : 0; }
+    assert(fn == 6);
+    assert(arg == (is_concurrent() ? 253 : 255));
+    reads++;
+    if (!count) { assert(arg == 255); return 0; }
+    key = keys[offset++];
+    if (offset == count) count = offset = 0;
+    return key;
+}
 #include "keyos.c"
-#include "keyboard.c"
-''' + wrapper + r'''
+int vi_bios_key_read(void) { return take_key(); }
+int vi_bios_key_ready(void) { return count != 0; }
+#include "keys.c"
+static void expect(int value) {
+    int before = reads + bios_reads;
+    assert(vi_key_peek() == value);
+    before = reads + bios_reads;
+    assert(vi_key_peek() == value);
+    assert(vi_key_read() == value);
+    assert(reads + bios_reads == before);
+}
+static void decode(int input, int expected, int navigation) {
+    int direct;
+    assert(vi_key_decode_command(input, &direct) == expected);
+    assert(direct == navigation);
+}
+static void check_closed(void) {
+    assert(expansions == (is_concurrent() ? 4 : 0));
+}
 int main(void) {
-    int ansi, i, n;
-    int keys[] = {0xC8,0xD0,0xCD,0xCB,0xC7,0xC9,0xD2,0xCF,0xD1,0xD3};
-    char letters[] = "ABCDHIL";
-    int direct[] = {26,10,127};
-    version = 0x1431;
-    for (ansi = 0; ansi <= 1; ansi++) {
-        nout = 0;
-        vi_key_init(ansi);
-        check(vi_key_concurrent() && nout == 2 && !memcmp(output,"\0336",2));
-        for (i = 0; i < 10; i++) {
-            input = keys[i]; n = inputs;
-            if (i < 7) {
-                check(windgetc() == 27);
-                if (ansi) check(windgetc() == '[');
-                check(windgetc() == letters[i]);
-            } else check(windgetc() == direct[i-7]);
-            check(inputs == n+1 && legacy_calls == 0);
-        }
-        input = 0xE9; check(windgetc() == 0xE9); /* do not mask text to 7 bits */
-        input = 27; check(windgetc() == 27); /* literal Esc */
-        vi_key_exit(); vi_key_exit();
-        check(!vi_key_concurrent() && nout == 4 && !memcmp(output,"\0336\0337",4));
-    }
-    version = 0x1022; nout = 0;
-    vi_key_init(0); check(!vi_key_concurrent() && windgetc() == 'x');
-    vi_key_exit(); check(nout == 0);
-    version = 0x1041; vi_key_init(0); check(!vi_key_concurrent());
-    version = 0x1422; vi_key_init(0); check(!vi_key_concurrent());
-    version = 0x1041; vi_os_close(); check(crt_resets == 1);
-    version = 0x1441; vi_os_close(); check(crt_resets == 1);
-    version = 0x1431; vi_os_close(); check(crt_resets == 1);
-    version = 0x1022; vi_os_close(); check(crt_resets == 1);
-    puts("PASS: VI raw keys, terminal sequences, unsigned bytes, legacy gate and no BIOS dispatch concurrently");
-    return 0;
-}
-'''
-with tempfile.TemporaryDirectory(prefix='vi-keys-') as folder:
-    work = Path(folder)
-    (work / 'keys.c').write_text(source)
-    binary = work / 'keys'
-    subprocess.run([os.environ.get('CC_HOST','cc'),'-std=gnu89','-D__CPM86__',
-                    '-fsanitize=address,undefined','-I'+str(root),str(work/'keys.c'),'-o',str(binary)],check=True)
-    subprocess.run([str(binary)],check=True)
-
-raw = edit[edit.index('#if defined(__PCBIOS__)'):edit.index('void edit(void)')]
-raw = raw.replace(function(edit, 'static int bioskey(void)'),
-                  'static int bioskey(void) { return take_key(); }')
-raw = raw.replace(function(edit, 'static int keyready(void)'),
-                  'static int keyready(void) { return key_count != 0; }')
-poll_probe = r'''
-#include <assert.h>
-#include <stdio.h>
-#include "stevie.h"
-#include "keyboard.h"
-static int keys[16], key_count, key_offset;
-static int take_key(void) {
-    assert(key_count > 0);
-    key_count--;
-    return keys[key_offset++];
-}
-static void queue(int a, int b, int c) {
-    assert(!key_count);
-    key_offset = 0;
-    keys[0] = a; keys[1] = b; keys[2] = c;
-    key_count = c >= 0 ? 3 : b >= 0 ? 2 : 1;
-}
-int vi_os_concurrent(void) { return CONCURRENT; }
-int bdos(int fn, int arg) {
-    if (fn == 2) return 0;
-    if (fn == 11) return key_count ? 255 : 0;
-    assert(fn == 6 && arg == 255);
-    return key_count ? take_key() : 0;
-}
-void windrefreshcursor(void) { assert(0); }
-''' + raw + r'''
-int main(void) {
-    vi_key_init(1);
-    assert(windpeek() == -1);
-    queue('a', 'b', 'c');
-    assert(windpeek() == 'a' && windpeek() == 'a');
-    assert(windgetc() == 'a');
-    assert(windpeek() == 'b' && windgetc() == 'b');
-    assert(windpeek() == 'c' && windgetc() == 'c');
-    assert(windpeek() == -1);
-    queue(27, 8, 233);
-    assert(windpeek() == 27 && windgetc() == 27);
-    assert(windpeek() == 8 && windgetc() == 8);
-    assert(windpeek() == 233 && windgetc() == 233);
-    assert(windpeek() == -1);
-#if defined(__PCBIOS__) && !CONCURRENT
-    {
-        static int scans[] = {0x48,0x50,0x4d,0x4b,0x47,0x49,0x52,0x51,0x4f,0x53};
-        static char mapped[] = "ABCDHIL\n\032\177";
-        int i;
-        for (i = 0; i < 10; i++) {
-            queue(scans[i] << 8, -1, -1);
-            if (i < 7)
-                assert(windpeek() == 27 && windgetc() == 27);
-            assert(windpeek() == mapped[i] && windgetc() == mapped[i]);
-        }
-    }
-    queue(0x3b00, -1, -1);
-    assert(windpeek() == -1);
-#elif CONCURRENT
-    queue(0xcd, -1, -1);
-    assert(windpeek() == 27 && windgetc() == 27);
-    assert(windpeek() == '[' && windgetc() == '[');
-    assert(windpeek() == 'C' && windgetc() == 'C');
+    int versions[] = {0x1022,0x1431,0x1441,0x1041};
+    int v, i, before;
+    int scans[] = {0x48,0x50,0x4d,0x4b,0x47,0x49,0x52,0x4f,0x51,0x53};
+    int concurrent[] = {0xc8,0xd0,0xcd,0xcb,0xc7,0xc9,0xd2,0xcf,0xd1,0xd3};
+    char mapped[] = "ABCDHIL\032\n\177";
+    for (v=0; v<4; v++) {
+#ifdef __CPM86__
+        version = versions[v];
+#else
+        version = 0;
 #endif
-    assert(windpeek() == -1);
-    vi_key_exit();
-    puts("PASS: nonblocking keyboard peek, retained controls and extended keys");
+        expansions = modes = reads = bios_reads = waits = 0;
+        vi_key_init(on_wait);
+#ifdef __CPM86__
+        assert(modes == 1);
+#endif
+        assert(expansions == (is_concurrent() ? 2 : 0));
+        assert(vi_key_peek() == -1 && waits == 0);
+        queue('a'); queue('b'); queue(233);
+        expect('a'); expect('b'); expect(233);
+        assert(vi_key_peek() == -1 && waits == 0);
+        queue(27); queue(8); queue(0x11);
+        expect(27); expect(8); expect(0x11);
+        for(i=0;i<10;i++) {
+            if (is_concurrent()) queue(concurrent[i]);
+#if defined(__PCBIOS__) || defined(__MSDOS__)
+            else queue(scans[i] << 8);
+#else
+            else {
+                if (i<7) {
+                    queue(27);
+#ifdef __VT100__
+                    queue('[');
+#endif
+                }
+                queue(mapped[i]);
+            }
+#endif
+            if(i<7) {
+                expect(27);
+#ifdef __VT100__
+                expect('[');
+#endif
+            }
+            expect(mapped[i]);
+        }
+        assert(vi_key_peek() == -1);
+        if (is_concurrent()) assert(bios_reads == 0);
+#if defined(__PCBIOS__) || defined(__MSDOS__)
+        if(!is_concurrent()) {
+            queue(0x3b00); assert(vi_key_peek() == -1 && waits == 0);
+            assert(vi_key_read() == 'z' && waits == 1);
+        }
+#endif
+        decode('x','x',0);
+        decode(27,-1,0);
+#ifdef __VT100__
+        decode('[',-1,1);
+#endif
+        decode('A','k',1);
+        decode(27,-1,0); decode('x','x',0);
+        decode(27,-1,0); decode(27,-1,0);
+#ifdef __VT100__
+        decode('[',-1,1);
+#endif
+        decode('H','0',1);
+        decode(26,'$',1); decode(10,6,1);
+#ifdef __CPM86__
+        decode(0x13,'h',0); decode(0x04,'l',0);
+        decode(0x11,-1,0); decode('E','0',0);
+        decode(0x11,-1,0); decode('X','$',0);
+        decode(0x11,-1,0); decode('?',-1,0);
+#else
+        decode(0x11,0x11,0);
+#endif
+        /* Closing clears buffered bytes and incomplete decoder prefixes. */
+        queue('q'); assert(vi_key_peek() == 'q');
+        decode(27,-1,0);
+        before = expansions;
+        vi_key_close(); vi_key_close();
+        assert(expansions == before + (is_concurrent() ? 2 : 0));
+        vi_key_init(on_wait);
+        assert(vi_key_peek() == -1);
+        decode('A','A',0);
+        vi_key_close();
+    }
+    /* Application-owned atexit cleanup must also run on error exit paths. */
+    expansions = 0;
+    assert(atexit(check_closed) == 0);
+    assert(atexit(vi_key_close) == 0);
+    vi_key_init(on_wait);
+    puts("PASS: OS dispatch, read/peek, navigation, literals, decoding, lifecycle");
     return 0;
 }
 '''
-with tempfile.TemporaryDirectory(prefix='vi-key-peek-') as folder:
-    work = Path(folder)
-    (work / 'peek.c').write_text(poll_probe)
-    for flags in (['-D__PCBIOS__', '-DCONCURRENT=0'],
-                  ['-D__VTCMD__', '-DCONCURRENT=0'],
-                  ['-D__PCBIOS__', '-DCONCURRENT=1']):
+with tempfile.TemporaryDirectory(prefix='vi-keyboard-') as directory:
+    work = Path(directory)
+    (work / 'sgtty.h').write_text(STUB)
+    (work / 'keys.c').write_text(source)
+    (work / 'probe.c').write_text(PROBE)
+    profiles = [('cpm52', ['-D__CPM86__', '-D__VTCMD__', '-D__VT52__']),
+                ('cpm100', ['-D__CPM86__', '-D__VTCMD__', '-D__VT100__']),
+                ('cpmbios', ['-D__CPM86__', '-D__PCBIOS__']),
+                ('dos1', ['-D__MSDOS__=1']), ('dos2', ['-D__MSDOS__=2'])]
+    for name, flags in profiles:
         subprocess.run([os.environ.get('CC_HOST', 'cc'), '-std=gnu89',
-                        '-D__CPM86__', *flags, '-fsanitize=address,undefined',
-                        '-I' + str(root), str(work / 'peek.c'),
-                        str(root / 'keyboard.c'), '-o', str(work / 'peek')],
-                       check=True)
-        subprocess.run([str(work / 'peek')], check=True, timeout=10)
+                        '-fsanitize=address,undefined', *flags,
+                        '-I'+str(work), '-I'+str(ROOT), str(work/'probe.c'),
+                        '-o', str(work/'probe')], check=True)
+        subprocess.run([str(work/'probe')], check=True, timeout=10)
+        print(name, 'PASS', flush=True)

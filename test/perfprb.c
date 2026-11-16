@@ -42,6 +42,8 @@ int main(void)
     int ok;
 
     REQUIRE(vi_yank_init());
+    atexit(vi_key_close);
+    vi_key_init(windrefreshcursor);
     windinit();
     screenalloc();
     filealloc();
@@ -124,7 +126,7 @@ int main(void)
 finish:
     if (spare != NULL)
         free(spare);
-    vi_key_exit();
+    vi_key_close();
     vi_yank_close();
     report = fopen("RESULT.TXT", "w");
     if (report == NULL)

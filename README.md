@@ -609,6 +609,32 @@ paths are preserved. VI includes its own small OS helpers and needs no utility
 library. The BIOS build still uses BIOS display calls; prefer VT52 for native
 Concurrent CP/M consoles.
 
+Concurrent CP/M waits for input through BDOS 6 with `DL=FDh`, allowing the
+scheduler to suspend the waiting task. Nonblocking checks and pending
+extended-key bytes return immediately. CP/M-86 1.x VT52 uses ESC m/n for
+cursor visibility; later consoles retain ESC e/f.
+
+### Keyboard ownership
+
+`keyboard.c` owns BIOS/BDOS selection, raw input, buffering, terminal key
+sequences and CP/M command-key mappings. Its public interface is in
+`keyboard.h`: `vi_key_init`, `vi_key_close`, `vi_key_read`, `vi_key_peek`,
+and `vi_key_decode_command`. Read blocks; peek returns `-1` when empty
+and retains the next byte. Command decoding is separate from raw input so
+insert/literal input and replayed commands keep their existing behaviour.
+
+`edit.c` contains no OS or terminal selection. `main.c` initializes the
+keyboard once and registers its cleanup with `atexit`. It supplies the
+optional cursor-maintenance callback; the keyboard has no direct display
+module dependency. `window.c` owns display operations and does not initialize
+or close the keyboard. The low-level OS helpers remain in `keyos.c`/`os.asm`.
+BIOS instructions live in separately linked `keybios.asm` and `vidbios.asm`,
+with declarations in their matching private headers. They own their stack
+frames and take explicit arguments; no assembly fragments are included in C.
+
+`main.c` still has separate CP/M user-area setup; this input refactor does not
+make the entire application entry module OS-independent.
+
 ## Viewport scrolling
 
 Up/Down scroll only as far as needed to keep the cursor visible. Page and

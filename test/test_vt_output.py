@@ -16,6 +16,7 @@ struct sgttyb { int sg_flags; };
 #define CBREAK 2
 #define TIOCSETP 1
 int ioctl(int, int, struct sgttyb *);
+int cpm_version_below(int, int);
 ssize_t probe_write(int, const void *, size_t);
 int probe_flush(FILE *);
 '''
@@ -29,8 +30,10 @@ PROBE = r'''
 #include "stub.h"
 int vi_rows = 24, vi_columns = 80;
 static int failure, writes;
-void vi_key_init(int ansi) { (void)ansi; }
-void vi_key_exit(void) { fputs("keys restored\n", stderr); }
+int cpm_version_below(int major, int minor) {
+    (void)major; (void)minor;
+    return getenv("VI_TEST_LEGACY") != NULL;
+}
 int ioctl(int fd, int request, struct sgttyb *state) {
     (void)fd; (void)request; (void)state; return 0;
 }
@@ -118,12 +121,16 @@ def main():
                          b'\x1b[32m~\x1b[0m\x1b[?25l\x1b[?25h'
                          b'\x1b[2J\x1b[H\x1b[23;80HZsuffix')
             assert result.stdout == expected, (terminal, result.stdout, expected)
+            if terminal == '52':
+                result = subprocess.run([str(work / 'probe')], capture_output=True,
+                                        env=dict(os.environ, VI_TEST_LEGACY='1'))
+                legacy = expected.replace(b'\x1bf\x1be\x1bE', b'\x1bn\x1bm\x1bE')
+                assert result.returncode == 0 and result.stdout == legacy
             for failure in (1, 2, 3, 4):
                 result = subprocess.run([str(work / 'probe'), str(failure)],
                                         capture_output=True)
                 assert result.returncode == 1, (terminal, failure, result.stderr)
                 assert b'Unable to write terminal output!' in result.stderr
-                assert b'keys restored' in result.stderr
             print(f'VT{terminal} PASS: 1920 cursor positions, all byte values, '
                   'buffered ordering, flush/write/short-write errors')
 

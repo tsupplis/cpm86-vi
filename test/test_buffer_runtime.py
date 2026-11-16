@@ -103,6 +103,8 @@ int main(int argc, char **argv) {
 #endif
     REQUIRE(vi_yank_init());
     REQUIRE(vi_yank_capacity() == FILELENG);
+    atexit(vi_key_close);
+    vi_key_init(windrefreshcursor);
     windinit();
     hexchars();
     vi_file_name = strsave("INPUT.TXT");
@@ -180,7 +182,7 @@ int main(int argc, char **argv) {
         REQUIRE(spare[i] == 'Z');
     free(spare);
     clearlastmess();
-    vi_key_exit();
+    vi_key_close();
     vi_yank_close();
     report = fopen("RESULT.TXT", "w");
     REQUIRE(report != NULL);

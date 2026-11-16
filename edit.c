@@ -7,124 +7,11 @@
 #include "stevie.h"
 #include "keyboard.h"
 
-#if defined(__MSDOS__)
-#define __PCBIOS__
-#endif
-
 static void donormal(int c);
 static void insertchar(int c);
 static int insertroom(int n, int reserve_eof);
 static int insertbyte(int c, int reserve_eof);
 static int gethexchar(void);
-
-/* ------------------------------------------------------------------ */
-/* Raw keyboard input                                                  */
-/* ------------------------------------------------------------------ */
-#if defined(__PCBIOS__)
-
-/* One pending byte, for the second half of a synthesized ESC sequence. */
-static int pending = -1;
-
-/* INT 16h AH=0: wait for a keystroke, return AH=scan code, AL=ASCII in AX. */
-static int bioskey(void) {
-#include "bioskey.asm"
-}
-
-/* INT 16h AH=1: non-zero if a keystroke is waiting (doesn't consume it). */
-static int keyready(void) {
-#include "keyready.asm"
-}
-
-static int getch(int wait) {
-    static char scans[] = "\110\120\115\113\107\111\122\121\117\123";
-    static char translated[] = "ABCDHIL\n\032\177";
-    int c, al, ah;
-
-    if (pending >= 0) {
-        c = pending;
-        pending = -1;
-        return c;
-    }
-    for (;;) {
-        /* Don't block in INT 16h: CP/M-86's background clock/status
-         * update can reposition the BIOS cursor while we're blocked,
-         * with no chance for us to correct it until a key arrives.
-         * Poll instead, re-asserting our cursor position every time
-         * around, so any interference is fought at high frequency
-         * instead of just once, best-effort, after the fact. */
-        while (!keyready()) {
-            if (!wait)
-                return -1;
-            windrefreshcursor();
-        }
-        c = bioskey();
-        al = c & 0xff;
-        ah = (c >> 8) & 0xff;
-        if (al != 0)
-            return al;
-        /* Extended key: no ASCII, decode the BIOS scan code in AH. */
-        for (al = 0; al < 10; al++) {
-            if (ah != (unsigned char)scans[al])
-                continue;
-            c = translated[al];
-            if (al >= 7)
-                return c;
-            pending = c;
-            return 27;
-        }
-    }
-}
-
-#elif defined(__VTCMD__)
-
-#define GETCH_BUFLEN 64
-static char getch_buffer[GETCH_BUFLEN];
-static int getch_size, getch_offset;
-
-static int getch(int wait) {
-    int c, d;
-    if (getch_size > 0) {
-        c = (unsigned char)getch_buffer[getch_offset];
-        getch_size--;
-        getch_offset = (getch_offset + 1) % GETCH_BUFLEN;
-        return c;
-    }
-    while (!(c = bdos(6, 0xFF)))
-        if (!wait)
-            return -1;
-    while (getch_size < GETCH_BUFLEN && (d = bdos(6, 0xFF))) {
-        getch_buffer[(getch_offset + getch_size) % GETCH_BUFLEN] = d;
-        getch_size++;
-    }
-    return c;
-}
-
-#endif /* __PCBIOS__ / __VTCMD__ */
-
-/* OS-independent wrapper around whichever getch() is active above. */
-static int peeked = -1;
-int windgetc(void) {
-    int c;
-    if (peeked >= 0) {
-        c = peeked;
-        peeked = -1;
-        return c;
-    }
-    if (vi_key_concurrent()) return vi_key_read();
-    return getch(1);
-}
-
-int windpeek(void)
-{
-    if (peeked >= 0)
-        return peeked;
-    if (vi_key_concurrent()) {
-        if (vi_key_ready())
-            peeked = vi_key_read();
-    } else
-        peeked = getch(0);
-    return peeked;
-}
 
 void edit(void) {
     int c, c1, c2;
@@ -169,131 +56,15 @@ void edit(void) {
             windrefresh();
             c = vgetc();
             switch (vi_state) {
-            case NORMAL:
-                /* We're in the normal (non-insert) mode. */
-                if (c == 27) {
-                    /* VT52 and the DOS BIOS key mapping both send a lone ESC
-                     * followed directly by a letter; VT100/ANSI sends ESC '['.
-                     */
-#if defined(__VT52__) || defined(__PCBIOS__)
-                    vi_state = NORMAL_ESCAPE;
-#elif defined(__VT100__)
-                    vi_state = BRACKET_ESCAPE;
-#endif
+            case NORMAL: {
+                int reset_count;
+                c = vi_key_decode_command(c, &reset_count);
+                if (reset_count) vi_renum = 0;
+                if (c < 0)
                     break;
-                }
-#if defined(__CPM86__)
-                if (c == 0x11) {
-                    vi_state = NORMAL_11;
-                    break;
-                }
-#endif
-                /* End and Page-Down arrive as bare bytes, with no ESC prefix */
-                if (c == '\032') { /* End key -> end of line */
-                    vi_renum = 0;
-                    normal('$');
-                    break;
-                }
-                if (c == '\n') { /* Page-Down key -> forward 1 screen */
-                    vi_renum = 0;
-                    normal(06);
-                    break;
-                }
-#if defined(__CPM86__)
-                switch (c) {
-                case 0x13:
-                    c = 'h';
-                    break;
-                case 0x04:
-                    c = 'l';
-                    break;
-                case 0x05:
-                    c = 'k';
-                    break;
-                case 0x18:
-                    c = 'j';
-                    break;
-                case 0x03:
-                    c = 06;
-                    break;
-                case 0x12:
-                    c = 02;
-                    break;
-
-                default:
-                    break;
-                }
-#endif
-
-                donormal(c);
-                break;
-#if defined(__CPM86__)
-            case NORMAL_11:
-                /* Handle the special case for CPM86 when c==0x11 */
-                switch (c) {
-                case 'E':
-                    donormal('0');
-                    break;
-                case 'X':
-                    donormal('$');
-                    break;
-                default:
-                    break;
-                }
-                vi_state = NORMAL;
-                break;
-#endif
-            case BRACKET_ESCAPE:
-                /* A lone ESC (not followed by '[') is just the usual */
-                /* harmless "make sure we're in Normal mode" keystroke; */
-                /* the character that follows must still be executed. */
-                if (c == '[') {
-                    vi_state = NORMAL_ESCAPE;
-                    vi_renum = 0;
-                    break;
-                }
-                vi_state = NORMAL;
-                if (c == 27)
-                    vi_state = BRACKET_ESCAPE;
+                if (reset_count)
+                    normal(c);
                 else
-                    donormal(c);
-                break;
-            case NORMAL_ESCAPE: {
-                int d = 0;
-                switch (c) {
-                case 'A':
-                    d = 'k';
-                    break;
-                case 'B':
-                    d = 'j';
-                    break;
-                case 'C':
-                    d = 'l';
-                    break;
-                case 'D':
-                    d = 'h';
-                    break;
-                case 'H': /* Home key -> beginning of line */
-                    d = '0';
-                    break;
-                case 'I': /* Page Up key -> back 1 screen */
-                    d = 02;
-                    break;
-                }
-                vi_state = NORMAL;
-                if (d) {
-                    vi_renum = 0;
-                    normal(d);
-                }
-                /* Same as above: don't drop a keystroke that turns */
-                /* out not to be part of an escape sequence. */
-                else if (c == 27) {
-#if defined(__VT52__) || defined(__PCBIOS__)
-                    vi_state = NORMAL_ESCAPE;
-#elif defined(__VT100__)
-                    vi_state = BRACKET_ESCAPE;
-#endif
-                } else
                     donormal(c);
             } break;
             case INSERT:
@@ -527,7 +298,7 @@ static void insertchar(int c)
             if (physical) {
                 if (n == 2)
                     break;
-                c = windpeek();
+                c = vi_key_peek();
                 if (c < ' ' || c >= 127)
                     break;
             } else {

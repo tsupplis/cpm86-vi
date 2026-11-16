@@ -52,38 +52,38 @@ all: vicp52.cmd vicp100.cmd vicpbios.cmd \
 # --------------------------------------------------------------------
 # Binary Link Targets
 # --------------------------------------------------------------------
-vicp52.cmd: $(SHARED_OBJS) yankcp.o cmdline.o savecp.o edtcp52.o wincp52.o keycp.o keyos.o os.o
+vicp52.cmd: $(SHARED_OBJS) yankcp.o cmdline.o savecp.o edit.o wincp52.o keycp52.o keyos.o os.o
 	$(LD) $(CPM86_LDFLAGS) -o $@ $(filter %.o,$^)
 	$(CMDMOD) -t DATA -n f000 -m 10000 $@ 1
 	$(CMDMOD) -t EXTRA -n 10000 -m 10000 $@ 2
 
-vicp100.cmd: $(SHARED_OBJS) yankcp.o cmdline.o savecp.o edtcp100.o wincp100.o keycp.o keyos.o os.o
+vicp100.cmd: $(SHARED_OBJS) yankcp.o cmdline.o savecp.o edit.o wincp100.o keycp100.o keyos.o os.o
 	$(LD) $(CPM86_LDFLAGS) -o $@ $(filter %.o,$^)
 	$(CMDMOD) -t DATA -n f000 -m 10000 $@ 1
 	$(CMDMOD) -t EXTRA -n 10000 -m 10000 $@ 2
 
 # CP/M-86 binary using the PC BIOS window/keyboard implementation
-vicpbios.cmd: $(SHARED_OBJS) yankcp.o cmdline.o savecp.o edtcpbio.o wincpbio.o keycp.o keyos.o os.o
+vicpbios.cmd: $(SHARED_OBJS) yankcp.o cmdline.o savecp.o edit.o wincpbio.o keycpbio.o keybios.o vidbios.o keyos.o os.o
 	$(LD) $(CPM86_LDFLAGS) -o $@ $(filter %.o,$^)
 	$(CMDMOD) -t DATA -n f000 -m 10000 $@ 1
 	$(CMDMOD) -t EXTRA -n 10000 -m 10000 $@ 2
 
 vicp52.cmd vicp100.cmd vicpbios.cmd: Makefile
 
-vid1bios.com: $(TINY_OBJS) yankcopy.o yankd1c.o
+vid1bios.com: $(TINY_OBJS) keybios.o vidbios.o yankcopy.o yankd1c.o
 	$(LD) $(DOS11_LDFLAGS) -o $@ $^
 
-vid1bios.exe: $(SHARED_OBJS) yankd11.o cmddos.o savedos.o edtd1bio.o wind1bio.o keydos.o
+vid1bios.exe: $(SHARED_OBJS) yankd11.o cmddos.o savedos.o edit.o wind1bio.o keydos.o keybios.o vidbios.o
 	$(LD) $(DOS11_LDFLAGS) -o $@ $^
 
-vid2bios.exe: $(SHARED_OBJS) yankd20.o cmddos.o savedos.o edtd2bio.o wind2bio.o keydos.o
+vid2bios.exe: $(SHARED_OBJS) yankd20.o cmddos.o savedos.o edit.o wind2bio.o keydos.o keybios.o vidbios.o
 	$(LD) $(DOS20_LDFLAGS) -o $@ $^
 
 # Scratch diagnostics for BIOS cursor positioning
-curstest.cmd: curstest.o wincpbio.o keycp.o keyos.o os.o
+curstest.cmd: curstest.o wincpbio.o keycpbio.o keybios.o vidbios.o keyos.o os.o
 	$(LD) $(CPM86_LDFLAGS) -o $@ $(filter %.o,$^)
 
-curstest.com: curstestdos.o wind1bio.o keydos.o
+curstest.com: curstestdos.o wind1bio.o keydos.o keybios.o vidbios.o
 	$(LD) $(DOS11_LDFLAGS) -o $@ $^
 
 # --------------------------------------------------------------------
@@ -150,34 +150,22 @@ normal.o: normal.c
 	$(CC) $(CFLAGS) -c -o $@ normal.c
 
 # --------------------------------------------------------------------
-# Compilation Rules: Terminal & BIOS edit/window Variants
+# Compilation Rules: Generic Editor and Display Variants
 # --------------------------------------------------------------------
-edtcp52.o: edit.c
-	$(CC) $(CFLAGS) -target=cpm86 -D__VTCMD__ -D__VT52__ -c -o $@ $<
+edit.o: edit.c keyboard.h stevie.h
+	$(CC) $(CFLAGS) -c -o $@ $<
 
 wincp52.o: window.c gitver.h
 	$(CC) $(CFLAGS) -target=cpm86 -D__VTCMD__ -D__VT52__ -c -o $@ $<
 
-edtcp100.o: edit.c
-	$(CC) $(CFLAGS) -target=cpm86 -D__VTCMD__ -D__VT100__ -c -o $@ $<
-
 wincp100.o: window.c gitver.h
 	$(CC) $(CFLAGS) -target=cpm86 -D__VTCMD__ -D__VT100__ -c -o $@ $<
-
-edtcpbio.o: edit.c
-	$(CC) $(CFLAGS) -target=cpm86 -D__PCBIOS__ -c -o $@ $<
 
 wincpbio.o: window.c gitver.h
 	$(CC) $(CFLAGS) -target=cpm86 -D__PCBIOS__ -c -o $@ $<
 
-edtd1bio.o: edit.c
-	$(CC) $(CFLAGS) -target=dos1 -c -o $@ $<
-
 wind1bio.o: window.c gitver.h
 	$(CC) $(CFLAGS) -target=dos1 -c -o $@ $<
-
-edtd2bio.o: edit.c
-	$(CC) $(CFLAGS) -target=dos2 -c -o $@ $<
 
 wind2bio.o: window.c gitver.h
 	$(CC) $(CFLAGS) -target=dos2 -c -o $@ $<
@@ -185,14 +173,26 @@ wind2bio.o: window.c gitver.h
 # --------------------------------------------------------------------
 # Compilation Rules: Keyboard, OS & I/O Adapters
 # --------------------------------------------------------------------
-keycp.o: keyboard.c keyboard.h keyos.h
-	$(CC) $(CFLAGS) -target=cpm86 -c -o $@ keyboard.c
+keycp52.o: keyboard.c keyboard.h keyos.h
+	$(CC) $(CFLAGS) -target=cpm86 -D__VTCMD__ -D__VT52__ -c -o $@ keyboard.c
 
-keydos.o: keyboard.c keyboard.h
-	$(CC) $(CFLAGS) -c -o $@ keyboard.c
+keycp100.o: keyboard.c keyboard.h keyos.h
+	$(CC) $(CFLAGS) -target=cpm86 -D__VTCMD__ -D__VT100__ -c -o $@ keyboard.c
+
+keycpbio.o: keyboard.c keyboard.h keyos.h keybios.h
+	$(CC) $(CFLAGS) -target=cpm86 -D__PCBIOS__ -c -o $@ keyboard.c
+
+keydos.o: keyboard.c keyboard.h keybios.h
+	$(CC) $(CFLAGS) -target=dos2 -c -o $@ keyboard.c
 
 keyos.o: keyos.c keyos.h
 	$(CC) $(CFLAGS) -c -o $@ keyos.c
+
+keybios.o: keybios.asm
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+vidbios.o: vidbios.asm
+	$(CC) $(CFLAGS) -c -o $@ $<
 
 os.o: os.asm
 	$(CC) $(CFLAGS) -c -o $@ $<
@@ -245,27 +245,26 @@ cmdd1.o: cmdline.c
 saved1.o: save.c
 edttiny.o: edit.c
 wintiny.o: window.c
-keytiny.o: keyboard.c
+keytiny.o: keyboard.c keybios.h
 
 # Tiny C objects never share compilation with the full-featured formats.
 $(TINY_OBJS): stevie.h keyboard.h yankmem.h save.h Makefile
 	$(CC) $(CFLAGS) -DVI_TINY -target=dos1 -c -o $@ $(filter %.c,$^)
 
-wintiny.o: gitver.h windrun.asm
+wintiny.o: gitver.h vidbios.h
 
 # --------------------------------------------------------------------
 # Header Dependencies
 # --------------------------------------------------------------------
-main.o edtcp52.o edtcp100.o edtcpbio.o edtd1bio.o edtd2bio.o \
-wincp52.o wincp100.o wincpbio.o wind1bio.o wind2bio.o: keyboard.h
+main.o edit.o: keyboard.h
 
 main.o: save.h
 
-$(SHARED_OBJS) cmdline.o cmddos.o edtcp52.o edtcp100.o edtcpbio.o edtd1bio.o edtd2bio.o \
+$(SHARED_OBJS) cmdline.o cmddos.o edit.o \
 wincp52.o wincp100.o wincpbio.o wind1bio.o wind2bio.o: stevie.h
 
 wincp52.o wincp100.o wincpbio.o: keyos.h
-wincpbio.o wind1bio.o wind2bio.o: windrun.asm
+wincpbio.o wind1bio.o wind2bio.o: vidbios.h
 main.o misccmds.o: yankmem.h
 
 # --------------------------------------------------------------------

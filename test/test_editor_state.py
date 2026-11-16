@@ -27,6 +27,7 @@ HARNESS = r'''
 #include <string.h>
 #include <setjmp.h>
 #include "stevie.h"
+#include "keyboard.h"
 #include "yankmem.h"
 
 unsigned char vi_char_width[256];
@@ -57,13 +58,13 @@ void screenclear(void) {}
 void beep(void) {}
 void help(void) {}
 void getout(void) { quit_calls++; }
-void vi_key_exit(void) { assert(0); }
+void vi_key_close(void) { assert(0); }
 char *viversion(void) { return "test"; }
-int windgetc(void) {
+int vi_key_read(void) {
     if(editing && (!input || !*input)) longjmp(input_done, 1);
     assert(input && *input); return (unsigned char)*input++;
 }
-int windpeek(void) {
+int vi_key_peek(void) {
     return keyboard_burst && input && *input ? (unsigned char)*input : -1;
 }
 void beginline(void) {
@@ -1262,6 +1263,10 @@ static void *edit_memmove(void *to, const void *from, size_t length) {
               'static int gethexchar(void);\n'
               'static int insertroom(int n, int reserve_eof);\n'
               'static int insertbyte(int c, int reserve_eof);\n')
+    editor += ('enum { KEY_COMMAND, KEY_ANSI_PREFIX, KEY_ESCAPE, KEY_CPM_PREFIX };\n'
+               'static int ansi_keys, command_state;\n')
+    editor += function((ROOT / 'keyboard.c').read_text(),
+                       'int vi_key_decode_command(int c, int *reset_count)') + '\n'
     for signature in ('void edit(void)', 'static void donormal(int c)\n',
                       'static int insertroom(int n, int reserve_eof)\n',
                       'static int insertbyte(int c, int reserve_eof)\n',

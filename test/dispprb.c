@@ -315,6 +315,8 @@ int main(int argc, char **argv)
 
     if (!vi_yank_init())
         return 1;
+    atexit(vi_key_close);
+    vi_key_init(windrefreshcursor);
     windinit();
     screenalloc();
     for (mode = 0; mode < 4; mode++) {

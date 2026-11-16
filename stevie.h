@@ -19,10 +19,7 @@
 #define APPEND 3
 #define FORWARD 4
 #define BACKWARD 5
-#define NORMAL_ESCAPE 6
-#define BRACKET_ESCAPE 7
 #define REPLACE 8
-#define NORMAL_11 9
 #define WORDSEP " \t\n()[]{},;:'\"-="
 
 #define CHANGED vi_changed = 1
@@ -114,8 +111,6 @@ int vpeekc(void);
 int anyinput(void);
 
 /* edit.c */
-int windgetc(void);
-int windpeek(void);
 void edit(void);
 void getout(void);
 void cursupdate(void);

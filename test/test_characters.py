@@ -102,6 +102,8 @@ int main(void)
     FILE *report;
     unsigned base, pattern, variant, i, row, start;
     REQUIRE(vi_yank_init());
+    atexit(vi_key_close);
+    vi_key_init(windrefreshcursor);
     windinit();
     screenalloc();
     filealloc();
@@ -146,7 +148,7 @@ int main(void)
         }
     }
 finish:
-    vi_key_exit();
+    vi_key_close();
     vi_yank_close();
     report = fopen("RESULT.TXT", "w");
     if (report == NULL) return 1;
